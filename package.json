@@ -1,0 +1,196 @@
+{
+  "name": "ai-context-orchestrator",
+  "displayName": "AI Context Orchestrator",
+  "description": "Generate project context and launch Claude, Gemini, or Copilot with it.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ai-context-orchestrator.initAI",
+        "title": "AI Context Orchestrator: Init Workflow"
+      },
+      {
+        "command": "ai-context-orchestrator.continueWorkflow",
+        "title": "AI Context Orchestrator: Continue Workflow"
+      },
+      {
+        "command": "ai-context-orchestrator.generateContext",
+        "title": "AI Context Orchestrator: Generate Context File"
+      }
+    ],
+    "configuration": {
+      "title": "AI Context Orchestrator",
+      "properties": {
+        "aiContextOrchestrator.treeDepth": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 6,
+          "description": "Maximum directory depth included in .ai-context.md."
+        },
+        "aiContextOrchestrator.readmePreviewLines": {
+          "type": "number",
+          "default": 20,
+          "minimum": 5,
+          "maximum": 200,
+          "description": "Number of README lines included in the generated context file."
+        },
+        "aiContextOrchestrator.contextFilePreviewLines": {
+          "type": "number",
+          "default": 80,
+          "minimum": 10,
+          "maximum": 400,
+          "description": "Number of lines to include from assistant-specific instruction files such as CLAUDE.md or GEMINI.md."
+        },
+        "aiContextOrchestrator.extraContextFiles": {
+          "type": "array",
+          "default": [
+            "AGENTS.md",
+            "CLAUDE.md",
+            "Claude.md",
+            "claude.md",
+            "COPILOT.md",
+            "Copilot.md",
+            "copilot.md",
+            "GEMINI.md",
+            "Gemini.md",
+            "gemini.md",
+            ".github/copilot-instructions.md"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional workspace-relative files to append into .ai-context.md when present."
+        },
+        "aiContextOrchestrator.showIgnoredDirectories": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show ignored directories such as node_modules in the tree, but mark them as excluded without listing their contents."
+        },
+        "aiContextOrchestrator.maxEntriesPerDirectory": {
+          "type": "number",
+          "default": 40,
+          "minimum": 5,
+          "maximum": 200,
+          "description": "Maximum number of displayed files and directories per folder before the rest are summarized as omitted."
+        },
+        "aiContextOrchestrator.optimizeWithCopilot": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use an available Copilot chat model to rewrite the generated context into a more compact prompt before saving .ai-context.md."
+        },
+        "aiContextOrchestrator.modelFamily": {
+          "type": "string",
+          "default": "",
+          "description": "Optional Copilot model family passed to vscode.lm.selectChatModels, for example gpt-4o. Leave empty to use any available Copilot model."
+        },
+        "aiContextOrchestrator.autoGenerateOnStartup": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically generate .ai-context.md when a workspace opens. External assistants are not launched automatically."
+        },
+        "aiContextOrchestrator.defaultPreset": {
+          "type": "string",
+          "default": "build",
+          "enum": [
+            "explore",
+            "plan",
+            "build",
+            "debug",
+            "review",
+            "test"
+          ],
+          "description": "Default workflow preset used when the extension auto-generates a context pack."
+        },
+        "aiContextOrchestrator.defaultProvider": {
+          "type": "string",
+          "default": "copilot",
+          "enum": [
+            "claude",
+            "gemini",
+            "copilot"
+          ],
+          "description": "Default provider target for generated workflow plans."
+        },
+        "aiContextOrchestrator.contextRefreshMode": {
+          "type": "string",
+          "default": "smart-refresh",
+          "enum": [
+            "reuse",
+            "smart-refresh",
+            "full-rebuild"
+          ],
+          "description": "How workflow runs should refresh the context pack: reuse the existing file, compare a workspace signature, or always rebuild."
+        },
+        "aiContextOrchestrator.costProfile": {
+          "type": "string",
+          "default": "balanced",
+          "enum": [
+            "fast",
+            "balanced",
+            "strong"
+          ],
+          "description": "Default model cost policy used to prepare workflow roles and optimization behavior."
+        },
+        "aiContextOrchestrator.generateNativeArtifacts": {
+          "type": "boolean",
+          "default": true,
+          "description": "Generate provider-native instruction, agent, and skill files alongside .ai-context.md."
+        },
+        "aiContextOrchestrator.enabledProviders": {
+          "type": "array",
+          "default": [
+            "claude",
+            "gemini",
+            "copilot"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "gemini",
+              "copilot"
+            ]
+          },
+          "description": "Providers shown in the workflow picker. Remove entries to hide providers you do not use."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.109.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.56.1",
+    "eslint": "^9.39.3",
+    "esbuild": "^0.27.3",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
