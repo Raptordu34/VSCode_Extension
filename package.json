@@ -26,8 +26,178 @@
       {
         "command": "ai-context-orchestrator.generateContext",
         "title": "AI Context Orchestrator: Generate Context File"
+      },
+      {
+        "command": "ai-context-orchestrator.openWorkflowBrief",
+        "title": "AI Context Orchestrator: Open Workflow Brief"
+      },
+      {
+        "command": "ai-context-orchestrator.openLatestWorkflowHandoff",
+        "title": "AI Context Orchestrator: Open Latest Workflow Handoff"
+      },
+      {
+        "command": "ai-context-orchestrator.openContextFile",
+        "title": "AI Context Orchestrator: Open Context File"
+      },
+      {
+        "command": "ai-context-orchestrator.openWorkflowSession",
+        "title": "AI Context Orchestrator: Open Workflow Session"
+      },
+      {
+        "command": "ai-context-orchestrator.openWorkflowTreeNode",
+        "title": "AI Context Orchestrator: Open Workflow Node"
+      },
+      {
+        "command": "ai-context-orchestrator.previewWorkflowPrompt",
+        "title": "AI Context Orchestrator: Preview Workflow Prompt"
+      },
+      {
+        "command": "ai-context-orchestrator.copyWorkflowPrompt",
+        "title": "AI Context Orchestrator: Copy Workflow Prompt"
+      },
+      {
+        "command": "ai-context-orchestrator.setSelectedStagePrepared",
+        "title": "AI Context Orchestrator: Mark Selected Stage Prepared"
+      },
+      {
+        "command": "ai-context-orchestrator.setSelectedStageInProgress",
+        "title": "AI Context Orchestrator: Mark Selected Stage In Progress"
+      },
+      {
+        "command": "ai-context-orchestrator.setSelectedStageCompleted",
+        "title": "AI Context Orchestrator: Mark Selected Stage Completed"
+      },
+      {
+        "command": "ai-context-orchestrator.refreshWorkflowUi",
+        "title": "AI Context Orchestrator: Refresh Workflow UI",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ai-context-orchestrator.refreshProviderStatus",
+        "title": "AI Context Orchestrator: Refresh Provider Status",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "ai-context-orchestrator.switchClaudeAccount",
+        "title": "AI Context Orchestrator: Switch Claude Account",
+        "icon": "$(account)"
+      },
+      {
+        "command": "ai-context-orchestrator.manageProviderAccounts",
+        "title": "AI Context Orchestrator: Manage Provider Accounts",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "ai-context-orchestrator.switchProviderAccount",
+        "title": "AI Context Orchestrator: Switch Provider Account",
+        "icon": "$(account)"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aiContextOrchestrator",
+          "title": "AI Workflow",
+          "icon": "media/workflow.svg"
+        }
+      ]
+    },
+    "views": {
+      "aiContextOrchestrator": [
+        {
+          "id": "aiContextOrchestrator.workflowControl",
+          "name": "Workflow Control",
+          "type": "webview",
+          "icon": "$(hubot)"
+        },
+        {
+          "id": "aiContextOrchestrator.workflowState",
+          "name": "Workflow State",
+          "icon": "$(list-tree)"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "ai-context-orchestrator.initAI",
+          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ai-context-orchestrator.continueWorkflow",
+          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ai-context-orchestrator.refreshWorkflowUi",
+          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "group": "navigation@3"
+        },
+        {
+          "command": "ai-context-orchestrator.refreshProviderStatus",
+          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "group": "navigation@4"
+        },
+        {
+          "command": "ai-context-orchestrator.previewWorkflowPrompt",
+          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "group": "navigation@5"
+        },
+        {
+          "command": "ai-context-orchestrator.switchClaudeAccount",
+          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "group": "navigation@6"
+        },
+        {
+          "command": "ai-context-orchestrator.manageProviderAccounts",
+          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "group": "navigation@7"
+        },
+        {
+          "command": "ai-context-orchestrator.setSelectedStageCompleted",
+          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "group": "navigation@8"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "ai-context-orchestrator.openWorkflowTreeNode",
+          "when": "view == aiContextOrchestrator.workflowState && viewItem == workflow-file",
+          "group": "inline"
+        },
+        {
+          "command": "ai-context-orchestrator.openWorkflowTreeNode",
+          "when": "view == aiContextOrchestrator.workflowState && (viewItem == workflow-stage || viewItem == workflow-stage-current)",
+          "group": "inline"
+        },
+        {
+          "command": "ai-context-orchestrator.continueWorkflow",
+          "when": "view == aiContextOrchestrator.workflowState && (viewItem == workflow-session || viewItem == workflow-stage-current)",
+          "group": "navigation"
+        },
+        {
+          "command": "ai-context-orchestrator.refreshWorkflowUi",
+          "when": "view == aiContextOrchestrator.workflowState",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ai-context-orchestrator.setSelectedStageInProgress",
+          "when": "view == aiContextOrchestrator.workflowState && (viewItem == workflow-stage || viewItem == workflow-stage-current)",
+          "group": "status@1"
+        },
+        {
+          "command": "ai-context-orchestrator.setSelectedStageCompleted",
+          "when": "view == aiContextOrchestrator.workflowState && (viewItem == workflow-stage || viewItem == workflow-stage-current)",
+          "group": "status@2"
+        },
+        {
+          "command": "ai-context-orchestrator.setSelectedStagePrepared",
+          "when": "view == aiContextOrchestrator.workflowState && (viewItem == workflow-stage || viewItem == workflow-stage-current)",
+          "group": "status@3"
+        }
+      ]
+    },
     "configuration": {
       "title": "AI Context Orchestrator",
       "properties": {
@@ -93,6 +263,136 @@
           "type": "string",
           "default": "",
           "description": "Optional Copilot model family passed to vscode.lm.selectChatModels, for example gpt-4o. Leave empty to use any available Copilot model."
+        },
+        "aiContextOrchestrator.defaultClaudeModel": {
+          "type": "string",
+          "default": "claude-sonnet-4-6",
+          "enum": [
+            "claude-sonnet-4-6",
+            "claude-opus-4-6"
+          ],
+          "description": "Default Claude model proposed in workflow setup and provider launch previews."
+        },
+        "aiContextOrchestrator.defaultGeminiModel": {
+          "type": "string",
+          "default": "gemini-2.5-flash",
+          "enum": [
+            "gemini-2.5-flash",
+            "gemini-2.5-pro",
+            "gemini-3.1-flash-lite-preview",
+            "gemini-3-flash-preview",
+            "gemini-3.1-pro-preview"
+          ],
+          "description": "Default Gemini model proposed in workflow setup and launch previews."
+        },
+        "aiContextOrchestrator.defaultClaudeEffort": {
+          "type": "string",
+          "default": "medium",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "description": "Default Claude effort level used for Sonnet 4.6 and Opus 4.6 workflows."
+        },
+        "aiContextOrchestrator.claudeAccounts": {
+          "type": "array",
+          "default": [],
+          "description": "Claude account definitions used for direct account switching and quota inspection. quotaCommand should print JSON with summary, detail, availability, and metrics.",
+          "items": {
+            "type": "object",
+            "required": [
+              "label",
+              "configDir"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Stable identifier for the Claude account."
+              },
+              "label": {
+                "type": "string",
+                "description": "Human-readable account name shown in the UI."
+              },
+              "configDir": {
+                "type": "string",
+                "description": "Absolute CLAUDE_CONFIG_DIR for this account."
+              },
+              "adminApiKeyEnvVar": {
+                "type": "string",
+                "description": "Optional environment variable name containing an Anthropic Admin API key."
+              },
+              "workspaceId": {
+                "type": "string",
+                "description": "Optional Anthropic workspace identifier reserved for future analytics filtering."
+              },
+              "apiKeyId": {
+                "type": "string",
+                "description": "Optional Anthropic API key identifier reserved for future analytics filtering."
+              },
+              "quotaCommand": {
+                "type": "string",
+                "description": "Optional shell command that outputs JSON quota status for this account. CLAUDE_CONFIG_DIR is injected into the command environment."
+              },
+              "notes": {
+                "type": "string",
+                "description": "Optional note shown in the provider status UI for this account."
+              }
+            }
+          }
+        },
+        "aiContextOrchestrator.activeClaudeAccountId": {
+          "type": "string",
+          "default": "",
+          "description": "Identifier of the currently active Claude account for UI state and future launches."
+        },
+        "aiContextOrchestrator.geminiAccounts": {
+          "type": "array",
+          "default": [],
+          "description": "Gemini account definitions used for linked account management and optional env-based launches.",
+          "items": {
+            "type": "object",
+            "required": [
+              "label"
+            ],
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "configDir": { "type": "string" },
+              "authMode": { "type": "string" },
+              "apiKeyEnvVar": { "type": "string" },
+              "quotaCommand": { "type": "string" },
+              "accountHint": { "type": "string" },
+              "notes": { "type": "string" }
+            }
+          }
+        },
+        "aiContextOrchestrator.activeGeminiAccountId": {
+          "type": "string",
+          "default": "",
+          "description": "Identifier of the currently active Gemini account for UI state and future launches."
+        },
+        "aiContextOrchestrator.copilotAccounts": {
+          "type": "array",
+          "default": [],
+          "description": "Copilot account references tracked by the extension UI for workflow ownership and labeling.",
+          "items": {
+            "type": "object",
+            "required": [
+              "label"
+            ],
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "accountHint": { "type": "string" },
+              "notes": { "type": "string" }
+            }
+          }
+        },
+        "aiContextOrchestrator.activeCopilotAccountId": {
+          "type": "string",
+          "default": "",
+          "description": "Identifier of the currently active Copilot account reference in the orchestrator UI."
         },
         "aiContextOrchestrator.autoGenerateOnStartup": {
           "type": "boolean",
