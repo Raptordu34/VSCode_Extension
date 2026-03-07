@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { Logger } from "../../core/logger.js";
 import { CONTEXT_FILE_NAME, GENERATED_SECTION_START, GENERATED_SECTION_END, WORKFLOW_SESSION_FILE, WORKFLOW_BRIEF_FILE, WORKFLOW_STAGE_DIRECTORY, WORKFLOW_STATE_DIRECTORY } from "../workflow/constants.js";
 import type { ContextMetadata, OptimizationResult, ExtensionConfiguration, AdditionalContextResult, CostProfile, WorkflowExecutionPlan, PackageDetails, WorkflowPreset, ProviderTarget, ContextRefreshMode, ClaudeEffortLevel, WorkflowSessionState, WorkflowBrief, ProjectContext, ArtifactPlan, WorkflowStageRecord } from "../workflow/types.js";
 import { readUtf8, buildWorkspaceUri, isIgnoredDirectory, normalizeWorkspaceRelativePath, shouldIncludeEntry } from "../../core/workspace.js";
@@ -263,54 +264,69 @@ export async function buildWorkspaceTree(folder: vscode.Uri, depth: number, conf
 		return [];
 	}
 
-	const entries = await vscode.workspace.fs.readDirectory(folder);
+	let entries: [string, vscode.FileType][] = [];
+	try {
+		entries = await vscode.workspace.fs.readDirectory(folder);
+	} catch (error) {
+		Logger.warn(`Failed to read directory ${folder.fsPath}: ${error instanceof Error ? error.message : String(error)}`);
+		return [];
+	}
+
 	const sortedEntries = entries
 		.sort(([leftName, leftType], [rightName, rightType]) => {
 			if (leftType !== rightType) {
 				return leftType === vscode.FileType.Directory ? -1 : 1;
 			}
-
 			return leftName.localeCompare(rightName);
 		});
 
-	const lines: string[] = [];
 	let includedEntries = 0;
 	let omittedEntries = 0;
 
-	for (const [name, type] of sortedEntries) {
-		const prefix = `${'  '.repeat(depth)}- `;
+	// Prepare entries to process
+	const validEntries = sortedEntries.filter(([name, type]) => {
 		if (type === vscode.FileType.Directory && isIgnoredDirectory(name)) {
-			if (configuration.showIgnoredDirectories) {
-				lines.push(`${prefix}${name}/ (excluded)`);
-			}
-			continue;
+			return true; // Keep to show as excluded if needed
 		}
-
 		if (name === CONTEXT_FILE_NAME) {
-			continue;
+			return false;
 		}
-
 		if (!shouldIncludeEntry(name, type, depth)) {
 			omittedEntries += 1;
-			continue;
+			return false;
 		}
-
 		if (includedEntries >= configuration.maxEntriesPerDirectory) {
 			omittedEntries += 1;
-			continue;
+			return false;
 		}
-
 		includedEntries += 1;
-		if (type === vscode.FileType.Directory) {
-			lines.push(`${prefix}${name}/`);
-			if (depth < configuration.treeDepth) {
-				lines.push(...await buildWorkspaceTree(vscode.Uri.joinPath(folder, name), depth + 1, configuration));
+		return true;
+	});
+
+	// Process them in parallel
+	const prefix = `${'  '.repeat(depth)}- `;
+	const linesPromises = validEntries.map(async ([name, type]) => {
+		if (type === vscode.FileType.Directory && isIgnoredDirectory(name)) {
+			if (configuration.showIgnoredDirectories) {
+				return [`${prefix}${name}/ (excluded)`];
 			}
-			continue;
+			return [];
 		}
 
-		lines.push(`${prefix}${name}`);
-	}
+		if (type === vscode.FileType.Directory) {
+			const dirLines = [`${prefix}${name}/`];
+			if (depth < configuration.treeDepth) {
+				const subLines = await buildWorkspaceTree(vscode.Uri.joinPath(folder, name), depth + 1, configuration);
+				dirLines.push(...subLines);
+			}
+			return dirLines;
+		}
+
+		return [`${prefix}${name}`];
+	});
+
+	const resolvedLinesArrays = await Promise.all(linesPromises);
+	const lines = resolvedLinesArrays.flat();
 
 	if (omittedEntries > 0) {
 		lines.push(`${'  '.repeat(depth)}- ... ${omittedEntries} additional entries omitted`);
@@ -330,7 +346,6 @@ export function getOptimizationSelector(costProfile: CostProfile): { vendor: str
 	}
 }
 export async function gatherProjectContext(
-	outputChannel: vscode.OutputChannel,
 	isStartupAutoGeneration: boolean,
 	workflowPlan: WorkflowExecutionPlan,
 	workspaceFolderOverride?: vscode.WorkspaceFolder
@@ -345,7 +360,7 @@ export async function gatherProjectContext(
 
 	try {
 		if (workflowPlan.refreshMode === 'reuse') {
-			const reusedProjectContext = await tryReuseExistingContext(contextFile, workspaceFolder, workflowPlan, outputChannel, 'Reused existing context file by user request.');
+			const reusedProjectContext = await tryReuseExistingContext(contextFile, workspaceFolder, workflowPlan, 'Reused existing context file by user request.');
 			if (reusedProjectContext) {
 				return reusedProjectContext;
 			}
@@ -360,7 +375,7 @@ export async function gatherProjectContext(
 			collectKeyFiles(workspaceFolder.uri)
 		]);
 
-		const detectedTech = detectTechStack(packageDetails.summary, treeLines, readmeLines);
+		const detectedTech = detectTechStack(packageDetails, treeLines, readmeLines);
 		const signatureSource = [
 			workflowPlan.preset,
 			workflowPlan.provider,
@@ -381,7 +396,6 @@ export async function gatherProjectContext(
 				contextFile,
 				workspaceFolder,
 				workflowPlan,
-				outputChannel,
 				'Smart refresh reused the existing context file because the workspace signature matched.',
 				signature
 			);
@@ -431,13 +445,13 @@ export async function gatherProjectContext(
 		const content = buildContextFileContent(metadata, optimization.content, optimization);
 		const workflowArtifacts = await persistWorkflowArtifacts(workspaceFolder, workflowPlan, metadata, contextFile, artifactPlan, content);
 
-		outputChannel.appendLine(`[context] Generated ${CONTEXT_FILE_NAME} for ${workspaceFolder.name}`);
-		outputChannel.appendLine(`[context] Workflow=${workflowPlan.preset} provider=${workflowPlan.provider} refresh=${workflowPlan.refreshMode} cost=${workflowPlan.costProfile}`);
-		outputChannel.appendLine(`[context] Optimizer requested=${workflowPlan.optimizeWithCopilot} applied=${optimization.applied} model=${optimization.modelName ?? 'n/a'} note=${optimization.reason}`);
+		Logger.info(`Generated ${CONTEXT_FILE_NAME} for ${workspaceFolder.name}`);
+		Logger.info(`Workflow=${workflowPlan.preset} provider=${workflowPlan.provider} refresh=${workflowPlan.refreshMode} cost=${workflowPlan.costProfile}`);
+		Logger.info(`Optimizer requested=${workflowPlan.optimizeWithCopilot} applied=${optimization.applied} model=${optimization.modelName ?? 'n/a'} note=${optimization.reason}`);
 		if (artifactPlan) {
-			outputChannel.appendLine(`[artifacts] Generated ${artifactPlan.files.length} ${workflowPlan.provider} artifact(s)`);
+			Logger.info(`Generated ${artifactPlan.files.length} ${workflowPlan.provider} artifact(s)`);
 		}
-		outputChannel.appendLine(`[workflow] Prepared shared handoff ${workflowArtifacts.stage.stageFile}`);
+		Logger.info(`Prepared shared handoff ${workflowArtifacts.stage.stageFile}`);
 		if (!isStartupAutoGeneration) {
 			void vscode.window.setStatusBarMessage(buildContextGenerationMessage({
 				workspaceFolder,
@@ -469,34 +483,32 @@ export async function gatherProjectContext(
 		};
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		outputChannel.appendLine(`[error] ${message}`);
+		Logger.error(message);
 		vscode.window.showErrorMessage(`Failed to generate ${CONTEXT_FILE_NAME}: ${message}`);
 		return undefined;
 	}
 }
-export function detectTechStack(packageSummary: string, treeLines: string[], readmeLines: string[]): string[] {
+export function detectTechStack(packageDetails: PackageDetails, treeLines: string[], readmeLines: string[]): string[] {
 	const detected = new Set<string>();
-	const summary = packageSummary.toLowerCase();
 	const tree = treeLines.join('\n').toLowerCase();
-	const readme = readmeLines.join('\n').toLowerCase();
-	const combined = `${summary}\n${tree}\n${readme}`;
+	const combinedDeps = { ...packageDetails.dependencies, ...packageDetails.devDependencies };
 
-	if (combined.includes('typescript') || tree.includes('.ts') || tree.includes('.tsx')) {
+	if (combinedDeps['typescript'] || tree.includes('.ts') || tree.includes('.tsx')) {
 		detected.add('TypeScript');
 	}
-	if (combined.includes('react') || tree.includes('.jsx')) {
+	if (combinedDeps['react'] || combinedDeps['react-dom'] || tree.includes('.jsx')) {
 		detected.add('React');
 	}
-	if (summary.includes('@types/vscode')) {
+	if (combinedDeps['@types/vscode']) {
 		detected.add('VS Code Extension');
 	}
-	if (combined.includes('eslint')) {
+	if (combinedDeps['eslint']) {
 		detected.add('ESLint');
 	}
-	if (combined.includes('esbuild')) {
+	if (combinedDeps['esbuild']) {
 		detected.add('esbuild');
 	}
-	if (combined.includes('mocha')) {
+	if (combinedDeps['mocha']) {
 		detected.add('Mocha');
 	}
 	if (tree.includes('index.html') || tree.includes('.html')) {
@@ -505,10 +517,10 @@ export function detectTechStack(packageSummary: string, treeLines: string[], rea
 	if (tree.includes('.css') || tree.includes('.scss')) {
 		detected.add('CSS');
 	}
-	if (tree.includes('.js') || summary.includes('package.json')) {
+	if (Object.keys(combinedDeps).length > 0 || tree.includes('.js')) {
 		detected.add('JavaScript');
 	}
-	if (tree.includes('server.js') || combined.includes('express') || combined.includes('fastify') || combined.includes('koa')) {
+	if (combinedDeps['express'] || combinedDeps['fastify'] || combinedDeps['koa'] || tree.includes('server.js')) {
 		detected.add('Node.js');
 	}
 	if (/\.worker\.(js|ts)/.test(tree)) {
@@ -530,8 +542,8 @@ export async function readPackageDetails(workspaceUri: vscode.Uri): Promise<Pack
 			scripts?: Record<string, string>;
 		};
 
-		const dependencies = formatDependencyList(packageJson.dependencies);
-		const devDependencies = formatDependencyList(packageJson.devDependencies);
+		const dependenciesText = formatDependencyList(packageJson.dependencies);
+		const devDependenciesText = formatDependencyList(packageJson.devDependencies);
 		const scripts = packageJson.scripts
 			? Object.keys(packageJson.scripts)
 				.sort((left, right) => left.localeCompare(right))
@@ -543,16 +555,21 @@ export async function readPackageDetails(workspaceUri: vscode.Uri): Promise<Pack
 				`Name: ${packageJson.name ?? 'unknown'}`,
 				`Version: ${packageJson.version ?? 'unknown'}`,
 				`Description: ${packageJson.description ?? 'n/a'}`,
-				`Dependencies: ${dependencies}`,
-				`Dev dependencies: ${devDependencies}`,
+				`Dependencies: ${dependenciesText}`,
+				`Dev dependencies: ${devDependenciesText}`,
 				`Scripts: ${scripts.length > 0 ? scripts.join(', ') : 'none'}`
 			].join('\n'),
-			scripts
+			scripts,
+			dependencies: packageJson.dependencies ?? {},
+			devDependencies: packageJson.devDependencies ?? {}
 		};
-	} catch {
+	} catch (error) {
+		Logger.warn(`Failed to read package.json: ${error instanceof Error ? error.message : String(error)}`);
 		return {
 			summary: 'package.json not found.',
-			scripts: []
+			scripts: [],
+			dependencies: {},
+			devDependencies: {}
 		};
 	}
 }
@@ -583,7 +600,6 @@ export async function tryReuseExistingContext(
 	contextFile: vscode.Uri,
 	workspaceFolder: vscode.WorkspaceFolder,
 	workflowPlan: WorkflowExecutionPlan,
-	outputChannel: vscode.OutputChannel,
 	reason: string,
 	expectedSignature?: string
 ): Promise<ProjectContext | undefined> {
@@ -625,11 +641,11 @@ export async function tryReuseExistingContext(
 			: undefined;
 		const workflowArtifacts = await persistWorkflowArtifacts(workspaceFolder, workflowPlan, metadata, contextFile, artifactPlan);
 
-		outputChannel.appendLine(`[context] ${reason}`);
+		Logger.info(reason);
 		if (artifactPlan) {
-			outputChannel.appendLine(`[artifacts] Refreshed ${artifactPlan.files.length} ${workflowPlan.provider} artifact(s) while reusing context`);
+			Logger.info(`Refreshed ${artifactPlan.files.length} ${workflowPlan.provider} artifact(s) while reusing context`);
 		}
-		outputChannel.appendLine(`[workflow] Prepared shared handoff ${workflowArtifacts.stage.stageFile}`);
+		Logger.info(`Prepared shared handoff ${workflowArtifacts.stage.stageFile}`);
 
 		return {
 			workspaceFolder,
@@ -648,7 +664,8 @@ export async function tryReuseExistingContext(
 			currentStage: workflowArtifacts.stage,
 			brief: workflowArtifacts.brief
 		};
-	} catch {
+	} catch (error) {
+		Logger.warn(`Failed to reuse context: ${error instanceof Error ? error.message : String(error)}`);
 		return undefined;
 	}
 }

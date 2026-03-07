@@ -83,52 +83,52 @@ suite('createNonce', () => {
 
 suite('detectTechStack', () => {
 	test('detects TypeScript from .ts extension', () => {
-		const stack = detectTechStack('', ['src/index.ts'], []);
+		const stack = detectTechStack({ summary: '', scripts: [], dependencies: {}, devDependencies: {} }, ['src/index.ts'], []);
 		assert.ok(stack.includes('TypeScript'));
 	});
 
 	test('detects React from dependency in summary', () => {
-		const stack = detectTechStack('react', ['src/App.tsx'], []);
+		const stack = detectTechStack({ summary: '', scripts: [], dependencies: { 'react': '18.0.0' }, devDependencies: {} }, ['src/App.tsx'], []);
 		assert.ok(stack.includes('React'));
 	});
 
 	test('does NOT detect React from .tsx alone (no react dep)', () => {
-		const stack = detectTechStack('', ['src/Component.tsx'], []);
+		const stack = detectTechStack({ summary: '', scripts: [], dependencies: {}, devDependencies: {} }, ['src/Component.tsx'], []);
 		assert.ok(!stack.includes('React'));
 	});
 
 	test('detects React from .jsx file without dependency', () => {
-		const stack = detectTechStack('', ['src/App.jsx'], []);
+		const stack = detectTechStack({ summary: '', scripts: [], dependencies: {}, devDependencies: {} }, ['src/App.jsx'], []);
 		assert.ok(stack.includes('React'));
 	});
 
 	test('detects VS Code Extension from @types/vscode in summary', () => {
-		const stack = detectTechStack('@types/vscode devdependencies', [], []);
+		const stack = detectTechStack({ summary: '', scripts: [], dependencies: {}, devDependencies: { '@types/vscode': '^1.0.0' } }, [], []);
 		assert.ok(stack.includes('VS Code Extension'));
 	});
 
 	test('does NOT detect VS Code Extension from "vscode" word alone', () => {
-		const stack = detectTechStack('mentions vscode in readme', [], ['uses vscode']);
+		const stack = detectTechStack({ summary: 'mentions vscode in readme', scripts: [], dependencies: {}, devDependencies: {} }, [], ['uses vscode']);
 		assert.ok(!stack.includes('VS Code Extension'));
 	});
 
 	test('detects Web Workers from .worker.ts file', () => {
-		const stack = detectTechStack('', ['src/my.worker.ts'], []);
+		const stack = detectTechStack({ summary: '', scripts: [], dependencies: {}, devDependencies: {} }, ['src/my.worker.ts'], []);
 		assert.ok(stack.includes('Web Workers'));
 	});
 
 	test('detects Web Workers from .worker.js file', () => {
-		const stack = detectTechStack('', ['dist/worker.worker.js'], []);
+		const stack = detectTechStack({ summary: '', scripts: [], dependencies: {}, devDependencies: {} }, ['dist/worker.worker.js'], []);
 		assert.ok(stack.includes('Web Workers'));
 	});
 
 	test('does NOT detect Web Workers from file named "worker"', () => {
-		const stack = detectTechStack('', ['src/workerUtils.ts', 'src/worker/index.ts'], []);
+		const stack = detectTechStack({ summary: '', scripts: [], dependencies: {}, devDependencies: {} }, ['src/workerUtils.ts', 'src/worker/index.ts'], []);
 		assert.ok(!stack.includes('Web Workers'));
 	});
 
 	test('detects ESLint from summary', () => {
-		const stack = detectTechStack('eslint ^8.0.0', [], []);
+		const stack = detectTechStack({ summary: '', scripts: [], dependencies: { 'eslint': '^8.0.0' }, devDependencies: {} }, [], []);
 		assert.ok(stack.includes('ESLint'));
 	});
 });
