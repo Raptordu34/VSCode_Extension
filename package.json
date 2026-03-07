@@ -56,6 +56,11 @@
         "title": "AI Context Orchestrator: Copy Workflow Prompt"
       },
       {
+        "command": "ai-context-orchestrator.openWorkflowStudio",
+        "title": "AI Context Orchestrator: Open Workflow Studio",
+        "icon": "$(layout-sidebar-right)"
+      },
+      {
         "command": "ai-context-orchestrator.setSelectedStagePrepared",
         "title": "AI Context Orchestrator: Mark Selected Stage Prepared"
       },
@@ -86,6 +91,26 @@
         "command": "ai-context-orchestrator.manageProviderAccounts",
         "title": "AI Context Orchestrator: Manage Provider Accounts",
         "icon": "$(gear)"
+      },
+      {
+        "command": "ai-context-orchestrator.connectProviderAccount",
+        "title": "AI Context Orchestrator: Connect Provider Account",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "ai-context-orchestrator.configureProviderCredential",
+        "title": "AI Context Orchestrator: Configure Provider Credential",
+        "icon": "$(key)"
+      },
+      {
+        "command": "ai-context-orchestrator.runProviderAuthAssist",
+        "title": "AI Context Orchestrator: Run Provider Auth Assist",
+        "icon": "$(unlock)"
+      },
+      {
+        "command": "ai-context-orchestrator.openProviderAccountPortal",
+        "title": "AI Context Orchestrator: Open Provider Account Portal",
+        "icon": "$(globe)"
       },
       {
         "command": "ai-context-orchestrator.switchProviderAccount",
@@ -145,19 +170,24 @@
           "group": "navigation@5"
         },
         {
-          "command": "ai-context-orchestrator.switchClaudeAccount",
+          "command": "ai-context-orchestrator.openWorkflowStudio",
           "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
           "group": "navigation@6"
         },
         {
-          "command": "ai-context-orchestrator.manageProviderAccounts",
+          "command": "ai-context-orchestrator.switchClaudeAccount",
           "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
           "group": "navigation@7"
         },
         {
-          "command": "ai-context-orchestrator.setSelectedStageCompleted",
+          "command": "ai-context-orchestrator.manageProviderAccounts",
           "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
           "group": "navigation@8"
+        },
+        {
+          "command": "ai-context-orchestrator.setSelectedStageCompleted",
+          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "group": "navigation@9"
         }
       ],
       "view/item/context": [
@@ -298,12 +328,11 @@
         "aiContextOrchestrator.claudeAccounts": {
           "type": "array",
           "default": [],
-          "description": "Claude account definitions used for direct account switching and quota inspection. quotaCommand should print JSON with summary, detail, availability, and metrics.",
+          "description": "Claude account definitions used for direct account switching, auth assist, SecretStorage-backed credentials, and quota inspection. quotaCommand should print JSON with summary, detail, availability, and metrics.",
           "items": {
             "type": "object",
             "required": [
-              "label",
-              "configDir"
+              "label"
             ],
             "properties": {
               "id": {
@@ -314,9 +343,34 @@
                 "type": "string",
                 "description": "Human-readable account name shown in the UI."
               },
+              "defaultModel": {
+                "type": "string",
+                "description": "Optional model identifier used by default for this account when launching or preparing a workflow."
+              },
+              "defaultClaudeEffort": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ],
+                "description": "Optional Claude Code effort used by default for this account. Leave unset to inherit aiContextOrchestrator.defaultClaudeEffort."
+              },
               "configDir": {
                 "type": "string",
-                "description": "Absolute CLAUDE_CONFIG_DIR for this account."
+                "description": "Absolute CLAUDE_CONFIG_DIR for this account. If omitted in the UI, the extension can create a managed profile directory."
+              },
+              "authMode": {
+                "type": "string",
+                "description": "Optional Claude auth mode, for example claudeai, console, api-key, vertex, or bedrock."
+              },
+              "authCommand": {
+                "type": "string",
+                "description": "Optional shell command used by the extension auth assist, for example claude login."
+              },
+              "apiKeyEnvVar": {
+                "type": "string",
+                "description": "Optional environment variable name containing an Anthropic API key for this account."
               },
               "adminApiKeyEnvVar": {
                 "type": "string",
@@ -349,21 +403,44 @@
         "aiContextOrchestrator.geminiAccounts": {
           "type": "array",
           "default": [],
-          "description": "Gemini account definitions used for linked account management and optional env-based launches.",
+          "description": "Gemini account definitions used for linked account management, auth assist, SecretStorage-backed credentials, and optional env-based launches.",
           "items": {
             "type": "object",
             "required": [
               "label"
             ],
             "properties": {
-              "id": { "type": "string" },
-              "label": { "type": "string" },
-              "configDir": { "type": "string" },
-              "authMode": { "type": "string" },
-              "apiKeyEnvVar": { "type": "string" },
-              "quotaCommand": { "type": "string" },
-              "accountHint": { "type": "string" },
-              "notes": { "type": "string" }
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "defaultModel": {
+                "type": "string",
+                "description": "Optional model identifier used by default for this Gemini account."
+              },
+              "configDir": {
+                "type": "string"
+              },
+              "authMode": {
+                "type": "string"
+              },
+              "authCommand": {
+                "type": "string"
+              },
+              "apiKeyEnvVar": {
+                "type": "string"
+              },
+              "quotaCommand": {
+                "type": "string"
+              },
+              "accountHint": {
+                "type": "string"
+              },
+              "notes": {
+                "type": "string"
+              }
             }
           }
         },
@@ -382,10 +459,22 @@
               "label"
             ],
             "properties": {
-              "id": { "type": "string" },
-              "label": { "type": "string" },
-              "accountHint": { "type": "string" },
-              "notes": { "type": "string" }
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "defaultModel": {
+                "type": "string",
+                "description": "Optional Copilot model family or model identifier associated with this tracked account reference."
+              },
+              "accountHint": {
+                "type": "string"
+              },
+              "notes": {
+                "type": "string"
+              }
             }
           }
         },
@@ -482,15 +571,15 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.109.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "typescript-eslint": "^8.56.1",
-    "eslint": "^9.39.3",
+    "@types/vscode": "^1.109.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.27.3",
+    "eslint": "^9.39.3",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.9.3",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "typescript-eslint": "^8.56.1"
   }
 }

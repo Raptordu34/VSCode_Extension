@@ -4,6 +4,22 @@ AI Context Orchestrator is a VS Code extension that prepares an AI workflow inst
 
 It now also maintains a provider-agnostic workflow relay in `.ai-orchestrator/` so you can explore with one assistant, plan with another, and implement with a third without losing the shared handoff.
 
+## Architecture & Design (New!)
+
+The extension has recently undergone a major structural refactoring to follow a **Vertical Slicing** and **Feature-Based Architecture**. This transition moved away from a massive, monolithic `extension.ts` file towards a highly modular, maintainable, and extensible design.
+
+**Directory Structure:**
+- `src/core/`: Contains transverse, foundation-level logic such as user configuration parsing (`configuration.ts`) and file system/workspace interaction (`workspace.ts`).
+- `src/features/`: The heart of the new architecture, organized by business domain:
+  - `aiAgents/`: Manages the generation of AI instructions, agents, prompts (`promptBuilder.ts`), and orchestrates the launch commands for the CLIs (`agentLauncher.ts`).
+  - `context/`: Handles the deep inspection of the workspace, parsing ignores, discovering key files, and generating the context markdown file (`contextBuilder.ts`).
+  - `providers/`: Centralizes the logic for Claude, Gemini, and Copilot accounts. It manages credentials, quotas, and switching accounts (`providerService.ts`).
+  - `workflow/`: Maintains the state of the orchestrator, UI generation, tree views, and presets (`workflowService.ts`, `ui.ts`, `presets.ts`).
+- `src/utils/`: Pure, standalone utility functions (`index.ts`).
+- `src/extension.ts`: Now drastically minimized, serving strictly as the VS Code lifecycle entry point (registering commands, views, and events).
+
+This design ensures that adding a new AI provider or a new workflow preset no longer risks breaking unrelated features. Dependencies are injected manually to keep the extension fast, lightweight, and completely free of unnecessary external framework bloat.
+
 ## What It Does
 
 - Generates a hidden `.ai-context.md` file at the workspace root.
@@ -13,6 +29,8 @@ It now also maintains a provider-agnostic workflow relay in `.ai-orchestrator/` 
 - Lets you choose a provider model per workflow run.
 - Lets you choose a Claude effort level for Sonnet 4.6 and Opus 4.6 workflows.
 - Lets you manage linked accounts directly in the UI for Claude, Gemini, and Copilot.
+- Lets each linked account carry its own default model, and its own default Claude effort when the provider is Claude.
+- Lets you connect Claude and Gemini accounts directly from the extension with guided setup, managed Claude profiles, optional auth-assist commands, and SecretStorage-backed credentials.
 - Lets you switch the active account per provider from the UI.
 - Tracks provider status in the UI, including per-account health and optional quota snapshots.
 - Supports refresh strategies: `reuse`, `smart-refresh`, and `full-rebuild`.
@@ -27,6 +45,7 @@ It now also maintains a provider-agnostic workflow relay in `.ai-orchestrator/` 
 	- `brief.md` stores the current user objective
 	- `stages/*.md` stores reusable handoffs between assistants
 - Adds an `AI Workflow` sidebar with a control panel and a workflow state tree so the current session is visible inside VS Code.
+- Adds an `AI Workflow Studio` panel command for a wider, design-system-driven orchestrator surface beyond the narrow sidebar.
 
 ## Workflow
 
@@ -56,9 +75,14 @@ It now also maintains a provider-agnostic workflow relay in `.ai-orchestrator/` 
 - `AI Context Orchestrator: Open Workflow Session`
 - `AI Context Orchestrator: Preview Workflow Prompt`
 - `AI Context Orchestrator: Copy Workflow Prompt`
+- `AI Context Orchestrator: Open Workflow Studio`
 - `AI Context Orchestrator: Refresh Provider Status`
 - `AI Context Orchestrator: Switch Claude Account`
 - `AI Context Orchestrator: Manage Provider Accounts`
+- `AI Context Orchestrator: Connect Provider Account`
+- `AI Context Orchestrator: Configure Provider Credential`
+- `AI Context Orchestrator: Run Provider Auth Assist`
+- `AI Context Orchestrator: Open Provider Account Portal`
 - `AI Context Orchestrator: Switch Provider Account`
 - `AI Context Orchestrator: Mark Selected Stage Prepared`
 - `AI Context Orchestrator: Mark Selected Stage In Progress`
@@ -69,8 +93,10 @@ It now also maintains a provider-agnostic workflow relay in `.ai-orchestrator/` 
 The extension now contributes an `AI Workflow` view container in the activity bar.
 
 - `Workflow Control` is now organized around the current state, the next recommended move, recent stages, and quick file access.
-- `Workflow Control` now also exposes a provider section with linked account management for Claude, Gemini, and Copilot, provider status refresh, configured provider models, and per-account quota cards when a quota source is available.
-- Each provider card exposes `Manage ... Accounts` and `Set Active ... Account` directly inside the sidebar.
+- `Workflow Control` now sits on a shared design shell that also powers the richer `AI Workflow Studio` panel.
+- `Workflow Control` now also exposes a provider section with linked account management for Claude, Gemini, and Copilot, provider status refresh, configured provider models, per-account default model and effort settings, and per-account quota cards when a quota source is available.
+- `AI Workflow Studio` opens in a wider editor panel and is the first step toward the full design-based experience for provider routing, stage inspection, and future console-oriented workflows.
+- Each provider card now exposes direct actions to connect an account, switch the active account, manage stored credentials, run auth assist, and open the provider portal directly inside the sidebar.
 - `Workflow Control` also lets you preview or copy the exact launch prompt that matches the current stage without launching the provider.
 - `Workflow Control` also reflects the currently selected stage from the tree so you can inspect its files, upstream dependencies, artifacts, and status in one place.
 - `Workflow State` shows the workspace overview, stage history, latest handoff, session file, context snapshot, and generated artifacts per stage.
@@ -83,9 +109,19 @@ The extension now contributes an `AI Workflow` view container in the activity ba
 
 ## Provider Launch Behavior
 
-- Claude: opens a terminal with the selected `CLAUDE_CONFIG_DIR`, `ANTHROPIC_MODEL`, and `CLAUDE_CODE_EFFORT_LEVEL`, then runs `claude --append-system-prompt-file ".ai-context.md"` with the selected workflow objective.
-- Gemini: opens a terminal and runs `gemini -m <selected-model>` with the selected workflow objective and the generated context file. If the linked Gemini account references an API key env var that is present locally, the launch terminal injects it as `GEMINI_API_KEY` and `GOOGLE_API_KEY`.
+- Claude: opens a terminal with the selected `CLAUDE_CONFIG_DIR`, `ANTHROPIC_MODEL`, and `CLAUDE_CODE_EFFORT_LEVEL`, injects a stored Anthropic API key when one is connected for the selected account, then runs `claude --append-system-prompt-file ".ai-context.md"` with the selected workflow objective.
+- Gemini: opens a terminal and runs `gemini -m <selected-model>` with the selected workflow objective and the generated context file. If the linked Gemini account has a SecretStorage credential or an API key env var reference, the launch terminal injects it as `GEMINI_API_KEY` and `GOOGLE_API_KEY`.
 - Copilot: opens Copilot Chat and copies a workflow-oriented prompt to the clipboard.
+
+When an account defines `defaultModel`, workflow setup uses that model as the preselected default for that account. Claude accounts can also define `defaultClaudeEffort`, which becomes the preselected effort level for workflows tied to that account.
+
+## Direct Account Connection
+
+- `Connect Provider Account` creates or updates a Claude or Gemini account from the extension, can store the provider credential in VS Code SecretStorage, and immediately sets the connected account active.
+- Claude accounts can omit `configDir` in the UI flow; the extension can create and reuse a managed profile directory under the extension global storage so multiple subscriptions can stay isolated.
+- `Run Provider Auth Assist` opens a terminal preloaded with the selected account environment and runs the configured auth command, such as `claude login` or `gemini auth login`.
+- `Open Provider Account Portal` opens the relevant Claude, Anthropic, Gemini, or GitHub account page when browser-based login or subscription management is needed.
+- Stored credentials are injected only into the launch terminal for the selected account and are not written back into workspace files or settings JSON.
 
 Copilot account references are tracked in the extension UI for ownership and planning, but the extension cannot programmatically switch the signed-in Copilot session because VS Code does not expose that capability.
 
@@ -158,7 +194,11 @@ New workflow settings:
 {
 	"id": "work",
 	"label": "Claude Work",
+	"defaultModel": "claude-opus-4-6",
+	"defaultClaudeEffort": "high",
 	"configDir": "C:/Users/you/.claude-work",
+	"authMode": "claudeai",
+	"authCommand": "claude login",
 	"quotaCommand": "node C:/scripts/claude-quota.js",
 	"notes": "Team org account"
 }
@@ -170,7 +210,9 @@ New workflow settings:
 {
 	"id": "gemini-work",
 	"label": "Gemini Work",
+	"defaultModel": "gemini-2.5-pro",
 	"authMode": "api-key",
+	"authCommand": "gemini auth login",
 	"apiKeyEnvVar": "GEMINI_WORK_API_KEY",
 	"quotaCommand": "node C:/scripts/gemini-quota.js",
 	"accountHint": "workspace-team-a",
@@ -184,6 +226,7 @@ New workflow settings:
 {
 	"id": "copilot-main",
 	"label": "Copilot Main",
+	"defaultModel": "gpt-5.4",
 	"accountHint": "me@company.com",
 	"notes": "Main VS Code sign-in"
 }
@@ -220,6 +263,7 @@ If `quotaCommand` is provided, it should print JSON to stdout using this shape:
 - Shared stage handoff files are prepared automatically, but the quality of the transition still depends on the active provider actually updating the generated stage file.
 - Copilot personal plan quota is shown as unavailable because there is no stable public API for reliable individual premium request telemetry.
 - Gemini quota telemetry is not implemented yet; the UI currently exposes model state and reserves quota refresh for a later monitoring integration.
+- Copilot account references can be labeled and tracked by the extension, but Copilot sign-in switching still cannot be automated because VS Code does not expose that auth surface.
 
 ## Development
 
