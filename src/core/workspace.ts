@@ -1,13 +1,39 @@
 import * as vscode from 'vscode';
 import { IGNORED_DIRECTORIES } from '../features/workflow/constants.js';
 
+export function normalizeWorkspaceRelativePath(inputPath: string): string {
+	const trimmedPath = inputPath.trim().replace(/\\+/g, '/');
+	if (!trimmedPath) {
+		return '';
+	}
+
+	const normalizedSegments: string[] = [];
+	for (const segment of trimmedPath.split('/')) {
+		const normalizedSegment = segment.trim();
+		if (!normalizedSegment || normalizedSegment === '.') {
+			continue;
+		}
+
+		if (normalizedSegment === '..') {
+			if (normalizedSegments.length > 0) {
+				normalizedSegments.pop();
+			}
+			continue;
+		}
+
+		normalizedSegments.push(normalizedSegment);
+	}
+
+	return normalizedSegments.join('/');
+}
+
 export function relativizeToWorkspace(workspaceUri: vscode.Uri, targetUri: vscode.Uri): string {
 	const workspacePath = workspaceUri.path.endsWith('/') ? workspaceUri.path : `${workspaceUri.path}/`;
 	if (!targetUri.path.startsWith(workspacePath)) {
 		return targetUri.path;
 	}
 
-	return targetUri.path.slice(workspacePath.length);
+	return normalizeWorkspaceRelativePath(targetUri.path.slice(workspacePath.length));
 }
 
 export function isIgnoredDirectory(name: string): boolean {
@@ -116,7 +142,8 @@ export function isBinaryLikeFile(name: string): boolean {
 }
 
 export function buildWorkspaceUri(workspaceUri: vscode.Uri, relativePath: string): vscode.Uri | undefined {
-	const segments = relativePath
+	const normalizedRelativePath = normalizeWorkspaceRelativePath(relativePath);
+	const segments = normalizedRelativePath
 		.split('/')
 		.map((segment) => segment.trim())
 		.filter((segment) => segment.length > 0);

@@ -9,7 +9,6 @@ import {
 import type {
 	ArtifactPlan,
 	ContextMetadata,
-	OptimizationResult,
 	ProjectContext,
 	WorkflowBrief,
 	WorkflowExecutionPlan,
@@ -17,10 +16,162 @@ import type {
 	WorkflowSessionState,
 	WorkflowStageRecord
 } from '../workflow/types.js';
-import { buildWorkspaceUri, readUtf8, relativizeToWorkspace } from '../../core/workspace.js';
+import { buildWorkspaceUri, normalizeWorkspaceRelativePath, readUtf8, relativizeToWorkspace } from '../../core/workspace.js';
 import { formatProviderModel, getProviderLabel } from '../providers/providerService.js';
 import { replaceManagedBlock } from '../aiAgents/promptBuilder.js';
 import { formatWorkflowRoles } from '../workflow/ui.js';
+
+export interface WorkspaceWriteOperation {
+	uri: vscode.Uri;
+	content: Uint8Array;
+}
+
+export interface TransactionFileSystem {
+	readFile(uri: vscode.Uri): Thenable<Uint8Array> | Promise<Uint8Array>;
+	writeFile(uri: vscode.Uri, content: Uint8Array): Thenable<void> | Promise<void>;
+	delete(uri: vscode.Uri): Thenable<void> | Promise<void>;
+	createDirectory?(uri: vscode.Uri): Thenable<void> | Promise<void>;
+}
+
+function toUtf8Bytes(content: string): Uint8Array {
+	return Buffer.from(content, 'utf8');
+}
+
+function isWorkflowSessionState(value: unknown): value is WorkflowSessionState {
+	if (!value || typeof value !== 'object') {
+		return false;
+	}
+
+	const candidate = value as Partial<WorkflowSessionState>;
+	return typeof candidate.workspaceName === 'string'
+		&& typeof candidate.currentStageIndex === 'number'
+		&& typeof candidate.currentPreset === 'string'
+		&& typeof candidate.currentProvider === 'string'
+		&& Array.isArray(candidate.stages);
+}
+
+function isWorkflowBrief(value: WorkflowBrief | undefined): value is WorkflowBrief {
+	return Boolean(value && typeof value.goal === 'string' && typeof value.taskType === 'string' && Array.isArray(value.constraints));
+}
+
+async function ensureParentDirectoryWith(fileUri: vscode.Uri, createDirectory?: (uri: vscode.Uri) => Thenable<void> | Promise<void>): Promise<void> {
+	if (!createDirectory) {
+		return;
+	}
+
+	const path = fileUri.path;
+	const lastSlashIndex = path.lastIndexOf('/');
+	if (lastSlashIndex <= 0) {
+		return;
+	}
+
+	const parentPath = path.slice(0, lastSlashIndex);
+	await createDirectory(fileUri.with({ path: parentPath }));
+}
+
+export async function commitFileTransaction(fileSystem: TransactionFileSystem, operations: WorkspaceWriteOperation[]): Promise<void> {
+	const snapshots = new Map<string, { uri: vscode.Uri; existed: boolean; content?: Uint8Array }>();
+
+	try {
+		for (const operation of operations) {
+			const operationKey = operation.uri.toString();
+			if (snapshots.has(operationKey)) {
+				continue;
+			}
+
+			try {
+				snapshots.set(operationKey, {
+					uri: operation.uri,
+					existed: true,
+					content: await fileSystem.readFile(operation.uri)
+				});
+			} catch {
+				snapshots.set(operationKey, { uri: operation.uri, existed: false });
+			}
+		}
+
+		for (const operation of operations) {
+			await ensureParentDirectoryWith(operation.uri, fileSystem.createDirectory?.bind(fileSystem));
+			await fileSystem.writeFile(operation.uri, operation.content);
+		}
+	} catch (error) {
+		for (const snapshot of [...snapshots.values()].reverse()) {
+			try {
+				if (snapshot.existed && snapshot.content) {
+					await fileSystem.writeFile(snapshot.uri, snapshot.content);
+					continue;
+				}
+
+				await fileSystem.delete(snapshot.uri);
+			} catch {
+				continue;
+			}
+		}
+
+		throw error;
+	}
+}
+
+async function commitWorkspaceWriteTransaction(operations: WorkspaceWriteOperation[]): Promise<void> {
+	await commitFileTransaction({
+		readFile: (uri) => vscode.workspace.fs.readFile(uri),
+		writeFile: (uri, content) => vscode.workspace.fs.writeFile(uri, content),
+		delete: (uri) => vscode.workspace.fs.delete(uri, { recursive: false, useTrash: false }),
+		createDirectory: (uri) => vscode.workspace.fs.createDirectory(uri)
+	}, operations);
+}
+
+async function buildManagedMarkdownContent(fileUri: vscode.Uri, generatedContent: string): Promise<string> {
+	const managedBlock = `${GENERATED_SECTION_START}\n${generatedContent.trim()}\n${GENERATED_SECTION_END}\n`;
+	try {
+		const existingContent = await readUtf8(fileUri);
+		return replaceManagedBlock(existingContent, managedBlock);
+	} catch {
+		return managedBlock;
+	}
+}
+
+async function buildArtifactWriteOperations(workspaceUri: vscode.Uri, artifactPlan: ArtifactPlan): Promise<WorkspaceWriteOperation[]> {
+	const operations: WorkspaceWriteOperation[] = [];
+	for (const artifact of artifactPlan.files) {
+		const fileUri = buildWorkspaceUri(workspaceUri, artifact.relativePath);
+		if (!fileUri) {
+			continue;
+		}
+
+		if (artifact.kind === 'instruction') {
+			const nextContent = await buildManagedMarkdownContent(fileUri, artifact.content);
+			operations.push({ uri: fileUri, content: toUtf8Bytes(nextContent) });
+			continue;
+		}
+
+		operations.push({
+			uri: fileUri,
+			content: toUtf8Bytes(`${artifact.content.trimEnd()}\n`)
+		});
+	}
+
+	return operations;
+}
+
+function buildWorkflowBriefContent(brief: WorkflowBrief): string {
+	return [
+		'# User Brief',
+		'',
+		`Type: ${brief.taskType}`,
+		`Goal: ${brief.goal}`,
+		'',
+		'Constraints:',
+		...(brief.constraints.length > 0 ? brief.constraints.map((constraint) => `- ${constraint}`) : ['- none provided']),
+		'',
+		'Raw:',
+		brief.rawText
+	].join('\n').trimEnd() + '\n';
+}
+
+function buildWorkflowSessionContent(session: WorkflowSessionState): string {
+	return `${JSON.stringify(session, null, 2)}\n`;
+}
 
 export async function readWorkflowSessionState(workspaceUri: vscode.Uri): Promise<WorkflowSessionState | undefined> {
 	const sessionUri = buildWorkspaceUri(workspaceUri, WORKFLOW_SESSION_FILE);
@@ -30,7 +181,8 @@ export async function readWorkflowSessionState(workspaceUri: vscode.Uri): Promis
 
 	try {
 		const content = await readUtf8(sessionUri);
-		return JSON.parse(content) as WorkflowSessionState;
+		const parsed = JSON.parse(content) as unknown;
+		return isWorkflowSessionState(parsed) ? parsed : undefined;
 	} catch {
 		return undefined;
 	}
@@ -47,12 +199,13 @@ export async function readWorkflowBrief(workspaceUri: vscode.Uri): Promise<Workf
 		const lines = content.split(/\r?\n/);
 		const taskType = lines.find((line) => line.startsWith('Type:'))?.slice('Type:'.length).trim() ?? 'general';
 		const goal = lines.find((line) => line.startsWith('Goal:'))?.slice('Goal:'.length).trim() ?? '';
-		return {
+		const brief: WorkflowBrief = {
 			taskType,
 			goal,
 			constraints: lines.filter((line) => line.startsWith('- ')).map((line) => line.slice(2).trim()),
 			rawText: content.trim()
 		};
+		return isWorkflowBrief(brief) ? brief : undefined;
 	} catch {
 		return undefined;
 	}
@@ -71,31 +224,12 @@ export async function ensureParentDirectory(fileUri: vscode.Uri): Promise<void> 
 }
 
 export async function upsertManagedMarkdown(fileUri: vscode.Uri, generatedContent: string): Promise<void> {
-	const managedBlock = `${GENERATED_SECTION_START}\n${generatedContent.trim()}\n${GENERATED_SECTION_END}\n`;
-	try {
-		const existingContent = await readUtf8(fileUri);
-		const nextContent = replaceManagedBlock(existingContent, managedBlock);
-		await vscode.workspace.fs.writeFile(fileUri, Buffer.from(nextContent, 'utf8'));
-	} catch {
-		await vscode.workspace.fs.writeFile(fileUri, Buffer.from(managedBlock, 'utf8'));
-	}
+	const nextContent = await buildManagedMarkdownContent(fileUri, generatedContent);
+	await vscode.workspace.fs.writeFile(fileUri, toUtf8Bytes(nextContent));
 }
 
 export async function writeArtifactPlan(workspaceUri: vscode.Uri, artifactPlan: ArtifactPlan): Promise<void> {
-	for (const artifact of artifactPlan.files) {
-		const fileUri = buildWorkspaceUri(workspaceUri, artifact.relativePath);
-		if (!fileUri) {
-			continue;
-		}
-
-		await ensureParentDirectory(fileUri);
-		if (artifact.kind === 'instruction') {
-			await upsertManagedMarkdown(fileUri, artifact.content);
-			continue;
-		}
-
-		await vscode.workspace.fs.writeFile(fileUri, Buffer.from(artifact.content.trimEnd() + '\n', 'utf8'));
-	}
+	await commitWorkspaceWriteTransaction(await buildArtifactWriteOperations(workspaceUri, artifactPlan));
 }
 
 export async function writeWorkflowBrief(workspaceUri: vscode.Uri, brief: WorkflowBrief): Promise<void> {
@@ -104,20 +238,7 @@ export async function writeWorkflowBrief(workspaceUri: vscode.Uri, brief: Workfl
 		return;
 	}
 
-	await ensureParentDirectory(briefUri);
-	const content = [
-		'# User Brief',
-		'',
-		`Type: ${brief.taskType}`,
-		`Goal: ${brief.goal}`,
-		'',
-		'Constraints:',
-		...(brief.constraints.length > 0 ? brief.constraints.map((constraint) => `- ${constraint}`) : ['- none provided']),
-		'',
-		'Raw:',
-		brief.rawText
-	].join('\n');
-	await vscode.workspace.fs.writeFile(briefUri, Buffer.from(content.trimEnd() + '\n', 'utf8'));
+	await commitWorkspaceWriteTransaction([{ uri: briefUri, content: toUtf8Bytes(buildWorkflowBriefContent(brief)) }]);
 }
 
 export async function writeWorkflowSessionState(workspaceUri: vscode.Uri, session: WorkflowSessionState): Promise<void> {
@@ -126,8 +247,7 @@ export async function writeWorkflowSessionState(workspaceUri: vscode.Uri, sessio
 		return;
 	}
 
-	await ensureParentDirectory(sessionUri);
-	await vscode.workspace.fs.writeFile(sessionUri, Buffer.from(`${JSON.stringify(session, null, 2)}\n`, 'utf8'));
+	await commitWorkspaceWriteTransaction([{ uri: sessionUri, content: toUtf8Bytes(buildWorkflowSessionContent(session)) }]);
 }
 
 export async function writeWorkflowStageFile(workspaceUri: vscode.Uri, relativePath: string, content: string): Promise<void> {
@@ -136,8 +256,7 @@ export async function writeWorkflowStageFile(workspaceUri: vscode.Uri, relativeP
 		return;
 	}
 
-	await ensureParentDirectory(fileUri);
-	await vscode.workspace.fs.writeFile(fileUri, Buffer.from(content.trimEnd() + '\n', 'utf8'));
+	await commitWorkspaceWriteTransaction([{ uri: fileUri, content: toUtf8Bytes(content.trimEnd() + '\n') }]);
 }
 
 export function buildSuggestedNextPresets(currentPreset: WorkflowPreset): WorkflowPreset[] {
@@ -227,17 +346,15 @@ export async function persistWorkflowArtifacts(
 	workflowPlan: WorkflowExecutionPlan,
 	metadata: ContextMetadata,
 	contextFile: vscode.Uri,
-	artifactPlan?: ArtifactPlan
+	artifactPlan?: ArtifactPlan,
+	contextContent?: string
 ): Promise<{ session: WorkflowSessionState; stage: WorkflowStageRecord; brief?: WorkflowBrief }> {
 	const existingSession = await readWorkflowSessionState(workspaceFolder.uri);
 	const brief = workflowPlan.brief ?? await readWorkflowBrief(workspaceFolder.uri);
-	if (brief) {
-		await writeWorkflowBrief(workspaceFolder.uri, brief);
-	}
 
 	const nextIndex = (existingSession?.currentStageIndex ?? 0) + 1;
-	const stageFile = `${WORKFLOW_STAGE_DIRECTORY}/${String(nextIndex).padStart(2, '0')}-${workflowPlan.preset}.md`;
-	const upstreamStageFiles = existingSession?.stages.map((stage) => stage.stageFile) ?? [];
+	const stageFile = normalizeWorkspaceRelativePath(`${WORKFLOW_STAGE_DIRECTORY}/${String(nextIndex).padStart(2, '0')}-${workflowPlan.preset}.md`);
+	const upstreamStageFiles = existingSession?.stages.map((stage) => normalizeWorkspaceRelativePath(stage.stageFile)) ?? [];
 	const stage: WorkflowStageRecord = {
 		index: nextIndex,
 		preset: workflowPlan.preset,
@@ -251,14 +368,13 @@ export async function persistWorkflowArtifacts(
 		contextFile: relativizeToWorkspace(workspaceFolder.uri, contextFile),
 		claudeAccountId: workflowPlan.claudeAccountId,
 		claudeEffort: workflowPlan.claudeEffort,
-		artifactFiles: artifactPlan?.files.map((file) => file.relativePath) ?? [],
+		artifactFiles: artifactPlan?.files.map((file) => normalizeWorkspaceRelativePath(file.relativePath)) ?? [],
 		upstreamStageFiles
 	};
 
-	await writeWorkflowStageFile(workspaceFolder.uri, stageFile, buildWorkflowStageContent(workflowPlan, stage, brief));
-
 	const session: WorkflowSessionState = {
 		workspaceName: workspaceFolder.name,
+		workspaceFolderId: workspaceFolder.uri.toString(),
 		updatedAt: new Date().toISOString(),
 		currentStageIndex: nextIndex,
 		currentPreset: workflowPlan.preset,
@@ -271,6 +387,34 @@ export async function persistWorkflowArtifacts(
 		stages: [...(existingSession?.stages ?? []), stage]
 	};
 
-	await writeWorkflowSessionState(workspaceFolder.uri, session);
+	const operations: WorkspaceWriteOperation[] = [];
+	if (contextContent !== undefined) {
+		operations.push({
+			uri: contextFile,
+			content: toUtf8Bytes(contextContent)
+		});
+	}
+	if (artifactPlan) {
+		operations.push(...await buildArtifactWriteOperations(workspaceFolder.uri, artifactPlan));
+	}
+	if (brief) {
+		const briefUri = buildWorkspaceUri(workspaceFolder.uri, WORKFLOW_BRIEF_FILE);
+		if (briefUri) {
+			operations.push({ uri: briefUri, content: toUtf8Bytes(buildWorkflowBriefContent(brief)) });
+		}
+	}
+	const stageUri = buildWorkspaceUri(workspaceFolder.uri, stageFile);
+	if (stageUri) {
+		operations.push({
+			uri: stageUri,
+			content: toUtf8Bytes(buildWorkflowStageContent(workflowPlan, stage, brief).trimEnd() + '\n')
+		});
+	}
+	const sessionUri = buildWorkspaceUri(workspaceFolder.uri, WORKFLOW_SESSION_FILE);
+	if (sessionUri) {
+		operations.push({ uri: sessionUri, content: toUtf8Bytes(buildWorkflowSessionContent(session)) });
+	}
+
+	await commitWorkspaceWriteTransaction(operations);
 	return { session, stage, brief };
 }

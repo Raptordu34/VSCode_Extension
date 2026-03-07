@@ -3,6 +3,7 @@ import type { WorkflowDashboardState, WorkflowTreeNode, WorkflowStageStatus, Ext
 import { PROVIDER_STATUS_CACHE_KEY, CONTEXT_FILE_NAME } from "./constants.js";
 import { getProviderAccounts, getActiveProviderAccountId, findProviderAccount, getDefaultProviderModel, getDefaultClaudeEffort, getProviderLabel, promptForProviderModel, promptForProviderAccount, buildProviderDetail, promptForProviderTarget, formatProviderModel } from "../providers/providerService.js";
 import { buildWorkspaceUri, fileExists, readUtf8 } from "../../core/workspace.js";
+import { getImplicitWorkspaceFolder } from '../../core/workspaceContext.js';
 import { readWorkflowSessionState, readWorkflowBrief, writeWorkflowSessionState, buildSuggestedNextPresets } from "../context/contextBuilder.js";
 import { getWorkflowStageStatusLabel, formatWorkflowRoles } from "./ui.js";
 import { getExtensionConfiguration } from "../../core/configuration.js";
@@ -10,8 +11,8 @@ import { mergeProviderStatusCache } from "../providers/providerService.js";
 import { buildProviderLaunchPrompt, buildWorkflowSummary } from "../aiAgents/promptBuilder.js";
 import { WORKFLOW_PRESETS } from "./presets.js";
 
-export async function updateContinueWorkflowButtonVisibility(statusBarItem: vscode.StatusBarItem): Promise<void> {
-	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+export async function updateContinueWorkflowButtonVisibility(statusBarItem: vscode.StatusBarItem, context: vscode.ExtensionContext): Promise<void> {
+	const workspaceFolder = getImplicitWorkspaceFolder(context);
 	if (!workspaceFolder) {
 		statusBarItem.hide();
 		return;
@@ -29,12 +30,13 @@ export async function getWorkflowDashboardState(selectedStageIndex: number | und
 	const configuration = getExtensionConfiguration();
 	const providerStatusCache = context.globalState.get<ProviderStatusCache>(PROVIDER_STATUS_CACHE_KEY);
 	const providerStatuses = mergeProviderStatusCache(configuration, providerStatusCache);
-	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+	const workspaceFolder = getImplicitWorkspaceFolder(context);
 	if (!workspaceFolder) {
 		return {
 			contextFileExists: false,
 			nextSuggestedPresets: [],
 			artifactCount: 0,
+			workspaceSelectionRequired: (vscode.workspace.workspaceFolders?.length ?? 0) > 1,
 			configuration,
 			providerStatuses,
 			providerStatusUpdatedAt: providerStatusCache?.updatedAt

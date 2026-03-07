@@ -157,6 +157,7 @@ export interface WorkflowStageRecord {
 
 export interface WorkflowSessionState {
 	workspaceName: string;
+	workspaceFolderId?: string;
 	updatedAt: string;
 	currentStageIndex: number;
 	currentPreset: WorkflowPreset;
@@ -228,6 +229,7 @@ export interface WorkflowQuickPickItem extends vscode.QuickPickItem {
 
 export interface WorkflowDashboardState {
 	workspaceFolder?: vscode.WorkspaceFolder;
+	workspaceSelectionRequired?: boolean;
 	session?: WorkflowSessionState;
 	brief?: WorkflowBrief;
 	latestStage?: WorkflowStageRecord;

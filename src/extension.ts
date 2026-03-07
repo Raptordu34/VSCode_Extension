@@ -62,6 +62,8 @@ import {
 import { execShellCommand, escapeHtml, createNonce, serializeList, parseList, computeSignature, clampNumber, formatListForMarkdown, capitalize } from "./utils/index.js";
 import { normalizeProviderAccounts, getExtensionConfiguration } from "./core/configuration.js";
 import { relativizeToWorkspace, isIgnoredDirectory, shouldIncludeEntry, isRelevantFile, isBinaryLikeFile, buildWorkspaceUri } from "./core/workspace.js";
+import { getImplicitWorkspaceFolder, resolveWorkspaceFolder } from './core/workspaceContext.js';
+import { UiRefreshDebouncer } from './core/uiRefreshDebouncer.js';
 import { buildDefaultProviderStatuses, buildDefaultAccountStatuses, buildDefaultAccountSummary, buildDefaultAccountDetail, buildDefaultAccountMetrics, mergeProviderStatusCache, refreshProviderStatuses, getAccountSecretStorageKey, getStoredProviderCredential, setStoredProviderCredential, getEnvProviderCredential, getResolvedProviderCredential, getManagedClaudeConfigDir, getProviderAccountPortalUrl, buildDefaultAuthAssistCommand, buildProviderLaunchEnvironment, resolveClaudeProviderStatus, resolveGenericProviderStatus, resolveClaudeAccountStatus, resolveGenericAccountStatus, switchActiveProviderAccount, manageProviderAccounts, connectProviderAccount, configureProviderCredential, runProviderAuthAssist, openProviderAccountPortal, promptForExistingProviderAccount, promptForProviderAccountDetails, promptForProviderTarget, promptForStoredCredential, promptForAccountClaudeEffort, ensureManagedClaudeConfigDir, promptForClaudeAccount, runQuotaCommand, getProviderAccounts, getActiveProviderAccountId, updateActiveProviderAccountId, writeProviderAccounts, findProviderAccount, findClaudeAccount, getProviderLabel, getDefaultProviderModel, getDefaultClaudeEffort, getProviderModelOptions, formatProviderModel, promptForProviderModel, promptForProviderAccount, buildProviderDetail } from "./features/providers/providerService.js";
 import { fileExists, readUtf8 } from "./core/workspace.js";
 import { buildRawContextContent, buildContextFileContent, parseContextMetadata, optimizeContextWithCopilot, readReadmeSummary, readAdditionalContextFiles, buildWorkspaceTree, getOptimizationSelector, gatherProjectContext, readWorkflowSessionState, readWorkflowBrief, writeArtifactPlan, ensureParentDirectory, buildContextGenerationMessage, writeWorkflowBrief, writeWorkflowSessionState, buildSuggestedNextPresets } from "./features/context/contextBuilder.js";
@@ -91,6 +93,7 @@ export function activate(context: vscode.ExtensionContext) {
 		treeDataProvider: workflowTreeDataProvider,
 		showCollapseAll: true
 	});
+	const refreshDebouncer = new UiRefreshDebouncer();
 	workflowTreeView.onDidChangeSelection((event) => {
 		selectedStageIndex = event.selection[0]?.stageIndex;
 		workflowControlViewProvider.refresh();
@@ -111,7 +114,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const refreshWorkflowUi = async (): Promise<void> => {
 		const dashboardState = await loadDashboardState();
-		await updateContinueWorkflowButtonVisibility(continueStatusBarItem);
+		await updateContinueWorkflowButtonVisibility(continueStatusBarItem, context);
 		workflowTreeView.badge = dashboardState.session
 			? { value: dashboardState.session.stages.length, tooltip: `${dashboardState.session.stages.length} workflow stage(s)` }
 			: undefined;
@@ -123,20 +126,42 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	};
 
+	const resolveCommandWorkspaceFolder = async (placeHolder: string): Promise<vscode.WorkspaceFolder | undefined> => {
+		return resolveWorkspaceFolder(context, {
+			placeHolder,
+			showWarning: true
+		});
+	};
+
 	const initCommand = vscode.commands.registerCommand('ai-context-orchestrator.initAI', async () => {
-		await runInitAiFlow(outputChannel);
+		const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder to initialize');
+		if (!workspaceFolder) {
+			return;
+		}
+
+		await runInitAiFlow(outputChannel, workspaceFolder);
 		await refreshWorkflowUi();
 	});
 
 	const continueWorkflowCommand = vscode.commands.registerCommand('ai-context-orchestrator.continueWorkflow', async () => {
-		await runContinueWorkflowFlow(outputChannel);
+		const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose workflow you want to continue');
+		if (!workspaceFolder) {
+			return;
+		}
+
+		await runContinueWorkflowFlow(outputChannel, workspaceFolder);
 		await refreshWorkflowUi();
 	});
 
 	const generateContextCommand = vscode.commands.registerCommand('ai-context-orchestrator.generateContext', async () => {
+		const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose context should be generated');
+		if (!workspaceFolder) {
+			return;
+		}
+
 		const configuration = getExtensionConfiguration();
 		const workflowPlan = buildDefaultWorkflowPlan(configuration);
-		const projectContext = await gatherProjectContext(outputChannel, false, workflowPlan);
+		const projectContext = await gatherProjectContext(outputChannel, false, workflowPlan, workspaceFolder);
 		if (!projectContext) {
 			return;
 		}
@@ -146,7 +171,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const openWorkflowBriefCommand = vscode.commands.registerCommand('ai-context-orchestrator.openWorkflowBrief', async () => {
-		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+		const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose brief should be opened');
 		if (!workspaceFolder) {
 			return;
 		}
@@ -155,7 +180,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const openLatestWorkflowHandoffCommand = vscode.commands.registerCommand('ai-context-orchestrator.openLatestWorkflowHandoff', async () => {
-		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+		const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose latest handoff should be opened');
 		if (!workspaceFolder) {
 			return;
 		}
@@ -171,7 +196,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const openContextFileCommand = vscode.commands.registerCommand('ai-context-orchestrator.openContextFile', async () => {
-		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+		const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose context file should be opened');
 		if (!workspaceFolder) {
 			return;
 		}
@@ -180,7 +205,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const openWorkflowSessionCommand = vscode.commands.registerCommand('ai-context-orchestrator.openWorkflowSession', async () => {
-		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+		const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose session should be opened');
 		if (!workspaceFolder) {
 			return;
 		}
@@ -189,7 +214,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const openWorkflowTreeNodeCommand = vscode.commands.registerCommand('ai-context-orchestrator.openWorkflowTreeNode', async (node?: WorkflowTreeNode) => {
-		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+		const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose workflow file should be opened');
 		if (!workspaceFolder || !node?.relativePath) {
 			return;
 		}
@@ -324,23 +349,24 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const sessionWatcher = vscode.workspace.createFileSystemWatcher(`**/${WORKFLOW_SESSION_FILE}`);
-	sessionWatcher.onDidCreate(() => void refreshWorkflowUi());
-	sessionWatcher.onDidChange(() => void refreshWorkflowUi());
-	sessionWatcher.onDidDelete(() => void refreshWorkflowUi());
+	sessionWatcher.onDidCreate(() => refreshDebouncer.enqueue('session-create', refreshWorkflowUi));
+	sessionWatcher.onDidChange(() => refreshDebouncer.enqueue('session-change', refreshWorkflowUi));
+	sessionWatcher.onDidDelete(() => refreshDebouncer.enqueue('session-delete', refreshWorkflowUi));
 
 	const workflowRelayWatcher = vscode.workspace.createFileSystemWatcher('**/.ai-orchestrator/**');
-	workflowRelayWatcher.onDidCreate(() => void refreshWorkflowUi());
-	workflowRelayWatcher.onDidChange(() => void refreshWorkflowUi());
-	workflowRelayWatcher.onDidDelete(() => void refreshWorkflowUi());
+	workflowRelayWatcher.onDidCreate(() => refreshDebouncer.enqueue('relay-create', refreshWorkflowUi));
+	workflowRelayWatcher.onDidChange(() => refreshDebouncer.enqueue('relay-change', refreshWorkflowUi));
+	workflowRelayWatcher.onDidDelete(() => refreshDebouncer.enqueue('relay-delete', refreshWorkflowUi));
 
 	const contextFileWatcher = vscode.workspace.createFileSystemWatcher(`**/${CONTEXT_FILE_NAME}`);
-	contextFileWatcher.onDidCreate(() => void refreshWorkflowUi());
-	contextFileWatcher.onDidChange(() => void refreshWorkflowUi());
-	contextFileWatcher.onDidDelete(() => void refreshWorkflowUi());
+	contextFileWatcher.onDidCreate(() => refreshDebouncer.enqueue('context-create', refreshWorkflowUi));
+	contextFileWatcher.onDidChange(() => refreshDebouncer.enqueue('context-change', refreshWorkflowUi));
+	contextFileWatcher.onDidDelete(() => refreshDebouncer.enqueue('context-delete', refreshWorkflowUi));
 
 	const configuration = getExtensionConfiguration();
-	if (configuration.autoGenerateOnStartup && vscode.workspace.workspaceFolders?.length) {
-		void gatherProjectContext(outputChannel, true, buildDefaultWorkflowPlan(configuration))
+	const startupWorkspaceFolder = getImplicitWorkspaceFolder(context);
+	if (configuration.autoGenerateOnStartup && startupWorkspaceFolder) {
+		void gatherProjectContext(outputChannel, true, buildDefaultWorkflowPlan(configuration), startupWorkspaceFolder)
 			.finally(() => refreshWorkflowUi());
 	}
 
@@ -372,6 +398,7 @@ export function activate(context: vscode.ExtensionContext) {
 		setSelectedStagePreparedCommand,
 		setSelectedStageInProgressCommand,
 		setSelectedStageCompletedCommand,
+		refreshDebouncer,
 		sessionWatcher,
 		workflowRelayWatcher,
 		contextFileWatcher,
@@ -384,14 +411,14 @@ export function deactivate() {
 	return undefined;
 }
 
-async function runInitAiFlow(outputChannel: vscode.OutputChannel): Promise<void> {
+async function runInitAiFlow(outputChannel: vscode.OutputChannel, workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
 	const configuration = getExtensionConfiguration();
 	const workflowPlan = await promptForWorkflowPlan(configuration);
 	if (!workflowPlan) {
 		return;
 	}
 
-	const projectContext = await gatherProjectContext(outputChannel, false, workflowPlan);
+	const projectContext = await gatherProjectContext(outputChannel, false, workflowPlan, workspaceFolder);
 	if (!projectContext) {
 		return;
 	}
@@ -427,13 +454,8 @@ async function runInitAiFlow(outputChannel: vscode.OutputChannel): Promise<void>
 	outputChannel.appendLine(`[launch] Started workflow ${workflowPlan.preset} with provider ${workflowPlan.provider}`);
 }
 
-async function runContinueWorkflowFlow(outputChannel: vscode.OutputChannel): Promise<void> {
+async function runContinueWorkflowFlow(outputChannel: vscode.OutputChannel, workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
 	const configuration = getExtensionConfiguration();
-	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-	if (!workspaceFolder) {
-		vscode.window.showWarningMessage('Open a workspace folder before continuing a workflow.');
-		return;
-	}
 
 	const existingSession = await readWorkflowSessionState(workspaceFolder.uri);
 	if (!existingSession) {
@@ -446,7 +468,7 @@ async function runContinueWorkflowFlow(outputChannel: vscode.OutputChannel): Pro
 		return;
 	}
 
-	const projectContext = await gatherProjectContext(outputChannel, false, workflowPlan);
+	const projectContext = await gatherProjectContext(outputChannel, false, workflowPlan, workspaceFolder);
 	if (!projectContext) {
 		return;
 	}

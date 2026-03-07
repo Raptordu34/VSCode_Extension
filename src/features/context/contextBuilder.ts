@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { CONTEXT_FILE_NAME, GENERATED_SECTION_START, GENERATED_SECTION_END, WORKFLOW_SESSION_FILE, WORKFLOW_BRIEF_FILE, WORKFLOW_STAGE_DIRECTORY, WORKFLOW_STATE_DIRECTORY } from "../workflow/constants.js";
 import type { ContextMetadata, OptimizationResult, ExtensionConfiguration, AdditionalContextResult, CostProfile, WorkflowExecutionPlan, PackageDetails, WorkflowPreset, ProviderTarget, ContextRefreshMode, ClaudeEffortLevel, WorkflowSessionState, WorkflowBrief, ProjectContext, ArtifactPlan, WorkflowStageRecord } from "../workflow/types.js";
-import { readUtf8, buildWorkspaceUri, isIgnoredDirectory, shouldIncludeEntry } from "../../core/workspace.js";
+import { readUtf8, buildWorkspaceUri, isIgnoredDirectory, normalizeWorkspaceRelativePath, shouldIncludeEntry } from "../../core/workspace.js";
 import { computeSignature, serializeList, parseList } from "../../utils/index.js";
 import { formatProviderModel } from "../providers/providerService.js";
 import { buildArtifactPlan } from "../aiAgents/promptBuilder.js";
@@ -11,7 +11,7 @@ import { replaceManagedBlock } from "../aiAgents/promptBuilder.js";
 import { relativizeToWorkspace } from "../../core/workspace.js";
 import { getProviderLabel } from "../providers/providerService.js";
 import { formatWorkflowRoles } from "../workflow/ui.js";
-import { readWorkflowSessionState, readWorkflowBrief, writeArtifactPlan, ensureParentDirectory, upsertManagedMarkdown, writeWorkflowBrief, writeWorkflowSessionState, writeWorkflowStageFile, buildWorkflowStageContent, buildSuggestedNextPresets, buildContextGenerationMessage, persistWorkflowArtifacts } from './workflowPersistence.js';
+import { readWorkflowSessionState, readWorkflowBrief, buildSuggestedNextPresets, buildContextGenerationMessage, persistWorkflowArtifacts } from './workflowPersistence.js';
 
 export function buildRawContextContent(
 	workflowPlan: WorkflowExecutionPlan,
@@ -236,7 +236,7 @@ export async function readAdditionalContextFiles(
 	const foundPaths: string[] = [];
 
 	for (const relativePath of filePaths) {
-		const sanitizedPath = relativePath.trim();
+		const sanitizedPath = normalizeWorkspaceRelativePath(relativePath);
 		if (!sanitizedPath) {
 			continue;
 		}
@@ -332,9 +332,10 @@ export function getOptimizationSelector(costProfile: CostProfile): { vendor: str
 export async function gatherProjectContext(
 	outputChannel: vscode.OutputChannel,
 	isStartupAutoGeneration: boolean,
-	workflowPlan: WorkflowExecutionPlan
+	workflowPlan: WorkflowExecutionPlan,
+	workspaceFolderOverride?: vscode.WorkspaceFolder
 ): Promise<ProjectContext | undefined> {
-	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+	const workspaceFolder = workspaceFolderOverride ?? vscode.workspace.workspaceFolders?.[0];
 	if (!workspaceFolder) {
 		vscode.window.showWarningMessage('Open a workspace folder before running AI Context Orchestrator.');
 		return undefined;
@@ -428,12 +429,7 @@ export async function gatherProjectContext(
 			: undefined;
 
 		const content = buildContextFileContent(metadata, optimization.content, optimization);
-		await vscode.workspace.fs.writeFile(contextFile, Buffer.from(content, 'utf8'));
-
-		if (artifactPlan) {
-			await writeArtifactPlan(workspaceFolder.uri, artifactPlan);
-		}
-		const workflowArtifacts = await persistWorkflowArtifacts(workspaceFolder, workflowPlan, metadata, contextFile, artifactPlan);
+		const workflowArtifacts = await persistWorkflowArtifacts(workspaceFolder, workflowPlan, metadata, contextFile, artifactPlan, content);
 
 		outputChannel.appendLine(`[context] Generated ${CONTEXT_FILE_NAME} for ${workspaceFolder.name}`);
 		outputChannel.appendLine(`[context] Workflow=${workflowPlan.preset} provider=${workflowPlan.provider} refresh=${workflowPlan.refreshMode} cost=${workflowPlan.costProfile}`);
@@ -627,9 +623,6 @@ export async function tryReuseExistingContext(
 		const artifactPlan = workflowPlan.generateNativeArtifacts
 			? buildArtifactPlan(workspaceFolder.uri, workflowPlan, metadata)
 			: undefined;
-		if (artifactPlan) {
-			await writeArtifactPlan(workspaceFolder.uri, artifactPlan);
-		}
 		const workflowArtifacts = await persistWorkflowArtifacts(workspaceFolder, workflowPlan, metadata, contextFile, artifactPlan);
 
 		outputChannel.appendLine(`[context] ${reason}`);

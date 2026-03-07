@@ -246,6 +246,10 @@ export function getWorkflowStageStatusLabel(status: WorkflowStageStatus): string
 }
 
 export function buildWorkflowTreeMessage(state: WorkflowDashboardState, helpers: WorkflowUiHelpers): string | undefined {
+	if (state.workspaceSelectionRequired) {
+		return 'Choose a workspace folder by opening a file in that folder or by starting a workflow command.';
+	}
+
 	if (!state.workspaceFolder) {
 		return 'Open a workspace to inspect the orchestrator workflow.';
 	}
@@ -260,6 +264,16 @@ export function buildWorkflowTreeMessage(state: WorkflowDashboardState, helpers:
 }
 
 export function buildWorkflowTreeNodes(state: WorkflowDashboardState, helpers: WorkflowUiHelpers): WorkflowTreeNode[] {
+	if (state.workspaceSelectionRequired) {
+		return [{
+			id: 'workflow.select-workspace',
+			label: 'Choose a workspace folder',
+			description: 'Open a file from the target folder or run Init Workflow to select one explicitly.',
+			icon: new vscode.ThemeIcon('folder-library'),
+			contextValue: 'workflow-empty'
+		}];
+	}
+
 	if (!state.workspaceFolder) {
 		return [{
 			id: 'workflow.no-workspace',

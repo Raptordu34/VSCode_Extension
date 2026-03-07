@@ -19,6 +19,8 @@ import {
 	getStoredProviderCredential,
 	setStoredProviderCredential
 } from './credentialService.js';
+import { getImplicitWorkspaceFolder } from '../../core/workspaceContext.js';
+import { extensionContextRef } from '../../extension.js';
 
 export * from './accountManager.js';
 export * from './credentialService.js';
@@ -327,7 +329,7 @@ export async function runProviderAuthAssist(provider?: ProviderTarget, accountId
 
 	const terminal = vscode.window.createTerminal({
 		name: `${getProviderLabel(resolvedProvider)} Auth (${targetAccount.label})`,
-		cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+		cwd: getImplicitWorkspaceFolder(extensionContextRef)?.uri.fsPath,
 		env: await buildProviderLaunchEnvironment(targetAccount)
 	});
 	terminal.show(true);
