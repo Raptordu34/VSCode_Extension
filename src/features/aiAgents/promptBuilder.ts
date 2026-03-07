@@ -523,15 +523,15 @@ export function getGeminiToolsForRole(role: WorkflowRole): string[] {
 }
 export function getGeminiModelForRole(role: WorkflowRole, costProfile: CostProfile): string {
 	if (costProfile === 'fast') {
-		return 'gemini-2.5-flash';
+		return 'gemini-3-flash-preview';
 	}
 
 	if (costProfile === 'strong') {
-		return role === 'explorer' || role === 'tester' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
+		return role === 'explorer' || role === 'tester' ? 'gemini-3-flash-preview' : 'gemini-3.1-pro-preview';
 	}
 
-	return role === 'architect' || role === 'reviewer' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
-	}
+	return role === 'architect' || role === 'reviewer' ? 'gemini-3.1-pro-preview' : 'gemini-3-flash-preview';
+}
 export function getCopilotToolsForRole(role: WorkflowRole): string[] {
 	switch (role) {
 		case 'explorer':

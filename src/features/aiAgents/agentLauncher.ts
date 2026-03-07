@@ -5,22 +5,23 @@ import { getManagedClaudeConfigDir } from "../providers/providerService.js";
 import { CONTEXT_FILE_NAME } from "../workflow/constants.js";
 import { getExtensionConfiguration } from "../../core/configuration.js";
 import { findClaudeAccount, findProviderAccount, buildProviderLaunchEnvironment } from "../providers/providerService.js";
+import { escapeShellArg } from "../../utils/index.js";
 
 export function buildClaudeLaunchCommand(projectContext: ProjectContext, instruction: string): string {
 	const parts = ['claude'];
 	if (projectContext.workflowPlan.providerModel) {
-		parts.push(`--model "${projectContext.workflowPlan.providerModel}"`);
+		parts.push(`--model "${escapeShellArg(projectContext.workflowPlan.providerModel)}"`);
 	}
 	parts.push(`--append-system-prompt-file "${CONTEXT_FILE_NAME}"`);
-	parts.push(`"${instruction}"`);
+	parts.push(`"${escapeShellArg(instruction)}"`);
 	return parts.join(' ');
 }
 export function buildGeminiLaunchCommand(projectContext: ProjectContext, instruction: string): string {
 	const parts = ['gemini'];
 	if (projectContext.workflowPlan.providerModel) {
-		parts.push(`-m "${projectContext.workflowPlan.providerModel}"`);
+		parts.push(`-m "${escapeShellArg(projectContext.workflowPlan.providerModel)}"`);
 	}
-	parts.push(`"${instruction}"`);
+	parts.push(`"${escapeShellArg(instruction)}"`);
 	return parts.join(' ');
 }
 export function launchClaude(projectContext: ProjectContext): void {

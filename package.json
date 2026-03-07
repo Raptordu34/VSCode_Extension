@@ -1,4 +1,5 @@
 {
+  "publisher": "bapti",
   "name": "ai-context-orchestrator",
   "displayName": "AI Context Orchestrator",
   "description": "Generate project context and launch Claude, Gemini, or Copilot with it.",
@@ -14,6 +15,13 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "themes": [
+      {
+        "label": "Glass Terracotta",
+        "uiTheme": "vs-dark",
+        "path": "./themes/glass-terracotta-color-theme.json"
+      }
+    ],
     "commands": [
       {
         "command": "ai-context-orchestrator.initAI",
@@ -296,22 +304,26 @@
         },
         "aiContextOrchestrator.defaultClaudeModel": {
           "type": "string",
-          "default": "claude-sonnet-4-6",
+          "default": "claude-opus-4-6",
           "enum": [
+            "claude-opus-4-6",
             "claude-sonnet-4-6",
-            "claude-opus-4-6"
+            "claude-haiku-4-5-20251001",
+            "claude-opus-4-5",
+            "claude-sonnet-4-5"
           ],
           "description": "Default Claude model proposed in workflow setup and provider launch previews."
         },
         "aiContextOrchestrator.defaultGeminiModel": {
           "type": "string",
-          "default": "gemini-2.5-flash",
+          "default": "gemini-3.1-pro-preview",
           "enum": [
-            "gemini-2.5-flash",
-            "gemini-2.5-pro",
+            "gemini-3.1-pro-preview",
             "gemini-3.1-flash-lite-preview",
             "gemini-3-flash-preview",
-            "gemini-3.1-pro-preview"
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite"
           ],
           "description": "Default Gemini model proposed in workflow setup and launch previews."
         },

@@ -68,7 +68,7 @@ export function buildDefaultAccountStatuses(provider: ProviderTarget, configurat
 		authMode: account.authMode,
 		accountHint: account.accountHint,
 		isActive: account.id === activeAccountId || (!activeAccountId && index === 0),
-		availability: account.label ? 'needs-config' : 'error',
+		availability: (account.provider === 'claude' && !account.configDir) ? 'needs-config' : 'ready',
 		summary: buildDefaultAccountSummary(account),
 		detail: account.notes ?? buildDefaultAccountDetail(account),
 		metrics: buildDefaultAccountMetrics(account)

@@ -146,6 +146,8 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		-webkit-backdrop-filter: blur(18px) saturate(135%);
 		box-shadow: var(--shadow-soft), var(--shadow-glow);
 		overflow: hidden;
+		transform: translateZ(0);
+		will-change: transform, backdrop-filter;
 	}
 	.sidebar-shell {
 		display: grid;
@@ -458,6 +460,22 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		.shortcuts {
 			grid-template-columns: 1fr;
 		}
+	}
+	@media (prefers-reduced-transparency: reduce) {
+		.glass-panel, .card {
+			backdrop-filter: none !important;
+			-webkit-backdrop-filter: none !important;
+			background: var(--vscode-editor-background, #1f1f1f) !important;
+		}
+		.cursor-halo, .blob {
+			display: none !important;
+		}
+	}
+	@keyframes bulb-pulse {
+		0%, 75%, 100% { filter: brightness(0.6) drop-shadow(0 0 2px rgba(214,117,86,0.2)); }
+		82% { filter: brightness(1.6) drop-shadow(0 0 10px rgba(214,117,86,1)) drop-shadow(0 0 22px rgba(214,117,86,0.55)); }
+		88% { filter: brightness(0.9) drop-shadow(0 0 5px rgba(214,117,86,0.5)); }
+		93% { filter: brightness(1.4) drop-shadow(0 0 8px rgba(214,117,86,0.8)); }
 	}
 </style>
 </head>

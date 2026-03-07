@@ -26,9 +26,6 @@ export function normalizeProviderAccounts(
 			if (!label) {
 				return undefined;
 			}
-			if (provider === 'claude' && !configDir) {
-				return undefined;
-			}
 
 			const id = account.id?.trim() || `${provider}-account-${index + 1}`;
 			return {

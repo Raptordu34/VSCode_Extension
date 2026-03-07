@@ -487,10 +487,10 @@ export function detectTechStack(packageSummary: string, treeLines: string[], rea
 	if (combined.includes('typescript') || tree.includes('.ts') || tree.includes('.tsx')) {
 		detected.add('TypeScript');
 	}
-	if (combined.includes('react') || tree.includes('.jsx') || tree.includes('.tsx')) {
+	if (combined.includes('react') || tree.includes('.jsx')) {
 		detected.add('React');
 	}
-	if (combined.includes('vscode')) {
+	if (summary.includes('@types/vscode')) {
 		detected.add('VS Code Extension');
 	}
 	if (combined.includes('eslint')) {
@@ -514,7 +514,7 @@ export function detectTechStack(packageSummary: string, treeLines: string[], rea
 	if (tree.includes('server.js') || combined.includes('express') || combined.includes('fastify') || combined.includes('koa')) {
 		detected.add('Node.js');
 	}
-	if (tree.includes('worker') || tree.includes('worker.js') || tree.includes('worker.ts')) {
+	if (/\.worker\.(js|ts)/.test(tree)) {
 		detected.add('Web Workers');
 	}
 
