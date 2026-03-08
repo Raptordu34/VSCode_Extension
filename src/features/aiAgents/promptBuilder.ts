@@ -119,7 +119,7 @@ function getPresetExecutionProfile(preset: WorkflowPreset): {
 					'Keep findings concrete, severity-ordered, and backed by repository evidence.'
 				],
 				completion: [
-					'Stop after findings, open questions, and verification gaps are explicit.',
+					'Stop once findings, open questions, and verification gaps are explicit.',
 					'Keep any summary or suggested edits secondary to the findings.'
 				],
 				avoid: [

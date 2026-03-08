@@ -1,10 +1,7 @@
+import type { ContextBudget, ProviderCapabilities, ProviderModelDescriptor, ProviderTarget } from './types.js';
 import type {
-	ContextBudget,
 	CostProfile,
 	ExtensionConfiguration,
-	ProviderCapabilities,
-	ProviderModelDescriptor,
-	ProviderTarget,
 	WorkflowPreset
 } from '../workflow/types.js';
 

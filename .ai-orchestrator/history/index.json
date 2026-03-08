@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "activeWorkflowId": "workflow-mmi1g4ed-Js25j7Li",
+  "entries": [
+    {
+      "workflowId": "workflow-mmi1gf3v-DYapFiXO",
+      "branchId": "main",
+      "parentWorkflowId": "workflow-mmi1g4ed-Js25j7Li",
+      "parentStageIndex": 4,
+      "label": "Continue from Plan:",
+      "createdAt": "2026-03-08T17:40:58.363Z",
+      "updatedAt": "2026-03-08T17:40:58.363Z",
+      "currentStageIndex": 4,
+      "stageCount": 4,
+      "currentPreset": "build",
+      "currentProvider": "claude",
+      "briefSummary": "Continue from Plan:",
+      "manifestPath": ".ai-orchestrator/history/workflow-mmi1gf3v-DYapFiXO/manifest.json",
+      "latestStageFile": ".ai-orchestrator/stages/04-build.md"
+    },
+    {
+      "workflowId": "workflow-mmi1g4ed-Js25j7Li",
+      "branchId": "main",
+      "parentWorkflowId": "workflow-mmi0g1tz-1L8kaxgp",
+      "parentStageIndex": 4,
+      "label": "Continue from Plan:",
+      "createdAt": "2026-03-08T17:40:44.485Z",
+      "updatedAt": "2026-03-08T17:40:44.485Z",
+      "currentStageIndex": 4,
+      "stageCount": 4,
+      "currentPreset": "build",
+      "currentProvider": "claude",
+      "briefSummary": "Continue from Plan:",
+      "manifestPath": ".ai-orchestrator/history/workflow-mmi1g4ed-Js25j7Li/manifest.json",
+      "latestStageFile": ".ai-orchestrator/stages/04-build.md"
+    }
+  ]
+}

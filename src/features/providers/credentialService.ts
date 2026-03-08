@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { PROVIDER_ACCOUNT_SECRET_PREFIX } from '../workflow/constants.js';
-import type { ProviderAccountConfiguration, ProviderTarget } from '../workflow/types.js';
+import type { ProviderAccountConfiguration, ProviderTarget } from './types.js';
 
 export function getAccountSecretStorageKey(account: ProviderAccountConfiguration): string {
 	return `${PROVIDER_ACCOUNT_SECRET_PREFIX}:${account.provider}:${account.id}`;

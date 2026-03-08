@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import type { ClaudeEffortLevel, ExtensionConfiguration, ProviderAccountConfiguration, ProviderTarget, WorkflowQuickPickItem } from '../workflow/types.js';
+import type { ProviderAccountConfiguration, ProviderTarget } from './types.js';
+import type { ClaudeEffortLevel, ExtensionConfiguration, WorkflowQuickPickItem } from '../workflow/types.js';
 import { getExtensionConfiguration } from '../../core/configuration.js';
 import {
 	findProviderAccount,

@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { PROVIDER_STATUS_CACHE_KEY } from '../workflow/constants.js';
 import type {
-	ExtensionConfiguration,
 	MetricDisplay,
 	ProviderAccountConfiguration,
 	ProviderAccountStatus,
@@ -9,7 +8,8 @@ import type {
 	ProviderStatusCache,
 	ProviderStatusSnapshot,
 	ProviderTarget
-} from '../workflow/types.js';
+} from './types.js';
+import type { ExtensionConfiguration } from '../workflow/types.js';
 import { execShellCommand } from '../../utils/index.js';
 import { getExtensionConfiguration } from '../../core/configuration.js';
 import { fileExists } from '../../core/workspace.js';

@@ -1,9 +1,8 @@
 import * as vscode from 'vscode';
+import type { ProviderAccountConfiguration, ProviderTarget } from './types.js';
 import type {
 	ClaudeEffortLevel,
 	ExtensionConfiguration,
-	ProviderAccountConfiguration,
-	ProviderTarget,
 	WorkflowPresetDefinition
 } from '../workflow/types.js';
 import { getProviderCapabilities, getProviderModelCatalog } from './providerCatalog.js';

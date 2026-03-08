@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { ProjectContext } from "../workflow/types.js";
+import type { ProjectContext, WorkflowExecutionPlan } from "../workflow/types.js";
 import { buildProviderLaunchPrompt, buildSharedWorkflowInstruction } from "./promptBuilder.js";
 import { getManagedClaudeConfigDir } from "../providers/providerService.js";
 import { CONTEXT_FILE_NAME } from "../workflow/constants.js";
@@ -42,6 +42,40 @@ export function launchClaude(context: vscode.ExtensionContext, projectContext: P
 		terminal.sendText(buildClaudeLaunchCommand(projectContext, buildSharedWorkflowInstruction(projectContext)), true);
 		void vscode.window.showInformationMessage(`Claude Code launched for the ${projectContext.workflowPlan.preset} workflow${claudeAccount ? ` with ${claudeAccount.label}` : ''}.`);
 	})();
+}
+
+export async function launchCopilot(projectContext: ProjectContext): Promise<void> {
+	const prompt = buildSharedWorkflowInstruction(projectContext);
+	await vscode.env.clipboard.writeText(prompt);
+	await vscode.commands.executeCommand('workbench.action.chat.open');
+
+	const action = await vscode.window.showInformationMessage(
+		'Copilot Chat opened. The workflow prompt has been copied to the clipboard.',
+		'Copy Prompt Again',
+		'Open Context File'
+	);
+
+	if (action === 'Copy Prompt Again') {
+		await vscode.env.clipboard.writeText(prompt);
+		return;
+	}
+	if (action === 'Open Context File') {
+		await vscode.window.showTextDocument(projectContext.contextFile);
+	}
+}
+
+export async function launchProvider(context: vscode.ExtensionContext, workflowPlan: WorkflowExecutionPlan, projectContext: ProjectContext): Promise<void> {
+	switch (workflowPlan.provider) {
+		case 'claude':
+			launchClaude(context, projectContext);
+			break;
+		case 'gemini':
+			launchGemini(context, projectContext);
+			break;
+		case 'copilot':
+			await launchCopilot(projectContext);
+			break;
+	}
 }
 
 export function launchGemini(context: vscode.ExtensionContext, projectContext: ProjectContext): void {

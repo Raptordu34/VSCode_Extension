@@ -1,0 +1,70 @@
+{
+  "workflowId": "workflow-mmi1gf50-LM6h_NVH",
+  "branchId": "main",
+  "label": "Fork of Continue from Plan: @ stage 01",
+  "createdAt": "2026-03-08T17:40:58.404Z",
+  "updatedAt": "2026-03-08T17:40:58.404Z",
+  "session": {
+    "workspaceName": "VSCode_Extension",
+    "workspaceFolderId": "file:///c%3A/Users/bapti/Documents/Projects/Business/VSCode_Extension",
+    "workflowId": "workflow-mmi1gf50-LM6h_NVH",
+    "branchId": "main",
+    "createdAt": "2026-03-08T17:40:58.404Z",
+    "label": "Fork of Continue from Plan: @ stage 01",
+    "updatedAt": "2026-03-08T17:40:58.404Z",
+    "currentStageIndex": 1,
+    "currentPreset": "explore",
+    "currentProvider": "claude",
+    "currentProviderModel": "claude-sonnet-4-6",
+    "currentClaudeEffort": "medium",
+    "briefFile": ".ai-orchestrator/brief.md",
+    "stages": [
+      {
+        "index": 1,
+        "workflowId": "workflow-mmi1gf50-LM6h_NVH",
+        "branchId": "main",
+        "preset": "explore",
+        "provider": "claude",
+        "providerModel": "claude-sonnet-4-6",
+        "status": "completed",
+        "stageFile": ".ai-orchestrator/stages/01-explore.md",
+        "generatedAt": "2026-03-08T17:12:41.543Z",
+        "briefSummary": "Explore the repository and identify reusable patterns.",
+        "contextFile": ".ai-context.md",
+        "claudeEffort": "medium",
+        "artifactFiles": [],
+        "upstreamStageFiles": []
+      }
+    ],
+    "parentWorkflowId": "workflow-mmi1g4ed-Js25j7Li",
+    "parentStageIndex": 1
+  },
+  "brief": {
+    "taskType": "feature",
+    "goal": "Continue from Plan:",
+    "constraints": [
+      "none provided"
+    ],
+    "rawText": "# User Brief\n\nType: feature\nGoal: Continue from Plan:\n\nConstraints:\n- none provided\n\nRaw:\n# User Brief\n\nType: feature\nGoal: Continue from Plan:\n\nConstraints:\n- none provided\n\nRaw:\nContinue from Plan:"
+  },
+  "files": [
+    {
+      "relativePath": ".ai-context.md",
+      "kind": "full",
+      "archivePath": ".ai-orchestrator/history/workflow-mmi1gf50-LM6h_NVH/files/.ai-context.md"
+    },
+    {
+      "relativePath": ".ai-orchestrator/session.json",
+      "kind": "session-json"
+    },
+    {
+      "relativePath": ".ai-orchestrator/brief.md",
+      "kind": "brief-markdown"
+    },
+    {
+      "relativePath": ".ai-orchestrator/stages/01-explore.md",
+      "kind": "full",
+      "archivePath": ".ai-orchestrator/history/workflow-mmi1gf50-LM6h_NVH/files/.ai-orchestrator/stages/01-explore.md"
+    }
+  ]
+}

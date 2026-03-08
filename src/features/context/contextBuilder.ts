@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
 import { Logger } from "../../core/logger.js";
 import { CONTEXT_FILE_NAME, GENERATED_SECTION_START, GENERATED_SECTION_END, WORKFLOW_SESSION_FILE, WORKFLOW_BRIEF_FILE, WORKFLOW_STAGE_DIRECTORY, WORKFLOW_STATE_DIRECTORY } from "../workflow/constants.js";
-import type { ContextBudget, ContextMetadata, OptimizationResult, ExtensionConfiguration, AdditionalContextResult, CostProfile, WorkflowExecutionPlan, PackageDetails, WorkflowPreset, ProviderTarget, ContextRefreshMode, ClaudeEffortLevel, WorkflowSessionState, WorkflowBrief, ProjectContext, ArtifactPlan, WorkflowStageRecord } from "../workflow/types.js";
+import type { ContextMetadata, OptimizationResult, ExtensionConfiguration, CostProfile, WorkflowExecutionPlan, WorkflowPreset, ProviderTarget, ContextRefreshMode, ClaudeEffortLevel, WorkflowSessionState, WorkflowBrief, ProjectContext, ArtifactPlan, WorkflowStageRecord } from "../workflow/types.js";
+import type { ContextBudget } from "../providers/types.js";
+import type { PackageDetails, AdditionalContextResult } from "./types.js";
 import { readUtf8, buildWorkspaceUri, isIgnoredDirectory, normalizeWorkspaceRelativePath, shouldIncludeEntry } from "../../core/workspace.js";
 import { computeSignature, serializeList, parseList } from "../../utils/index.js";
 import { formatProviderModel } from "../providers/providerService.js";
