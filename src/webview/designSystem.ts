@@ -68,11 +68,16 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		--spacing-sm: 1rem;
 		--spacing-md: 1.5rem;
 		--spacing-lg: 2.25rem;
-		--radius-sm: 8px;
-		--radius-md: 14px;
-		--radius-lg: 24px;
-		--shadow-soft: 0 18px 48px rgba(0,0,0,0.24), 0 6px 16px rgba(0,0,0,0.18);
-		--shadow-glow: 0 0 0 1px rgba(255,255,255,0.03), 0 0 24px rgba(214, 117, 86, 0.06);
+		--radius-sm: 3px;
+		--radius-md: 2px;
+		--radius-lg: 2px;
+		--radius-interactive: 4px;
+		--shadow-elev-1: 0 1px 2px rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.18);
+		--shadow-elev-2: 0 1px 3px rgba(0,0,0,0.32), 0 4px 12px rgba(0,0,0,0.22), 0 8px 24px rgba(0,0,0,0.14);
+		--shadow-elev-3: 0 2px 4px rgba(0,0,0,0.36), 0 8px 20px rgba(0,0,0,0.26), 0 16px 40px rgba(0,0,0,0.16);
+		--btn-highlight: inset 0 1px 0 rgba(255,255,255,0.08);
+		--btn-press: inset 0 2px 4px rgba(0,0,0,0.28);
+		--panel-glass: color-mix(in srgb, var(--vscode-sideBar-background, #252526) 90%, transparent);
 	}
 	body {
 		margin: 0;
