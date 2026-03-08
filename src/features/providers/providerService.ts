@@ -22,6 +22,7 @@ import {
 import { getImplicitWorkspaceFolder } from '../../core/workspaceContext.js';
 
 export * from './accountManager.js';
+export * from './providerCatalog.js';
 export * from './credentialService.js';
 export * from './statusService.js';
 

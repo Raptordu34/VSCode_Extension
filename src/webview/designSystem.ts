@@ -35,18 +35,34 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 <style>
 	:root {
 		color-scheme: light dark;
-		--bg-color: var(--vscode-editor-background, #262624);
-		--panel-bg: color-mix(in srgb, var(--vscode-sideBar-background, #1f1f1f) 78%, rgba(48, 48, 46, 0.55));
-		--panel-strong: color-mix(in srgb, var(--vscode-sideBar-background, #1f1f1f) 88%, rgba(48, 48, 46, 0.72));
-		--panel-soft: color-mix(in srgb, var(--vscode-sideBar-background, #1f1f1f) 68%, rgba(48, 48, 46, 0.35));
-		--glass-border: color-mix(in srgb, var(--vscode-panel-border, rgba(255,255,255,0.12)) 72%, rgba(255,255,255,0.12));
-		--accent: #d67556;
-		--accent-dark: #c4643f;
-		--accent-glow: rgba(214, 117, 86, 0.28);
-		--text-primary: var(--vscode-foreground, #f5f3f0);
-		--text-secondary: var(--vscode-descriptionForeground, #9e9a94);
-		--text-muted: color-mix(in srgb, var(--vscode-descriptionForeground, #c4c0ba) 88%, white 12%);
-		--text-body: color-mix(in srgb, var(--vscode-foreground, #dedad5) 92%, white 8%);
+		--bg-color: var(--vscode-editor-background, #1e1e1e);
+		--panel-bg: var(--vscode-sideBar-background, #252526);
+		--panel-strong: color-mix(in srgb, var(--vscode-sideBar-background, #252526) 92%, var(--vscode-editorWidget-background, #2d2d30) 8%);
+		--panel-soft: color-mix(in srgb, var(--vscode-sideBar-background, #252526) 88%, var(--vscode-list-hoverBackground, rgba(255,255,255,0.04)) 12%);
+		--panel-elevated: var(--vscode-editorWidget-background, #252526);
+		--glass-border: var(--vscode-panel-border, rgba(128,128,128,0.35));
+		--accent: var(--vscode-focusBorder, #007fd4);
+		--accent-dark: var(--vscode-button-background, #0e639c);
+		--accent-glow: color-mix(in srgb, var(--vscode-focusBorder, #007fd4) 35%, transparent);
+		--focus-ring: 0 0 0 1px var(--vscode-focusBorder, #007fd4);
+		--text-primary: var(--vscode-foreground, #cccccc);
+		--text-secondary: var(--vscode-descriptionForeground, #9d9d9d);
+		--text-muted: var(--vscode-disabledForeground, #7f7f7f);
+		--text-body: var(--vscode-foreground, #cccccc);
+		--button-primary-bg: var(--vscode-button-background, #0e639c);
+		--button-primary-fg: var(--vscode-button-foreground, #ffffff);
+		--button-primary-hover: var(--vscode-button-hoverBackground, #1177bb);
+		--button-secondary-bg: var(--vscode-button-secondaryBackground, #3a3d41);
+		--button-secondary-fg: var(--vscode-button-secondaryForeground, #ffffff);
+		--button-secondary-hover: var(--vscode-button-secondaryHoverBackground, #45494e);
+		--input-bg: var(--vscode-input-background, #3c3c3c);
+		--input-fg: var(--vscode-input-foreground, #cccccc);
+		--input-border: var(--vscode-input-border, rgba(0,0,0,0));
+		--hover-bg: var(--vscode-list-hoverBackground, rgba(255,255,255,0.04));
+		--active-bg: var(--vscode-list-activeSelectionBackground, rgba(14,99,156,0.35));
+		--active-fg: var(--vscode-list-activeSelectionForeground, #ffffff);
+		--badge-bg: var(--vscode-badge-background, #4d4d4d);
+		--badge-fg: var(--vscode-badge-foreground, #ffffff);
 		--font-family: "Segoe UI", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 		--spacing-xs: 0.5rem;
 		--spacing-sm: 1rem;
@@ -62,10 +78,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		margin: 0;
 		min-height: 100vh;
 		font-family: var(--font-family);
-		background:
-			radial-gradient(circle at top right, rgba(214, 117, 86, 0.16), transparent 24%),
-			radial-gradient(circle at bottom left, rgba(214, 117, 86, 0.10), transparent 22%),
-			var(--bg-color);
+		background: var(--bg-color);
 		color: var(--text-body);
 		line-height: 1.6;
 		overflow-x: hidden;
@@ -84,35 +97,15 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		background: transparent;
 	}
 	::-webkit-scrollbar-thumb {
-		background: rgba(214, 117, 86, 0.35);
+		background: color-mix(in srgb, var(--vscode-scrollbarSlider-background, rgba(121,121,121,0.4)) 90%, transparent);
 		border-radius: 999px;
 	}
 	::-webkit-scrollbar-thumb:hover {
-		background: rgba(214, 117, 86, 0.58);
+		background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100,100,100,0.7));
 	}
-	.cursor-halo {
-		position: fixed;
-		left: 0;
-		top: 0;
-		width: 220px;
-		height: 220px;
-		pointer-events: none;
-		transform: translate(-50%, -50%);
-		border-radius: 999px;
-		background: radial-gradient(circle, rgba(214, 117, 86, 0.12) 0%, rgba(214, 117, 86, 0.06) 34%, transparent 70%);
-		filter: blur(2px);
-		opacity: 0.9;
-		z-index: 0;
-	}
+	.cursor-halo,
 	.blob {
-		position: fixed;
-		width: 280px;
-		height: 280px;
-		border-radius: 50%;
-		background: radial-gradient(circle, rgba(214, 117, 86, 0.16) 0%, rgba(214, 117, 86, 0.04) 55%, transparent 76%);
-		filter: blur(20px);
-		pointer-events: none;
-		z-index: 0;
+		display: none;
 	}
 	.blob.blob-1 {
 		top: -100px;
@@ -138,16 +131,14 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	}
 	.glass-panel {
 		position: relative;
-		background: linear-gradient(160deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 28%, transparent 62%), var(--panel-bg);
+		background: var(--panel-bg);
 		border: 1px solid var(--glass-border);
-		border-top-color: rgba(255,255,255,0.16);
+		border-top-color: var(--glass-border);
 		border-radius: var(--radius-lg);
-		backdrop-filter: blur(18px) saturate(135%);
-		-webkit-backdrop-filter: blur(18px) saturate(135%);
-		box-shadow: var(--shadow-soft), var(--shadow-glow);
+		box-shadow: 0 1px 2px rgba(0,0,0,0.16);
 		overflow: hidden;
 		transform: translateZ(0);
-		will-change: transform, backdrop-filter;
+		will-change: transform;
 	}
 	.sidebar-shell {
 		display: grid;
@@ -181,15 +172,15 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		align-items: center;
 		gap: 8px;
 		width: fit-content;
-		padding: 7px 11px;
+		padding: 4px 8px;
 		border-radius: 999px;
-		background: rgba(214, 117, 86, 0.12);
-		border: 1px solid rgba(214, 117, 86, 0.24);
-		color: #f2b59e;
-		font-size: 0.74rem;
+		background: var(--badge-bg);
+		border: 1px solid transparent;
+		color: var(--badge-fg);
+		font-size: 0.72rem;
 		font-weight: 700;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
+		letter-spacing: 0.02em;
+		text-transform: none;
 	}
 	.nav-links {
 		display: grid;
@@ -201,23 +192,23 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		text-align: left;
 		padding: 12px 14px;
 		border-radius: 14px;
-		border: 1px solid rgba(255,255,255,0.08);
-		background: rgba(255,255,255,0.04);
+		border: 1px solid transparent;
+		background: transparent;
 		color: var(--text-body);
 		cursor: pointer;
 		transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
 	}
 	.nav-btn:hover {
-		transform: translateY(-1px);
-		background: rgba(214, 117, 86, 0.10);
-		border-color: rgba(214, 117, 86, 0.24);
+		transform: none;
+		background: var(--hover-bg);
+		border-color: transparent;
 	}
 	.nav-btn.active,
 	.nav-btn[data-emphasis="strong"] {
-		background: linear-gradient(160deg, rgba(214, 117, 86, 0.18) 0%, rgba(214, 117, 86, 0.08) 100%);
-		border-color: rgba(214, 117, 86, 0.34);
-		color: var(--text-primary);
-		box-shadow: 0 0 16px rgba(214, 117, 86, 0.08);
+		background: var(--active-bg);
+		border-color: transparent;
+		color: var(--active-fg);
+		box-shadow: none;
 	}
 	.nav-btn strong,
 	.nav-btn span {
@@ -250,16 +241,16 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		align-content: start;
 	}
 	.card {
-		background: linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 26%, transparent 68%), var(--panel-strong);
-		border: 1px solid rgba(255,255,255,0.08);
-		border-top-color: rgba(255,255,255,0.14);
+		background: var(--panel-strong);
+		border: 1px solid var(--glass-border);
+		border-top-color: var(--glass-border);
 		border-radius: 18px;
 		padding: 16px;
-		box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+		box-shadow: none;
 	}
 	.hero {
 		padding: 18px;
-		background: linear-gradient(145deg, rgba(214, 117, 86, 0.22), rgba(255,255,255,0.03) 55%, rgba(0,0,0,0.04));
+		background: var(--panel-elevated);
 	}
 	h1,
 	h2,
@@ -271,43 +262,22 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		color: var(--text-primary);
 		font-size: 1.02rem;
 		font-weight: 800;
-		position: relative;
-		display: inline-block;
-		padding-bottom: 10px;
-	}
-	h2::after {
-		content: '';
-		position: absolute;
-		left: 0;
-		bottom: 0;
-		width: 62%;
-		height: 4px;
-		border-radius: 999px;
-		background: var(--accent);
-		box-shadow: 0 0 14px var(--accent-glow);
-	}
-	@keyframes water-ripple {
-		0%,100% { box-shadow: 0 0 10px var(--accent-glow), 0 0 0 0 rgba(214,117,86,0); transform: scale(1); }
-		8% { box-shadow: 0 0 18px rgba(214,117,86,0.9), 0 0 0 0 rgba(214,117,86,0.18); transform: scale(1.24); }
-		18% { box-shadow: 0 0 10px var(--accent-glow), 0 0 0 10px rgba(214,117,86,0); transform: scale(1); }
 	}
 	h3 {
 		display: flex;
 		align-items: center;
-		gap: 10px;
+		gap: 8px;
 		font-size: 1rem;
 		font-weight: 700;
 		color: var(--text-primary);
-		padding-top: 8px;
+		padding-top: 0;
 	}
 	h3::before {
 		content: '';
-		width: 12px;
-		height: 12px;
-		border-radius: 50%;
+		width: 3px;
+		height: 16px;
+		border-radius: 999px;
 		background: var(--accent);
-		box-shadow: 0 0 10px var(--accent-glow);
-		animation: water-ripple 5.5s ease-out infinite;
 	}
 	.lead {
 		margin-top: 10px;
@@ -328,8 +298,8 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	.stat {
 		padding: 12px;
 		border-radius: 14px;
-		background: color-mix(in srgb, var(--panel-soft) 85%, rgba(255,255,255,0.03));
-		border: 1px solid rgba(255,255,255,0.06);
+		background: var(--panel-soft);
+		border: 1px solid var(--glass-border);
 	}
 	.stat strong {
 		display: block;
@@ -351,19 +321,27 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	button {
 		appearance: none;
 		width: 100%;
-		border: 0;
+		border: 1px solid transparent;
 		border-radius: 12px;
 		padding: 10px 12px;
-		background: linear-gradient(160deg, rgba(214,117,86,0.95), rgba(196,100,63,0.95));
-		color: #fff7f2;
+		background: var(--button-primary-bg);
+		color: var(--button-primary-fg);
 		cursor: pointer;
 		text-align: left;
-		box-shadow: 0 8px 24px rgba(214, 117, 86, 0.14);
-		transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+		box-shadow: none;
+		transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
 	}
 	button:hover:not(:disabled) {
-		transform: translateY(-1px);
-		box-shadow: 0 10px 26px rgba(214, 117, 86, 0.20);
+		transform: none;
+		background: var(--button-primary-hover);
+	}
+	button:focus-visible,
+	input:focus-visible,
+	textarea:focus-visible,
+	select:focus-visible,
+	details summary:focus-visible {
+		outline: none;
+		box-shadow: var(--focus-ring);
 	}
 	button:disabled {
 		cursor: default;
@@ -371,15 +349,15 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	}
 	button.secondary,
 	.linkButton {
-		background: rgba(255,255,255,0.04);
-		color: var(--text-body);
-		border: 1px solid rgba(255,255,255,0.08);
+		background: var(--button-secondary-bg);
+		color: var(--button-secondary-fg);
+		border: 1px solid transparent;
 		box-shadow: none;
 	}
 	button.secondary:hover:not(:disabled),
 	.linkButton:hover:not(:disabled) {
-		background: rgba(214, 117, 86, 0.10);
-		border-color: rgba(214, 117, 86, 0.28);
+		background: var(--button-secondary-hover);
+		border-color: transparent;
 	}
 	.linkButton span {
 		display: block;
@@ -398,7 +376,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		padding: 4px;
 		border-radius: 16px;
 		background: var(--panel-strong);
-		border: 1px solid rgba(255,255,255,0.06);
+		border: 1px solid var(--glass-border);
 		overflow-x: auto;
 		scrollbar-width: none;
 	}
@@ -421,15 +399,15 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		box-shadow: none;
 	}
 	.tab-bar-btn:hover {
-		background: rgba(214, 117, 86, 0.08);
+		background: var(--hover-bg);
 		color: var(--text-body);
 		transform: none;
 	}
 	.tab-bar-btn.active {
-		background: linear-gradient(160deg, rgba(214, 117, 86, 0.20) 0%, rgba(214, 117, 86, 0.10) 100%);
-		border-color: rgba(214, 117, 86, 0.30);
-		color: var(--text-primary);
-		box-shadow: 0 0 12px rgba(214, 117, 86, 0.06);
+		background: var(--active-bg);
+		border-color: transparent;
+		color: var(--active-fg);
+		box-shadow: none;
 	}
 	.tab-panel {
 		display: none;
@@ -481,7 +459,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	.mc-section {
 		border-radius: var(--radius-md);
 		background: var(--panel-strong);
-		border: 1px solid rgba(255,255,255,0.07);
+		border: 1px solid var(--glass-border);
 		margin-bottom: 6px;
 		overflow: hidden;
 	}
@@ -499,7 +477,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		color: var(--text-primary);
 	}
 	.mc-section-header::-webkit-details-marker { display: none; }
-	.mc-section-header:hover { background: rgba(214,117,86,0.06); }
+	.mc-section-header:hover { background: var(--hover-bg); }
 	.mc-section-title { flex: 1; }
 	.mc-section-badge {
 		font-size: 0.76rem;
@@ -511,6 +489,12 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		max-width: 60%;
 	}
 	.mc-section-body { padding: 0 12px 12px; }
+	.section-footnote {
+		margin: 0 0 10px;
+		font-size: 0.76rem;
+		color: var(--text-secondary);
+		line-height: 1.45;
+	}
 	.preset-selector {
 		display: flex;
 		flex-wrap: wrap;
@@ -521,8 +505,8 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		appearance: none;
 		padding: 5px 12px;
 		border-radius: 999px;
-		border: 1px solid rgba(255,255,255,0.10);
-		background: rgba(255,255,255,0.04);
+		border: 1px solid var(--glass-border);
+		background: var(--panel-soft);
 		color: var(--text-secondary);
 		cursor: pointer;
 		font-size: 0.80rem;
@@ -531,33 +515,49 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		box-shadow: none;
 		transition: background 100ms, border-color 100ms, color 100ms;
 	}
-	.preset-btn:hover:not(:disabled) { background: rgba(214,117,86,0.10); color: var(--text-body); transform: none; box-shadow: none; }
+	.preset-btn:hover:not(:disabled) { background: var(--hover-bg); color: var(--text-body); transform: none; box-shadow: none; }
 	.preset-btn.active {
-		background: linear-gradient(160deg, rgba(214,117,86,0.22), rgba(214,117,86,0.10));
-		border-color: rgba(214,117,86,0.40);
-		color: var(--text-primary);
+		background: var(--active-bg);
+		border-color: transparent;
+		color: var(--active-fg);
 		box-shadow: none;
 		transform: none;
 	}
-	.stage-pills { display: grid; gap: 6px; }
+	.stage-pills { display: grid; gap: 8px; }
 	.stage-pill {
-		border-radius: 10px;
-		padding: 8px 10px;
+		border-radius: 12px;
+		padding: 12px;
 		border: 1px solid rgba(255,255,255,0.07);
 		background: rgba(255,255,255,0.03);
 	}
-	.stage-pill.completed { border-color: rgba(100,200,100,0.20); background: rgba(100,200,100,0.05); }
-	.stage-pill.in-progress { border-color: rgba(214,117,86,0.30); background: rgba(214,117,86,0.07); }
+	.stage-pill.completed { border-color: color-mix(in srgb, var(--vscode-testing-iconPassed, #73c991) 40%, var(--glass-border)); background: color-mix(in srgb, var(--vscode-testing-iconPassed, #73c991) 12%, var(--panel-strong)); }
+	.stage-pill.in-progress { border-color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 42%, var(--glass-border)); background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 12%, var(--panel-strong)); }
+	.stage-meta-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+	}
+	.stage-badge {
+		background: rgba(255,255,255,0.05);
+		border-color: rgba(255,255,255,0.08);
+		color: var(--text-secondary);
+	}
+	.stage-pill.in-progress .stage-badge {
+		background: var(--badge-bg);
+		border-color: transparent;
+		color: var(--badge-fg);
+	}
 	.history-list { display: grid; gap: 8px; }
 	.history-entry {
 		border-radius: 12px;
-		padding: 10px;
+		padding: 12px;
 		border: 1px solid rgba(255,255,255,0.07);
 		background: rgba(255,255,255,0.03);
 	}
 	.history-entry.active {
-		border-color: rgba(214,117,86,0.30);
-		background: rgba(214,117,86,0.08);
+		border-color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 42%, var(--glass-border));
+		background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 12%, var(--panel-strong));
 	}
 	.history-meta-row {
 		display: flex;
@@ -575,9 +575,9 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		font-weight: 700;
 		padding: 3px 8px;
 		border-radius: 999px;
-		background: rgba(214,117,86,0.14);
-		border: 1px solid rgba(214,117,86,0.24);
-		color: #f2b59e;
+		background: var(--badge-bg);
+		border: 1px solid transparent;
+		color: var(--badge-fg);
 		white-space: nowrap;
 	}
 	.history-summary {
@@ -597,100 +597,151 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	}
 	.pill-label { display: block; font-size: 0.83rem; font-weight: 700; color: var(--text-primary); }
 	.pill-status { display: block; font-size: 0.74rem; color: var(--text-secondary); margin-top: 2px; }
-	.pill-actions { display: flex; gap: 6px; margin-top: 6px; }
+	.pill-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 	.small-btn { padding: 4px 10px !important; font-size: 0.76rem !important; border-radius: 8px !important; }
 	.provider-row { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
 	.provider-row:last-of-type { border-bottom: none; }
+	.provider-card {
+		padding: 12px;
+		border-radius: 14px;
+		background: var(--panel-soft);
+		border: 1px solid var(--glass-border);
+	}
+	.provider-title-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+	}
+	.provider-title-row strong {
+		font-size: 0.84rem;
+		color: var(--text-primary);
+	}
+	.provider-badge {
+		background: var(--badge-bg);
+		border-color: transparent;
+		color: var(--badge-fg);
+	}
+	.provider-detail {
+		display: block;
+		margin-top: 6px;
+	}
+	.dense-actions {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
 	.advanced-details summary { cursor: pointer; font-size: 0.80rem; color: var(--text-secondary); list-style: none; }
 	.advanced-details summary::-webkit-details-marker { display: none; }
 	.advanced-details summary:hover { color: var(--text-body); }
-	/* Config Drawer */
-	.mc-backdrop {
-	  position: fixed;
-	  inset: 0;
-	  background: rgba(0,0,0,0.5);
-	  backdrop-filter: blur(4px);
-	  -webkit-backdrop-filter: blur(4px);
-	  z-index: 100;
-	  animation: fade-in 150ms ease;
-	}
+	/* Workflow launcher */
 	.mc-drawer {
-	  position: fixed;
-	  bottom: 0;
-	  left: 0;
-	  right: 0;
-	  z-index: 101;
-	  background: var(--panel-strong);
-	  border-top: 1px solid var(--glass-border);
-	  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-	  display: flex;
-	  flex-direction: column;
-	  max-height: 90vh;
-	  animation: slide-up 200ms ease-out;
-	}
-	@keyframes slide-up {
-	  from { transform: translateY(100%); }
-	  to   { transform: translateY(0); }
+	  display: grid;
+	  gap: 0;
+	  margin-bottom: 12px;
+	  background: var(--panel-elevated);
+	  border: 1px solid var(--glass-border);
+	  box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+	  animation: fade-in 140ms ease-out;
 	}
 	@keyframes fade-in {
-	  from { opacity: 0; }
-	  to   { opacity: 1; }
+	  from { opacity: 0; transform: translateY(6px); }
+	  to   { opacity: 1; transform: translateY(0); }
 	}
 	.drawer-header {
 	  display: flex;
-	  align-items: center;
+	  align-items: flex-start;
 	  justify-content: space-between;
-	  padding: 14px 16px 10px;
-	  border-bottom: 1px solid rgba(255,255,255,0.07);
+	  gap: 16px;
+	  padding: 16px 18px 12px;
+	  border-bottom: 1px solid rgba(255,255,255,0.08);
 	  flex-shrink: 0;
 	}
 	.drawer-title {
-	  font-size: 0.95rem;
+	  font-size: 1rem;
 	  font-weight: 800;
 	  color: var(--text-primary);
 	}
-	.drawer-close {
-	  appearance: none;
-	  background: none;
-	  border: none;
+	.drawer-subtitle {
+	  margin-top: 4px;
+	  font-size: 0.80rem;
 	  color: var(--text-secondary);
-	  cursor: pointer;
-	  font-size: 1rem;
-	  padding: 4px 8px;
-	  border-radius: 6px;
-	  width: auto;
-	  box-shadow: none;
-	  transition: color 120ms, background 120ms;
+	  max-width: 44ch;
 	}
-	.drawer-close:hover { color: var(--text-primary); background: rgba(255,255,255,0.06); transform: none; box-shadow: none; }
+	.drawer-close {
+	  width: auto;
+	  padding: 7px 11px;
+	  font-size: 0.78rem;
+	  line-height: 1;
+	  background: var(--button-secondary-bg);
+	  color: var(--button-secondary-fg);
+	  border: 1px solid transparent;
+	  box-shadow: none;
+	}
+	.drawer-close:hover { color: var(--button-secondary-fg); background: var(--button-secondary-hover); transform: none; box-shadow: none; }
 	.drawer-body {
 	  overflow-y: auto;
-	  padding: 14px 16px;
+	  padding: 14px 18px 18px;
 	  display: grid;
-	  gap: 14px;
+	  gap: 12px;
 	  flex: 1;
 	}
+	.drawer-intro {
+	  display: grid;
+	  gap: 4px;
+	  padding: 12px 14px;
+	  border-radius: 14px;
+	  background: var(--panel-soft);
+	  border: 1px solid var(--glass-border);
+	}
+	.drawer-intro strong {
+	  font-size: 0.84rem;
+	  color: var(--text-primary);
+	}
+	.drawer-intro span {
+	  font-size: 0.77rem;
+	  color: var(--text-secondary);
+	}
+	.drawer-group {
+	  display: grid;
+	  gap: 12px;
+	  padding: 14px;
+	  border-radius: 16px;
+	  background: var(--panel-soft);
+	  border: 1px solid var(--glass-border);
+	}
 	.drawer-footer {
-	  padding: 12px 16px;
-	  border-top: 1px solid rgba(255,255,255,0.07);
-	  flex-shrink: 0;
+	  display: flex;
+	  align-items: center;
+	  justify-content: flex-end;
+	  gap: 10px;
+	  flex-wrap: wrap;
+	  padding: 12px 18px 16px;
+	  border-top: 1px solid var(--glass-border);
 	}
 	.drawer-field { display: grid; gap: 6px; }
 	.drawer-label {
-	  font-size: 0.78rem;
-	  font-weight: 700;
-	  color: var(--text-secondary);
+	  font-size: 0.76rem;
+	  font-weight: 800;
+	  color: var(--text-primary);
 	  text-transform: uppercase;
 	  letter-spacing: 0.06em;
+	}
+	.drawer-help {
+	  margin: 0;
+	  font-size: 0.78rem;
+	  color: var(--text-secondary);
+	}
+	.drawer-hint {
+	  font-size: 0.74rem;
+	  color: var(--text-secondary);
 	}
 	.drawer-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 	.drawer-pill {
 	  appearance: none;
-	  padding: 5px 12px;
+	  padding: 7px 12px;
 	  border-radius: 999px;
-	  border: 1px solid rgba(255,255,255,0.10);
-	  background: rgba(255,255,255,0.04);
-	  color: var(--text-secondary);
+	  border: 1px solid var(--glass-border);
+	  background: var(--panel-bg);
+	  color: var(--text-body);
 	  cursor: pointer;
 	  font-size: 0.80rem;
 	  font-weight: 600;
@@ -698,41 +749,103 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	  box-shadow: none;
 	  transition: background 100ms, border-color 100ms, color 100ms;
 	}
-	.drawer-pill:hover:not(:disabled) { background: rgba(214,117,86,0.10); color: var(--text-body); transform: none; box-shadow: none; }
+	.drawer-pill:hover:not(:disabled) { background: var(--hover-bg); color: var(--text-primary); transform: none; box-shadow: none; }
 	.drawer-pill.active {
-	  background: linear-gradient(160deg, rgba(214,117,86,0.22), rgba(214,117,86,0.10));
-	  border-color: rgba(214,117,86,0.40);
-	  color: var(--text-primary);
+	  background: var(--active-bg);
+	  border-color: transparent;
+	  color: var(--active-fg);
 	  transform: none;
 	  box-shadow: none;
 	}
 	.drawer-select {
 	  appearance: none;
 	  width: 100%;
-	  padding: 8px 10px;
+	  padding: 10px 12px;
 	  border-radius: 10px;
-	  border: 1px solid rgba(255,255,255,0.10);
-	  background: rgba(255,255,255,0.04);
-	  color: var(--text-body);
+	  border: 1px solid var(--input-border);
+	  background: var(--input-bg);
+	  color: var(--input-fg);
 	  font: inherit;
 	  font-size: 0.84rem;
 	  cursor: pointer;
 	}
-	.drawer-select:focus { outline: 1px solid rgba(214,117,86,0.40); }
 	.drawer-textarea {
 	  width: 100%;
-	  min-height: 64px;
-	  padding: 8px 10px;
+	  min-height: 84px;
+	  padding: 10px 12px;
 	  border-radius: 10px;
-	  border: 1px solid rgba(255,255,255,0.10);
-	  background: rgba(255,255,255,0.04);
-	  color: var(--text-body);
+	  border: 1px solid var(--input-border);
+	  background: var(--input-bg);
+	  color: var(--input-fg);
 	  font: inherit;
 	  font-size: 0.84rem;
 	  resize: vertical;
 	  box-sizing: border-box;
 	}
-	.drawer-textarea:focus { outline: 1px solid rgba(214,117,86,0.40); }
+	.drawer-advanced {
+	  border-radius: 14px;
+	  border: 1px solid var(--glass-border);
+	  background: var(--panel-bg);
+	  padding: 0 14px;
+	}
+	.drawer-advanced summary {
+	  display: flex;
+	  align-items: center;
+	  justify-content: space-between;
+	  gap: 10px;
+	  padding: 12px 0;
+	  font-size: 0.82rem;
+	  font-weight: 700;
+	  color: var(--text-body);
+	}
+	.drawer-summary-chip {
+	  display: inline-flex;
+	  align-items: center;
+	  justify-content: center;
+	  padding: 4px 8px;
+	  border-radius: 999px;
+	  border: 1px solid transparent;
+	  background: var(--badge-bg);
+	  font-size: 0.72rem;
+	  color: var(--badge-fg);
+	  white-space: nowrap;
+	}
+	.drawer-advanced-body {
+	  display: grid;
+	  gap: 12px;
+	  padding: 0 0 14px;
+	}
+	.drawer-utility-row {
+	  display: flex;
+	  align-items: center;
+	  justify-content: space-between;
+	  gap: 12px;
+	  flex-wrap: wrap;
+	}
+	.drawer-validation {
+	  margin-right: auto;
+	  font-size: 0.76rem;
+	  color: var(--text-secondary);
+	}
+	.shortcuts {
+		grid-template-columns: 1fr;
+	}
+	@media (max-width: 480px) {
+	  .drawer-header,
+	  .drawer-body,
+	  .drawer-footer {
+		padding-left: 14px;
+		padding-right: 14px;
+	  }
+	  .drawer-group,
+	  .drawer-advanced {
+		padding-left: 12px;
+		padding-right: 12px;
+	  }
+	  .dense-actions {
+		grid-template-columns: 1fr;
+	  }
+	}
 </style>
 </head>
 <body>

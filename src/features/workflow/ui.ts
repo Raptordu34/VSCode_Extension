@@ -269,7 +269,7 @@ export function getWorkflowControlHtml(
 
 	const heroHtml = state.session
 		? buildActiveHero(state, helpers, recommendedPreset)
-		: buildInitHero(helpers, defaultPreset, defaultProvider, defaultModel);
+		: buildInitHero(helpers, defaultPreset, defaultProvider, defaultModel, drawerOpen);
 
 	const stagesHtml = state.session ? `
 <details class="mc-section" open>
@@ -278,11 +278,15 @@ export function getWorkflowControlHtml(
 	<span class="mc-section-badge">${state.session.stages.filter((s) => s.status === 'completed').length}/${state.session.stages.length}</span>
 </summary>
 <div class="mc-section-body">
+	<p class="section-footnote">Track the current stage here, open its file, or fork from a checkpoint when you need a branch.</p>
 	<div class="stage-pills">
 		${state.session.stages.map((stage) => `
 		<div class="stage-pill ${stage.status}">
-			<span class="pill-label">${String(stage.index).padStart(2, '0')} ${helpers.escapeHtml(WORKFLOW_PRESETS[stage.preset].label)}</span>
-			<span class="pill-status">${getWorkflowStageStatusLabel(stage.status)}</span>
+			<div class="stage-meta-row">
+				<span class="pill-label">${String(stage.index).padStart(2, '0')} ${helpers.escapeHtml(WORKFLOW_PRESETS[stage.preset].label)}</span>
+				<span class="history-badge stage-badge">${stage.index === state.session?.currentStageIndex ? 'Current' : getWorkflowStageStatusLabel(stage.status)}</span>
+			</div>
+			<span class="pill-status">${helpers.escapeHtml(stage.stageFile)}</span>
 			<div class="pill-actions">
 				<button type="button" class="secondary small-btn" data-command="openStageFile" data-target="${helpers.escapeHtml(stage.stageFile)}">Open</button>
 				<button type="button" class="secondary small-btn" data-command="forkWorkflowFromStage" data-stage-index="${stage.index}">Fork Here</button>
@@ -298,12 +302,15 @@ export function getWorkflowControlHtml(
 		: '';
 
 	// Providers section
-	const providerSummary = state.providerStatuses.map((p) => `${helpers.escapeHtml(helpers.getProviderLabel(p.provider))} · ${helpers.escapeHtml(p.summary)}`).join('  ');
+	const providerSummary = `${state.providerStatuses.length} available`;
 	const providerBody = state.providerStatuses.map((providerStatus) => `
-	<div class="provider-row">
-		<strong>${helpers.escapeHtml(helpers.getProviderLabel(providerStatus.provider))}</strong>
-		<span class="small">${helpers.escapeHtml(providerStatus.detail)}</span>
-		<div class="actions" style="margin-top:8px;">
+	<div class="provider-row provider-card">
+		<div class="provider-title-row">
+			<strong>${helpers.escapeHtml(helpers.getProviderLabel(providerStatus.provider))}</strong>
+			<span class="history-badge provider-badge">${helpers.escapeHtml(providerStatus.summary)}</span>
+		</div>
+		<span class="small provider-detail">${helpers.escapeHtml(providerStatus.detail)}</span>
+		<div class="actions dense-actions" style="margin-top:8px;">
 			<button type="button" class="secondary" data-command="switchProviderAccount" data-provider="${providerStatus.provider}">Switch Active</button>
 			<button type="button" class="secondary" data-command="connectProviderAccount" data-provider="${providerStatus.provider}">Connect</button>
 		</div>
@@ -316,6 +323,7 @@ export function getWorkflowControlHtml(
 	<span class="mc-section-badge small">${helpers.escapeHtml(providerSummary)}</span>
 </summary>
 <div class="mc-section-body">
+	<p class="section-footnote">Keep providers healthy here. The launcher only exposes the options you need for the current workflow.</p>
 	${providerBody}
 	<div class="actions" style="margin-top:8px;">
 		<button type="button" class="secondary" data-command="refreshProviders">Refresh Provider Status</button>
@@ -323,13 +331,15 @@ export function getWorkflowControlHtml(
 </div>
 </details>`;
 
+	const quickFilesCount = [state.contextFileExists, Boolean(state.brief), Boolean(state.latestStage), Boolean(state.session)].filter(Boolean).length;
 	const filesHtml = `
 <details class="mc-section">
 <summary class="mc-section-header">
 	<span class="mc-section-title">Quick Files</span>
-	<span class="mc-section-badge">${helpers.escapeHtml(WORKFLOW_HISTORY_INDEX_FILE)}</span>
+	<span class="mc-section-badge">${quickFilesCount} ready</span>
 </summary>
 <div class="mc-section-body">
+	<p class="section-footnote">Open the current workflow assets directly without leaving the sidebar.</p>
 	<div class="shortcuts">
 		<button type="button" class="linkButton" data-command="openContext" ${state.contextFileExists ? '' : 'disabled'}>Context Pack<span>${helpers.escapeHtml(CONTEXT_FILE_NAME)}</span></button>
 		<button type="button" class="linkButton" data-command="openBrief" ${state.brief ? '' : 'disabled'}>Brief<span>${helpers.escapeHtml(state.brief ? state.brief.taskType : 'No brief')}</span></button>
@@ -357,20 +367,11 @@ ${historyHtml}
 ${stagesHtml}
 ${providersHtml}
 ${filesHtml}
-<div style="margin-top:4px;">
+	${state.session ? `<div style="margin-top:4px;">
 	<button type="button" data-command="init" class="secondary">+ New Workflow</button>
-</div>`;
+</div>` : ''}`;
 
 	const scriptBody = `
-// ── Preset selector (hero) ──
-var selectedPreset = '${defaultPreset}';
-for (var btn of document.querySelectorAll('.preset-btn')) {
-	btn.addEventListener('click', (function(b) { return function() {
-		selectedPreset = b.dataset.preset;
-		for (var x of document.querySelectorAll('.preset-btn')) { x.classList.toggle('active', x.dataset.preset === selectedPreset); }
-	}; })(btn));
-}
-
 // ── Stage mark buttons ──
 for (var markBtn of document.querySelectorAll('button[data-stage-index]')) {
 	markBtn.addEventListener('click', (function(b) { return function() {
@@ -378,7 +379,7 @@ for (var markBtn of document.querySelectorAll('button[data-stage-index]')) {
 	}; })(markBtn));
 }
 
-// ── Drawer state ──
+// ── Composer state ──
 var drawerPreset = '${lastConfig?.preset ?? defaultPreset}';
 var drawerProvider = '${lastConfig?.provider ?? defaultProvider}';
 var drawerEffort = '${lastConfig?.claudeEffort ?? 'medium'}';
@@ -395,23 +396,111 @@ function updateModelSelect(provider, currentModel) {
 	var sel = document.getElementById('drawer-model');
 	if (!sel) { return; }
 	var models = getModels(provider);
+	var resolvedModel = models.indexOf(currentModel) >= 0 ? currentModel : models[0];
 	sel.innerHTML = models.map(function(m) {
-		return '<option value="' + m + '"' + (m === currentModel ? ' selected' : '') + '>' + m + '</option>';
+		return '<option value="' + m + '"' + (m === resolvedModel ? ' selected' : '') + '>' + m + '</option>';
 	}).join('');
+	updateSelectionSummary();
 }
 
 function updateEffortVisibility(provider) {
 	var row = document.getElementById('effort-field');
-	if (row) { row.style.display = provider === 'claude' ? '' : 'none'; }
+	if (!row) { return; }
+	var visible = provider === 'claude';
+	row.hidden = !visible;
+	row.setAttribute('aria-hidden', visible ? 'false' : 'true');
+	updateSelectionSummary();
 }
 
 function updateBriefVisibility(preset) {
 	var row = document.getElementById('brief-field');
-	if (row) { row.style.display = preset === 'explore' ? 'none' : ''; }
+	var help = document.getElementById('brief-help');
+	var hint = document.getElementById('brief-hint');
+	var visible = preset !== 'explore';
+	if (row) {
+		row.hidden = !visible;
+		row.setAttribute('aria-hidden', visible ? 'false' : 'true');
+	}
+	if (help) {
+		help.textContent = visible
+			? 'One sentence on the expected outcome. Keep it concrete.'
+			: 'Optional for Explore. Leave it empty to start with the current workspace context.';
+	}
+	if (hint) {
+		hint.textContent = visible
+			? 'You can refine scope or constraints here.'
+			: 'Explore starts faster without a brief.';
+	}
 	var ta = document.getElementById('drawer-brief');
 	if (ta) {
 		var ph = { explore: 'What area to explore?', plan: 'What to plan?', build: 'What to build?', debug: 'What bug to fix?', review: 'What to review?', test: 'What to test?' };
 		ta.placeholder = ph[preset] || 'Describe the objective...';
+	}
+	updateLaunchState();
+	updateSelectionSummary();
+}
+
+function updateProviderHelp(provider) {
+	var help = document.getElementById('provider-help');
+	if (!help) { return; }
+	if (provider === 'claude') {
+		help.textContent = 'Best when you want deeper reasoning. Effort controls quality, speed, and cost.';
+		return;
+	}
+	if (provider === 'gemini') {
+		help.textContent = 'Good default for broad analysis and faster iteration.';
+		return;
+	}
+	help.textContent = 'Uses the active Copilot setup. Model selection stays minimal.';
+}
+
+function updateAdvancedSummary() {
+	var summary = document.getElementById('advanced-summary');
+	var modelEl = document.getElementById('drawer-model');
+	if (!summary || !modelEl) { return; }
+	var parts = ['Model: ' + modelEl.value];
+	if (drawerProvider === 'claude') {
+		parts.push('Effort: ' + drawerEffort);
+	}
+	summary.textContent = parts.join(' · ');
+}
+
+function updateSelectionSummary() {
+	var summary = document.getElementById('launch-summary');
+	var modelEl = document.getElementById('drawer-model');
+	if (!summary || !modelEl) { return; }
+	var presetLabelEl = document.querySelector('.drawer-pill[data-field="preset"].active');
+	var providerLabelEl = document.querySelector('.drawer-pill[data-field="provider"].active');
+	var presetLabel = presetLabelEl ? presetLabelEl.textContent : drawerPreset;
+	var providerLabel = providerLabelEl ? providerLabelEl.textContent : drawerProvider;
+	var detail = presetLabel + ' with ' + providerLabel + ' · ' + modelEl.value;
+	if (drawerProvider === 'claude') {
+		detail += ' · ' + drawerEffort + ' effort';
+	}
+	summary.textContent = detail;
+	updateAdvancedSummary();
+}
+
+function updateLaunchState() {
+	var launchBtn = document.getElementById('drawer-launch-btn');
+	var message = document.getElementById('launch-validation');
+	var briefEl = document.getElementById('drawer-brief');
+	if (!launchBtn || !message) { return; }
+	var requiresBrief = drawerPreset !== 'explore';
+	var briefValue = briefEl ? briefEl.value.trim() : '';
+	var isValid = !requiresBrief || briefValue.length > 0;
+	launchBtn.disabled = !isValid;
+	message.textContent = isValid
+		? 'Launch uses the current provider and remembers this setup for next time.'
+		: 'Add a brief before launching this workflow.';
+	}
+
+function focusComposer() {
+	var focusTarget = drawerPreset === 'explore'
+		? document.querySelector('.drawer-pill[data-field="provider"].active')
+		: document.getElementById('drawer-brief');
+	if (focusTarget && typeof focusTarget.focus === 'function') {
+		focusTarget.focus();
 	}
 }
 
@@ -433,34 +522,69 @@ for (var pill of document.querySelectorAll('.drawer-pill')) {
 			var sel = document.getElementById('drawer-model');
 			updateModelSelect(value, sel ? sel.value : '');
 			updateEffortVisibility(value);
+			updateProviderHelp(value);
 		} else if (field === 'effort') {
 			drawerEffort = value;
+			updateSelectionSummary();
 		}
 	}; })(pill));
 }
 
-// Close drawer
+var modelSelect = document.getElementById('drawer-model');
+if (modelSelect) {
+	modelSelect.addEventListener('change', updateSelectionSummary);
+}
+var briefInput = document.getElementById('drawer-brief');
+if (briefInput) {
+	briefInput.addEventListener('input', updateLaunchState);
+}
+
+function triggerLaunch() {
+	if (!drawerLaunchBtn || drawerLaunchBtn.disabled) {
+		return;
+	}
+	var modelEl = document.getElementById('drawer-model');
+	var briefEl = document.getElementById('drawer-brief');
+	vscode.postMessage({
+		command: 'smartInit',
+		preset: drawerPreset,
+		provider: drawerProvider,
+		providerModel: modelEl ? modelEl.value : undefined,
+		claudeEffort: drawerProvider === 'claude' ? drawerEffort : undefined,
+		brief: briefEl && briefEl.value.trim() ? briefEl.value.trim() : undefined
+	});
+}
+
+// Close composer
 function closeDrawer() { vscode.postMessage({ command: 'closeConfigDrawer' }); }
 var closeBtn = document.getElementById('drawer-close-btn');
 if (closeBtn) { closeBtn.addEventListener('click', closeDrawer); }
-var backdrop = document.getElementById('mc-backdrop');
-if (backdrop) { backdrop.addEventListener('click', closeDrawer); }
+var cancelBtn = document.getElementById('drawer-cancel-btn');
+if (cancelBtn) { cancelBtn.addEventListener('click', closeDrawer); }
+document.addEventListener('keydown', function(event) {
+	if (event.key === 'Escape' && document.getElementById('mc-drawer')) {
+		event.preventDefault();
+		closeDrawer();
+	}
+	if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && document.getElementById('mc-drawer')) {
+		event.preventDefault();
+		triggerLaunch();
+	}
+});
 
-// Launch from drawer
+// Launch from composer
 var drawerLaunchBtn = document.getElementById('drawer-launch-btn');
 if (drawerLaunchBtn) {
-	drawerLaunchBtn.addEventListener('click', function() {
-		var modelEl = document.getElementById('drawer-model');
-		var briefEl = document.getElementById('drawer-brief');
-		vscode.postMessage({
-			command: 'smartInit',
-			preset: drawerPreset,
-			provider: drawerProvider,
-			providerModel: modelEl ? modelEl.value : undefined,
-			claudeEffort: drawerProvider === 'claude' ? drawerEffort : undefined,
-			brief: briefEl && briefEl.value.trim() ? briefEl.value.trim() : undefined
-		});
-	});
+	drawerLaunchBtn.addEventListener('click', triggerLaunch);
+}
+
+updateModelSelect(drawerProvider, '${lastConfig?.providerModel ?? defaultModel}');
+updateProviderHelp(drawerProvider);
+updateEffortVisibility(drawerProvider);
+updateBriefVisibility(drawerPreset);
+updateLaunchState();
+if (document.getElementById('mc-drawer')) {
+	focusComposer();
 }
 `;
 
@@ -475,22 +599,25 @@ if (drawerLaunchBtn) {
 	});
 }
 
-function buildInitHero(helpers: WorkflowUiHelpers, defaultPreset: string, defaultProvider: string, defaultModel: string): string {
-	const presets = Object.values(WORKFLOW_PRESETS);
-	const presetButtons = presets.map((p) => `<button type="button" class="preset-btn ${p.preset === defaultPreset ? 'active' : ''}" data-preset="${p.preset}">${helpers.escapeHtml(p.label)}</button>`).join('');
+function buildInitHero(helpers: WorkflowUiHelpers, defaultPreset: string, defaultProvider: string, defaultModel: string, drawerOpen: boolean): string {
 	return `
 <section class="card hero">
 	<div class="kicker">No active workflow</div>
-	<div class="preset-selector">${presetButtons}</div>
-	<p class="small" style="margin-top:8px;">With: ${helpers.escapeHtml(defaultProvider)} · ${helpers.escapeHtml(defaultModel)}</p>
-	<div class="actions" style="margin-top:10px;">
-		<button type="button" data-command="openConfigDrawer">Launch ▶</button>
-	</div>
-	<div class="advanced-details" style="margin-top: 14px;">
-		<summary>▸ Full configuration</summary>
-		<div style="margin-top: 8px;">
-			<button type="button" class="secondary" data-command="init">Choose preset, provider, model...</button>
+	<h3>Start a workflow from the sidebar</h3>
+	<p class="lead">Use the quick launcher for the common path, then open advanced settings only when you need to change model or provider-specific tuning.</p>
+	<div class="stat-grid" style="margin-top:12px;">
+		<div class="stat">
+			<strong>Default route</strong>
+			<span>${helpers.escapeHtml(defaultPreset)} · ${helpers.escapeHtml(defaultProvider)} · ${helpers.escapeHtml(defaultModel)}</span>
 		</div>
+		<div class="stat">
+			<strong>Fast path</strong>
+			<span>Goal, provider, optional brief, then launch.</span>
+		</div>
+	</div>
+	<div class="actions" style="margin-top:10px;">
+		<button type="button" data-command="${drawerOpen ? 'closeConfigDrawer' : 'openConfigDrawer'}" aria-expanded="${drawerOpen ? 'true' : 'false'}" aria-controls="mc-drawer" ${drawerOpen ? '' : 'autofocus'}>${drawerOpen ? 'Hide launcher' : 'Start workflow'}</button>
+		<button type="button" class="secondary" data-command="init">Open full setup</button>
 	</div>
 </section>`;
 }
@@ -510,6 +637,7 @@ function buildHistorySection(
 	<span class="mc-section-badge">${historyCount} archived${activeEntry ? ` · active: ${helpers.escapeHtml(activeEntry.label)}` : ''}</span>
 </summary>
 <div class="mc-section-body">
+	<p class="section-footnote">Restore a previous run, fork from an archived workflow, or branch from a saved stage.</p>
 	<div class="history-list">
 		${historyEntries.map((entry) => buildHistoryEntryHtml(entry, activeWorkflowId, entryById, helpers)).join('')}
 	</div>
@@ -565,6 +693,7 @@ function buildActiveHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpe
 		<button type="button" class="secondary" data-command="forkWorkflowFromHistory" data-target="${helpers.escapeHtml(session.workflowId ?? '')}" ${session.workflowId ? '' : 'disabled'}>Fork</button>
 		<button type="button" class="secondary" data-command="previewPrompt" ${state.session ? '' : 'disabled'}>Prompt</button>
 	</div>
+	<p class="small" style="margin-top:8px;">Use the sections below to inspect handoffs, restore previous runs, or branch from the current stage.</p>
 </section>`;
 }
 
@@ -637,46 +766,78 @@ function buildConfigDrawerHtml(
 	).join('');
 
 	const briefPlaceholder = preset === 'explore' ? 'What area to explore?' : 'Describe the objective for this stage...';
+	const providerHelp = provider === 'claude'
+		? 'Best when you want deeper reasoning. Effort controls quality, speed, and cost.'
+		: provider === 'gemini'
+			? 'Good default for broad analysis and faster iteration.'
+			: 'Uses the active Copilot setup. Model selection stays minimal.';
+	const briefVisible = preset !== 'explore';
+	const selectionSummary = `${WORKFLOW_PRESETS[preset].label} with ${helpers.getProviderLabel(provider)} · ${model || activeModels[0]}${provider === 'claude' ? ` · ${effort} effort` : ''}`;
 
 	return `
-<div class="mc-backdrop" id="mc-backdrop"></div>
-<div class="mc-drawer" id="mc-drawer">
+
+<section class="card mc-drawer" id="mc-drawer" aria-labelledby="drawer-title">
 	<div class="drawer-header">
-		<span class="drawer-title">New Workflow</span>
-		<button type="button" class="drawer-close" id="drawer-close-btn">✕</button>
+		<div>
+			<div class="drawer-title" id="drawer-title">New workflow</div>
+			<p class="drawer-subtitle">Keep the common path short. Advanced settings are available below when needed.</p>
+		</div>
+		<button type="button" class="drawer-close" id="drawer-close-btn" aria-label="Close workflow launcher">Close</button>
 	</div>
 	<div class="drawer-body">
-		<div class="drawer-field">
-			<label class="drawer-label">Goal</label>
+		<div class="drawer-intro">
+			<strong id="launch-summary" aria-live="polite">${helpers.escapeHtml(selectionSummary)}</strong>
+			<span>Launch remembers this setup and reuses it the next time you open the sidebar launcher.</span>
+		</div>
+		<div class="drawer-group">
+			<div class="drawer-field">
+				<label class="drawer-label">Goal</label>
+				<p class="drawer-help">Pick the workflow outcome first. This controls whether a brief is required.</p>
 			<div class="drawer-pills" id="preset-pills">${presetPills}</div>
-		</div>
-		<div class="drawer-field" id="brief-field"${preset === 'explore' ? ' style="display:none"' : ''}>
-			<label class="drawer-label">Brief</label>
-			<textarea class="drawer-textarea" id="drawer-brief" placeholder="${helpers.escapeHtml(briefPlaceholder)}">${helpers.escapeHtml(brief)}</textarea>
-		</div>
-		<div class="drawer-field">
-			<label class="drawer-label">Provider</label>
-			<div class="drawer-pills" id="provider-pills">${providerPills}</div>
-		</div>
-		<div class="drawer-field">
-			<label class="drawer-label">Model</label>
-			<select class="drawer-select" id="drawer-model">${modelOptions}</select>
-		</div>
-		<div class="drawer-field" id="effort-field"${provider !== 'claude' ? ' style="display:none"' : ''}>
-			<label class="drawer-label">Claude Effort</label>
-			<div class="drawer-pills" id="effort-pills">${effortPills}</div>
-		</div>
-		<div class="advanced-details">
-			<summary>▸ Advanced settings</summary>
-			<div style="margin-top: 8px;">
-				<button type="button" class="secondary" data-command="init">Full configuration (QuickPick)...</button>
+			</div>
+			<div class="drawer-field" id="brief-field"${briefVisible ? '' : ' hidden aria-hidden="true"'}>
+				<label class="drawer-label" for="drawer-brief">Brief</label>
+				<p class="drawer-help" id="brief-help">${briefVisible ? 'One sentence on the expected outcome. Keep it concrete.' : 'Optional for Explore. Leave it empty to start with the current workspace context.'}</p>
+				<textarea class="drawer-textarea" id="drawer-brief" placeholder="${helpers.escapeHtml(briefPlaceholder)}" aria-describedby="brief-help brief-hint">${helpers.escapeHtml(brief)}</textarea>
+				<span class="drawer-hint" id="brief-hint">${briefVisible ? 'You can refine scope or constraints here.' : 'Explore starts faster without a brief.'}</span>
 			</div>
 		</div>
+		<div class="drawer-group">
+			<div class="drawer-field">
+				<label class="drawer-label">Provider</label>
+				<p class="drawer-help" id="provider-help">${helpers.escapeHtml(providerHelp)}</p>
+			<div class="drawer-pills" id="provider-pills">${providerPills}</div>
+			</div>
+		</div>
+		<details class="advanced-details drawer-advanced">
+			<summary>
+				<span>Advanced settings</span>
+				<span class="drawer-summary-chip" id="advanced-summary">Model: ${helpers.escapeHtml(model || activeModels[0])}${provider === 'claude' ? ` · Effort: ${helpers.escapeHtml(effort)}` : ''}</span>
+			</summary>
+			<div class="drawer-advanced-body">
+				<div class="drawer-field">
+					<label class="drawer-label" for="drawer-model">Model</label>
+					<p class="drawer-help">Model options update with the selected provider.</p>
+					<select class="drawer-select" id="drawer-model">${modelOptions}</select>
+				</div>
+				<div class="drawer-field" id="effort-field"${provider === 'claude' ? '' : ' hidden aria-hidden="true"'}>
+					<label class="drawer-label">Claude effort</label>
+					<p class="drawer-help">Low is cheaper and faster. High is slower but usually stronger.</p>
+					<div class="drawer-pills" id="effort-pills">${effortPills}</div>
+				</div>
+				<div class="drawer-utility-row">
+					<span class="drawer-hint">Need the full command flow or account selection?</span>
+					<button type="button" class="secondary" data-command="init">Open full setup</button>
+				</div>
+			</div>
+		</details>
 	</div>
 	<div class="drawer-footer">
+		<span class="drawer-validation" id="launch-validation" aria-live="polite">Launch uses the current provider and remembers this setup for next time.</span>
+		<button type="button" class="secondary" id="drawer-cancel-btn">Cancel</button>
 		<button type="button" id="drawer-launch-btn">Launch ▶</button>
 	</div>
-</div>`;
+</section>`;
 }
 
 export function formatWorkflowRoles(roles: WorkflowRole[]): string {

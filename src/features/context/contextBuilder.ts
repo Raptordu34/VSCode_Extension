@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { Logger } from "../../core/logger.js";
 import { CONTEXT_FILE_NAME, GENERATED_SECTION_START, GENERATED_SECTION_END, WORKFLOW_SESSION_FILE, WORKFLOW_BRIEF_FILE, WORKFLOW_STAGE_DIRECTORY, WORKFLOW_STATE_DIRECTORY } from "../workflow/constants.js";
-import type { ContextMetadata, OptimizationResult, ExtensionConfiguration, AdditionalContextResult, CostProfile, WorkflowExecutionPlan, PackageDetails, WorkflowPreset, ProviderTarget, ContextRefreshMode, ClaudeEffortLevel, WorkflowSessionState, WorkflowBrief, ProjectContext, ArtifactPlan, WorkflowStageRecord } from "../workflow/types.js";
+import type { ContextBudget, ContextMetadata, OptimizationResult, ExtensionConfiguration, AdditionalContextResult, CostProfile, WorkflowExecutionPlan, PackageDetails, WorkflowPreset, ProviderTarget, ContextRefreshMode, ClaudeEffortLevel, WorkflowSessionState, WorkflowBrief, ProjectContext, ArtifactPlan, WorkflowStageRecord } from "../workflow/types.js";
 import { readUtf8, buildWorkspaceUri, isIgnoredDirectory, normalizeWorkspaceRelativePath, shouldIncludeEntry } from "../../core/workspace.js";
 import { computeSignature, serializeList, parseList } from "../../utils/index.js";
 import { formatProviderModel } from "../providers/providerService.js";
@@ -12,6 +12,7 @@ import { replaceManagedBlock } from "../aiAgents/promptBuilder.js";
 import { relativizeToWorkspace } from "../../core/workspace.js";
 import { getProviderLabel } from "../providers/providerService.js";
 import { formatWorkflowRoles } from "../workflow/ui.js";
+import { buildContextBudget, formatContextBudgetSummary } from "../providers/providerCatalog.js";
 import { readWorkflowSessionState, readWorkflowBrief, buildSuggestedNextPresets, buildContextGenerationMessage, persistWorkflowArtifacts } from './workflowPersistence.js';
 
 export function buildRawContextContent(
@@ -83,13 +84,15 @@ export function buildContextFileContent(metadata: ContextMetadata, optimizedCont
 		`Optimizer applied: ${optimization.applied ? 'yes' : 'no'}`,
 		`Optimizer model: ${optimization.modelName ?? 'n/a'}`,
 		`Optimizer note: ${optimization.reason}`,
+		metadata.contextBudgetProfile ? `Context budget profile: ${metadata.contextBudgetProfile}` : undefined,
+		metadata.contextBudgetSummary ? `Context budget summary: ${metadata.contextBudgetSummary}` : undefined,
 		`Key files: ${serializeList(metadata.keyFiles)}`,
 		`Instruction files: ${serializeList(metadata.instructionFiles)}`,
 		`Suggested commands: ${serializeList(metadata.commands)}`,
 		`Native artifacts: ${serializeList(metadata.artifactFiles)}`,
 		'',
 		optimizedContent
-	].join('\n');
+	].filter((value): value is string => value !== undefined).join('\n');
 }
 export function parseContextMetadata(content: string): ContextMetadata | undefined {
 	const lines = content.split(/\r?\n/);
@@ -140,7 +143,23 @@ export function parseContextMetadata(content: string): ContextMetadata | undefin
 		keyFiles: parseList(values.get('Key files')),
 		instructionFiles: parseList(values.get('Instruction files')),
 		commands: parseList(values.get('Suggested commands')),
-		artifactFiles: parseList(values.get('Native artifacts'))
+		artifactFiles: parseList(values.get('Native artifacts')),
+		contextBudgetProfile: values.get('Context budget profile') || undefined,
+		contextBudgetSummary: values.get('Context budget summary') || undefined
+	};
+}
+
+export function applyContextBudgetConfiguration(
+	configuration: ExtensionConfiguration,
+	budget: ContextBudget
+): ExtensionConfiguration {
+	return {
+		...configuration,
+		treeDepth: Math.min(configuration.treeDepth, budget.treeDepth),
+		readmePreviewLines: Math.min(configuration.readmePreviewLines, budget.readmePreviewLines),
+		contextFilePreviewLines: Math.min(configuration.contextFilePreviewLines, budget.contextFilePreviewLines),
+		maxEntriesPerDirectory: Math.min(configuration.maxEntriesPerDirectory, budget.maxEntriesPerDirectory),
+		extraContextFiles: configuration.extraContextFiles.slice(0, budget.maxInstructionFiles)
 	};
 }
 export async function optimizeContextWithCopilot(
@@ -372,12 +391,14 @@ export async function gatherProjectContext(
 		}
 
 		const configuration = getExtensionConfiguration();
+		const contextBudget = buildContextBudget(workflowPlan.provider, workflowPlan.costProfile, configuration);
+		const budgetedConfiguration = applyContextBudgetConfiguration(configuration, contextBudget);
 		const [treeLines, readmeLines, packageDetails, additionalContext, keyFiles] = await Promise.all([
-			buildWorkspaceTree(workspaceFolder.uri, 0, configuration),
-			readReadmeSummary(workspaceFolder.uri, configuration.readmePreviewLines),
-			readPackageDetails(workspaceFolder.uri),
-			readAdditionalContextFiles(workspaceFolder.uri, configuration.extraContextFiles, configuration.contextFilePreviewLines),
-			collectKeyFiles(workspaceFolder.uri)
+			buildWorkspaceTree(workspaceFolder.uri, 0, budgetedConfiguration),
+			readReadmeSummary(workspaceFolder.uri, budgetedConfiguration.readmePreviewLines),
+			readPackageDetails(workspaceFolder.uri, contextBudget),
+			readAdditionalContextFiles(workspaceFolder.uri, budgetedConfiguration.extraContextFiles, budgetedConfiguration.contextFilePreviewLines),
+			collectKeyFiles(workspaceFolder.uri, contextBudget.maxKeyFiles)
 		]);
 
 		const detectedTech = detectTechStack(packageDetails, treeLines, readmeLines);
@@ -433,7 +454,9 @@ export async function gatherProjectContext(
 			keyFiles,
 			instructionFiles: additionalContext.foundPaths,
 			commands: packageDetails.scripts,
-			artifactFiles: []
+			artifactFiles: [],
+			contextBudgetProfile: contextBudget.profile,
+			contextBudgetSummary: formatContextBudgetSummary(contextBudget)
 		};
 
 		const preliminaryArtifactPlan = workflowPlan.generateNativeArtifacts
@@ -534,7 +557,7 @@ export function detectTechStack(packageDetails: PackageDetails, treeLines: strin
 
 	return [...detected];
 }
-export async function readPackageDetails(workspaceUri: vscode.Uri): Promise<PackageDetails> {
+	export async function readPackageDetails(workspaceUri: vscode.Uri, budget?: Pick<ContextBudget, 'maxDependencies' | 'maxDevDependencies' | 'maxScripts'>): Promise<PackageDetails> {
 	const packageUri = vscode.Uri.joinPath(workspaceUri, 'package.json');
 	try {
 		const packageContent = await readUtf8(packageUri);
@@ -547,12 +570,11 @@ export async function readPackageDetails(workspaceUri: vscode.Uri): Promise<Pack
 			scripts?: Record<string, string>;
 		};
 
-		const dependenciesText = formatDependencyList(packageJson.dependencies);
-		const devDependenciesText = formatDependencyList(packageJson.devDependencies);
+		const devDependenciesText = formatDependencyList(packageJson.devDependencies, budget?.maxDevDependencies);
 		const scripts = packageJson.scripts
 			? Object.keys(packageJson.scripts)
 				.sort((left, right) => left.localeCompare(right))
-				.slice(0, 8)
+				.slice(0, budget?.maxScripts ?? 8)
 			: [];
 
 		return {
@@ -560,7 +582,7 @@ export async function readPackageDetails(workspaceUri: vscode.Uri): Promise<Pack
 				`Name: ${packageJson.name ?? 'unknown'}`,
 				`Version: ${packageJson.version ?? 'unknown'}`,
 				`Description: ${packageJson.description ?? 'n/a'}`,
-				`Dependencies: ${dependenciesText}`,
+				`Dependencies: ${formatDependencyList(packageJson.dependencies, budget?.maxDependencies)}`,
 				`Dev dependencies: ${devDependenciesText}`,
 				`Scripts: ${scripts.length > 0 ? scripts.join(', ') : 'none'}`
 			].join('\n'),
@@ -578,26 +600,26 @@ export async function readPackageDetails(workspaceUri: vscode.Uri): Promise<Pack
 		};
 	}
 }
-export async function collectKeyFiles(workspaceUri: vscode.Uri): Promise<string[]> {
+export async function collectKeyFiles(workspaceUri: vscode.Uri, limit = 8): Promise<string[]> {
 	try {
 		const entries = await vscode.workspace.fs.readDirectory(workspaceUri);
 		return entries
 			.filter(([name, type]) => type === vscode.FileType.File && isRelevantFile(name) && name !== CONTEXT_FILE_NAME)
 			.map(([name]) => name)
 			.sort((left, right) => left.localeCompare(right))
-			.slice(0, 8);
+			.slice(0, limit);
 	} catch {
 		return [];
 	}
 }
-export function formatDependencyList(dependencies: Record<string, string> | undefined): string {
+export function formatDependencyList(dependencies: Record<string, string> | undefined, limit = 12): string {
 	if (!dependencies || Object.keys(dependencies).length === 0) {
 		return 'none';
 	}
 
 	return Object.entries(dependencies)
 		.sort(([left], [right]) => left.localeCompare(right))
-		.slice(0, 12)
+		.slice(0, limit)
 		.map(([name, version]) => `${name}@${version}`)
 		.join(', ');
 }

@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import { CLAUDE_DEFAULT_MODELS, GEMINI_DEFAULT_MODELS } from '../workflow/constants.js';
 import type {
 	ClaudeEffortLevel,
 	ExtensionConfiguration,
@@ -7,6 +6,7 @@ import type {
 	ProviderTarget,
 	WorkflowPresetDefinition
 } from '../workflow/types.js';
+import { getProviderCapabilities, getProviderModelCatalog } from './providerCatalog.js';
 
 export function getProviderAccounts(configuration: ExtensionConfiguration, provider: ProviderTarget): ProviderAccountConfiguration[] {
 	switch (provider) {
@@ -130,37 +130,20 @@ export function getProviderModelOptions(
 	configuration: ExtensionConfiguration,
 	preferredModel?: string
 ): Array<{ label: string; value: string | undefined; description?: string; detail: string }> {
-	if (provider === 'claude') {
-		const options: Array<{ label: string; value: string | undefined; description?: string; detail: string }> = CLAUDE_DEFAULT_MODELS.map((model) => ({
-			label: model,
-			value: model,
-			description: model === configuration.defaultClaudeModel ? 'Default Claude model' : undefined,
-			detail: model.includes('opus') ? 'Highest reasoning quality, typically the most expensive.' : 'Fastest Claude default for implementation and debugging.'
+	if (provider !== 'copilot') {
+		const defaultModel = provider === 'claude' ? configuration.defaultClaudeModel : configuration.defaultGeminiModel;
+		const options: Array<{ label: string; value: string | undefined; description?: string; detail: string }> = getProviderModelCatalog(provider).map((model) => ({
+			label: model.label,
+			value: model.id,
+			description: model.id === defaultModel ? `Default ${getProviderLabel(provider)} model` : model.description,
+			detail: model.detail
 		}));
 		if (preferredModel && !options.some((option) => option.value === preferredModel)) {
 			options.unshift({
 				label: preferredModel,
 				value: preferredModel,
 				description: 'Saved account model',
-				detail: 'Custom Claude model currently configured for this account.'
-			});
-		}
-		return options;
-	}
-
-	if (provider === 'gemini') {
-		const options: Array<{ label: string; value: string | undefined; description?: string; detail: string }> = GEMINI_DEFAULT_MODELS.map((model) => ({
-			label: model,
-			value: model,
-			description: model === configuration.defaultGeminiModel ? 'Default Gemini model' : undefined,
-			detail: model.includes('flash') ? 'Lower latency and cost, good for tight loops.' : 'Higher reasoning depth for planning and review.'
-		}));
-		if (preferredModel && !options.some((option) => option.value === preferredModel)) {
-			options.unshift({
-				label: preferredModel,
-				value: preferredModel,
-				description: 'Saved account model',
-				detail: 'Custom Gemini model currently configured for this account.'
+				detail: `Custom ${getProviderLabel(provider)} model currently configured for this account.`
 			});
 		}
 		return options;
@@ -194,13 +177,5 @@ export function formatProviderModel(provider: ProviderTarget, model: string | un
 }
 
 export function buildProviderDetail(provider: ProviderTarget, presetDefinition: WorkflowPresetDefinition): string {
-	switch (provider) {
-		case 'claude':
-			return `Best when ${presetDefinition.label.toLowerCase()} needs strong delegation, specialized subagents, deeper parallel investigation, or explicit account switching.`;
-		case 'gemini':
-			return `Best when ${presetDefinition.label.toLowerCase()} should stay terminal-first with explicit model control, fast delegation, and scriptable automation.`;
-		case 'copilot':
-			return `Best when ${presetDefinition.label.toLowerCase()} should stay inside VS Code with custom agents, handoffs, and chat review tools.`;
-	}
-	return '';
+	return getProviderCapabilities(provider).recommendedDetail[presetDefinition.preset];
 }

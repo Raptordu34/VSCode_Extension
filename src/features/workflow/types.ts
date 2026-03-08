@@ -10,6 +10,40 @@ export type WorkflowStageStatus = 'prepared' | 'in-progress' | 'completed';
 export type ClaudeEffortLevel = 'low' | 'medium' | 'high';
 export type ProviderStatusAvailability = 'ready' | 'needs-config' | 'warning' | 'error' | 'unavailable';
 export type WorkflowArchivedFileKind = 'full' | 'managed-markdown' | 'session-json' | 'brief-markdown';
+export type ProviderModelTier = 'stable' | 'preview' | 'alias' | 'custom';
+
+export interface ProviderModelDescriptor {
+	id: string;
+	label: string;
+	tier: ProviderModelTier;
+	detail: string;
+	description?: string;
+	isDefaultCandidate?: boolean;
+}
+
+export interface ProviderCapabilities {
+	provider: ProviderTarget;
+	label: string;
+	instructionArtifactPath: string;
+	supportsNativeOptimization: boolean;
+	supportsNativeHandoffs: boolean;
+	supportsStableAliases: boolean;
+	modelCatalog: ProviderModelDescriptor[];
+	recommendedDetail: Record<WorkflowPreset, string>;
+}
+
+export interface ContextBudget {
+	profile: string;
+	treeDepth: number;
+	maxEntriesPerDirectory: number;
+	readmePreviewLines: number;
+	contextFilePreviewLines: number;
+	maxDependencies: number;
+	maxDevDependencies: number;
+	maxScripts: number;
+	maxKeyFiles: number;
+	maxInstructionFiles: number;
+}
 
 export interface MetricDisplay {
 	label: string;
@@ -131,6 +165,8 @@ export interface ContextMetadata {
 	instructionFiles: string[];
 	commands: string[];
 	artifactFiles: string[];
+	contextBudgetProfile?: string;
+	contextBudgetSummary?: string;
 }
 
 export interface GeneratedArtifact {

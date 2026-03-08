@@ -5,9 +5,11 @@ import * as vscode from 'vscode';
 import { normalizeWorkspaceRelativePath } from '../core/workspace.js';
 import { commitFileTransaction, persistWorkflowArtifacts, readWorkflowSessionState, type WorkspaceWriteOperation } from '../features/context/workflowPersistence.js';
 import { archiveActiveWorkflowState, cleanActiveWorkflowFiles, forkWorkflowFromHistory, forkWorkflowFromHistoryAtStage, readWorkflowArchiveManifest, readWorkflowHistoryIndex, restoreWorkflowFromHistory } from '../features/context/workflowHistory.js';
-import type { ArtifactPlan, ContextMetadata, WorkflowDashboardState, WorkflowExecutionPlan, WorkflowSessionState } from '../features/workflow/types.js';
+import type { ArtifactPlan, ContextMetadata, ExtensionConfiguration, ProjectContext, WorkflowDashboardState, WorkflowExecutionPlan, WorkflowSessionState } from '../features/workflow/types.js';
 import { computeSignature, escapeShellArg, createNonce } from '../utils/index.js';
-import { detectTechStack } from '../features/context/contextBuilder.js';
+import { applyContextBudgetConfiguration, detectTechStack } from '../features/context/contextBuilder.js';
+import { buildContextBudget, getProviderModelCatalog } from '../features/providers/providerCatalog.js';
+import { buildInstructionArtifactContent, buildSharedWorkflowInstruction } from '../features/aiAgents/promptBuilder.js';
 import { WORKFLOW_PRESETS } from '../features/workflow/presets.js';
 import { GENERATED_SECTION_END, GENERATED_SECTION_START } from '../features/workflow/constants.js';
 import { getWorkflowControlHtml } from '../features/workflow/ui.js';
@@ -133,6 +135,203 @@ suite('detectTechStack', () => {
 	test('detects ESLint from summary', () => {
 		const stack = detectTechStack({ summary: '', scripts: [], dependencies: { 'eslint': '^8.0.0' }, devDependencies: {} }, [], []);
 		assert.ok(stack.includes('ESLint'));
+	});
+});
+
+suite('provider-aware context budgets', () => {
+	test('caps Copilot fast budgets below workspace maxima', () => {
+		const configuration: ExtensionConfiguration = {
+			treeDepth: 6,
+			readmePreviewLines: 120,
+			contextFilePreviewLines: 300,
+			extraContextFiles: ['A.md', 'B.md', 'C.md', 'D.md', 'E.md'],
+			showIgnoredDirectories: true,
+			maxEntriesPerDirectory: 100,
+			optimizeWithCopilot: false,
+			modelFamily: '',
+			defaultClaudeModel: 'claude-sonnet-4-6',
+			defaultGeminiModel: 'gemini-2.5-pro',
+			defaultClaudeEffort: 'medium',
+			claudeAccounts: [],
+			geminiAccounts: [],
+			copilotAccounts: [],
+			autoGenerateOnStartup: false,
+			defaultPreset: 'build',
+			defaultProvider: 'copilot',
+			contextRefreshMode: 'smart-refresh',
+			costProfile: 'balanced',
+			generateNativeArtifacts: true,
+			enabledProviders: ['claude', 'gemini', 'copilot']
+		};
+
+		const budget = buildContextBudget('copilot', 'fast', configuration);
+		const applied = applyContextBudgetConfiguration(configuration, budget);
+
+		assert.strictEqual(budget.profile, 'copilot-fast');
+		assert.strictEqual(budget.treeDepth, 2);
+		assert.strictEqual(budget.maxEntriesPerDirectory, 16);
+		assert.strictEqual(budget.maxInstructionFiles, 3);
+		assert.strictEqual(applied.treeDepth, 2);
+		assert.strictEqual(applied.maxEntriesPerDirectory, 16);
+		assert.strictEqual(applied.extraContextFiles.length, 3);
+		assert.strictEqual(applied.readmePreviewLines, 16);
+	});
+
+	test('keeps stable Gemini models ahead of previews in the catalog', () => {
+		const catalog = getProviderModelCatalog('gemini');
+		assert.strictEqual(catalog[0].id, 'gemini-2.5-pro');
+		assert.strictEqual(catalog[0].tier, 'stable');
+		assert.ok(catalog.some((model) => model.id === 'gemini-3.1-pro-preview' && model.tier === 'preview'));
+	});
+});
+
+suite('provider-specific prompt builder output', () => {
+	function createWorkflowPlan(provider: WorkflowExecutionPlan['provider']): WorkflowExecutionPlan {
+		return {
+			preset: 'build',
+			provider,
+			providerAccountId: `${provider}-account`,
+			providerModel: provider === 'gemini' ? 'gemini-2.5-pro' : provider === 'claude' ? 'claude-sonnet-4-6' : 'gpt-5',
+			refreshMode: 'smart-refresh',
+			costProfile: 'balanced',
+			roles: ['architect', 'implementer', 'reviewer'],
+			optimizeWithCopilot: false,
+			presetDefinition: WORKFLOW_PRESETS.build,
+			generateNativeArtifacts: true,
+			claudeEffort: provider === 'claude' ? 'medium' : undefined
+		};
+	}
+
+	function createMetadata(): ContextMetadata {
+		return {
+			generatedAt: '2026-03-08T12:00:00.000Z',
+			signature: 'sig-test',
+			preset: 'build',
+			provider: 'gemini',
+			providerModel: 'gemini-2.5-pro',
+			providerAccountId: 'gemini-account',
+			refreshMode: 'smart-refresh',
+			costProfile: 'balanced',
+			reused: false,
+			keyFiles: ['src/extension.ts', 'src/features/aiAgents/promptBuilder.ts'],
+			commands: ['npm run compile', 'npm test'],
+			instructionFiles: ['.github/copilot-instructions.md'],
+			artifactFiles: ['.github/copilot-instructions.md'],
+			contextBudgetProfile: 'gemini-balanced',
+			contextBudgetSummary: 'tree 4, readme 48, files 5'
+		};
+	}
+
+	function createProjectContext(provider: WorkflowExecutionPlan['provider']): ProjectContext {
+		const workflowPlan = createWorkflowPlan(provider);
+		return {
+			workspaceFolder: {
+				uri: vscode.Uri.file(path.join(os.tmpdir(), 'prompt-builder-workspace')),
+				name: 'prompt-builder-workspace',
+				index: 0
+			} as vscode.WorkspaceFolder,
+			contextFile: vscode.Uri.file(path.join(os.tmpdir(), '.ai-context.md')),
+			content: '# Context',
+			optimization: {
+				content: '# Context',
+				applied: true,
+				reason: 'test fixture'
+			},
+			metadata: {
+				...createMetadata(),
+				provider,
+				providerModel: workflowPlan.providerModel,
+				providerAccountId: workflowPlan.providerAccountId,
+				claudeEffort: workflowPlan.claudeEffort
+			},
+			workflowPlan,
+			artifactPlan: {
+				provider,
+				files: []
+			},
+			reused: false,
+			currentStage: {
+				index: 2,
+				preset: workflowPlan.preset,
+				provider,
+				providerModel: workflowPlan.providerModel,
+				providerAccountId: workflowPlan.providerAccountId,
+				status: 'prepared',
+				stageFile: '.ai-orchestrator/stages/02-implement.md',
+				generatedAt: '2026-03-08T12:00:00.000Z',
+				briefSummary: 'Implement provider-specific prompt shaping',
+				contextFile: '.ai-context.md',
+				artifactFiles: [],
+				upstreamStageFiles: ['.ai-orchestrator/stages/01-plan.md'],
+				claudeEffort: workflowPlan.claudeEffort
+			}
+		};
+	}
+
+	test('builds Claude instruction artifacts with workflow and delegation sections', () => {
+		const content = buildInstructionArtifactContent(createWorkflowPlan('claude'), createMetadata());
+
+		assert.ok(content.includes('<workflow>'));
+		assert.ok(content.includes('<when_to_delegate>'));
+		assert.ok(content.includes('Context budget summary: tree 4, readme 48, files 5'));
+	});
+
+	test('builds Gemini launch prompts with context-first structure', () => {
+		const instruction = buildSharedWorkflowInstruction(createProjectContext('gemini'));
+
+		assert.ok(instruction.startsWith('## Context'));
+		assert.ok(instruction.includes('## Provider'));
+		assert.ok(instruction.includes('## Task'));
+		assert.ok(instruction.includes('This run was generated with a bounded context budget: tree 4, readme 48, files 5.'));
+		assert.ok(instruction.includes('Use provider model gemini-2.5-pro.'));
+	});
+
+	test('builds Copilot review prompts with findings-first review guidance', () => {
+		const reviewContext: ProjectContext = {
+			...createProjectContext('copilot'),
+			workflowPlan: {
+				...createWorkflowPlan('copilot'),
+				preset: 'review',
+				presetDefinition: WORKFLOW_PRESETS.review,
+				roles: ['reviewer', 'architect']
+			},
+			metadata: {
+				...createMetadata(),
+				preset: 'review',
+				provider: 'copilot',
+				providerModel: 'gpt-5',
+				providerAccountId: 'copilot-account'
+			}
+		};
+
+		const instruction = buildSharedWorkflowInstruction(reviewContext);
+
+		assert.ok(instruction.includes('Preset priorities: Lead with correctness, regression risk, and missing verification'));
+		assert.ok(instruction.includes('Done when: Stop once findings, open questions, and verification gaps are explicit'));
+		assert.ok(instruction.includes('Avoid: Do not rewrite code by default during review'));
+	});
+
+	test('builds Claude debug instruction artifacts with root-cause-first guidance', () => {
+		const debugPlan: WorkflowExecutionPlan = {
+			...createWorkflowPlan('claude'),
+			preset: 'debug',
+			presetDefinition: WORKFLOW_PRESETS.debug,
+			roles: ['debugger', 'implementer', 'tester']
+		};
+		const debugMetadata: ContextMetadata = {
+			...createMetadata(),
+			preset: 'debug',
+			provider: 'claude',
+			providerModel: 'claude-sonnet-4-6',
+			providerAccountId: 'claude-account',
+			claudeEffort: 'medium'
+		};
+
+		const content = buildInstructionArtifactContent(debugPlan, debugMetadata);
+
+		assert.ok(content.includes('Reproduce or tightly characterize the failing behavior before editing code.'));
+		assert.ok(content.includes('Identify the root cause and apply the smallest valid fix.'));
+		assert.ok(content.includes('Do not patch symptoms without explaining the underlying cause.'));
 	});
 });
 

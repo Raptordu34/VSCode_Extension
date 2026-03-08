@@ -1,7 +1,9 @@
 # Config Drawer — Design
 
 **Date:** 2026-03-08
-**Statut:** Approuvé
+**Statut:** Partiellement supersede par l'implementation
+
+> Note implementation: le concept de drawer overlay a ete remplace par un lanceur inline/expandable dans la sidebar afin d'ameliorer la lisibilite, de reduire l'effet wizard, et d'eviter l'empilement de glassmorphism par-dessus le contenu existant.
 
 ---
 
@@ -11,7 +13,7 @@ Le lancement d'un nouveau workflow passe par 7 QuickPicks successifs dans la bar
 
 ## Objectif
 
-Configurer et lancer un workflow entièrement depuis la sidebar (webview), via un drawer overlay qui s'ouvre au clic Lancer quand il n'y a pas de session active.
+Configurer et lancer un workflow entierement depuis la sidebar (webview), via une surface de lancement integree qui s'ouvre au clic Lancer quand il n'y a pas de session active.
 
 ---
 
@@ -39,14 +41,14 @@ Sauvegardé après chaque lancement réussi. Fallback sur la config VS Code si a
 Clic "Lancer ▶" (pas de session active)
   → webview poste { command: 'openConfigDrawer' }
   → WorkflowControlViewProvider lit lastWorkflowConfig depuis globalState
-  → re-render avec lastWorkflowConfig injecté dans le HTML
-  → drawer visible (CSS transition slide-up)
+  → re-render avec lastWorkflowConfig injecte dans le HTML
+  → lanceur inline visible dans la sidebar
 
-Utilisateur remplit le drawer → clic "Lancer ▶"
+Utilisateur remplit le lanceur → clic "Lancer ▶"
   → webview poste { command: 'smartInit', preset, provider, providerModel, claudeEffort?, brief? }
   → extension sauvegarde lastWorkflowConfig dans globalState
   → runSmartInitAiFlow(preset, provider, providerModel, claudeEffort, brief, workspaceFolder)
-  → drawer se ferme
+  → le lanceur se ferme
 
 Clic "Continuer ▶" (session active)
   → poste { command: 'continue' } directement, pas de drawer
@@ -54,9 +56,9 @@ Clic "Continuer ▶" (session active)
 
 ---
 
-## UI du Drawer
+## UI du Lanceur
 
-Overlay CSS fixe par-dessus la sidebar. Backdrop flou + slide-up 200ms.
+Surface integree dans la sidebar. Niveau primaire visible immediatement, reglages avances replis par defaut.
 
 ```
 ┌─────────────────────────────┐

@@ -5,6 +5,7 @@ import { formatListForMarkdown, capitalize } from "../../utils/index.js";
 import { CONTEXT_FILE_NAME, WORKFLOW_SESSION_FILE, WORKFLOW_BRIEF_FILE } from "../workflow/constants.js";
 import { serializeList } from "../../utils/index.js";
 import { getProviderLabel, formatProviderModel } from "../providers/providerService.js";
+import { getProviderCapabilities } from "../providers/providerCatalog.js";
 import { formatWorkflowRoles } from "../workflow/ui.js";
 import { buildClaudeLaunchCommand, buildGeminiLaunchCommand } from "./agentLauncher.js";
 
@@ -32,27 +33,177 @@ export function buildInstructionArtifact(workflowPlan: WorkflowExecutionPlan, me
 	};
 }
 export function getInstructionArtifactPath(provider: ProviderTarget): string {
-	switch (provider) {
-		case 'claude':
-			return 'CLAUDE.md';
-		case 'gemini':
-			return 'GEMINI.md';
-		case 'copilot':
-			return '.github/copilot-instructions.md';
-	}
+	return getProviderCapabilities(provider).instructionArtifactPath;
 }
 export function buildInstructionArtifactContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata): string {
+	switch (workflowPlan.provider) {
+		case 'claude':
+			return buildClaudeInstructionArtifactContent(workflowPlan, metadata);
+		case 'gemini':
+			return buildGeminiInstructionArtifactContent(workflowPlan, metadata);
+		case 'copilot':
+		default:
+			return buildCopilotInstructionArtifactContent(workflowPlan, metadata);
+	}
+}
+function getPresetExecutionProfile(preset: WorkflowPreset): {
+	priorities: string[];
+	completion: string[];
+	avoid: string[];
+} {
+	switch (preset) {
+		case 'explore':
+			return {
+				priorities: [
+					'Map the relevant code paths, extension points, and reusable patterns before proposing changes.',
+					'Keep the output descriptive and grounded in files instead of speculative solutioning.'
+				],
+				completion: [
+					'Stop once the user has a clear map of the relevant surface and the likely next action.',
+					'Do not edit code unless a later instruction explicitly converts exploration into implementation.'
+				],
+				avoid: [
+					'Do not drift into implementation detail that the exploration evidence does not justify.',
+					'Do not broaden the scan beyond the user-relevant area of the repository.'
+				]
+			};
+		case 'plan':
+			return {
+				priorities: [
+					'Turn the gathered context into a constrained implementation plan with explicit checkpoints.',
+					'Prefer reuse and low-complexity changes over fresh abstractions.'
+				],
+				completion: [
+					'Stop once the plan is concrete enough to implement without design guesswork.',
+					'Keep code changes out of scope unless the user explicitly requests implementation.'
+				],
+				avoid: [
+					'Do not present multiple equivalent plans when one clear recommendation is defensible.',
+					'Do not hide tradeoffs or prerequisites.'
+				]
+			};
+		case 'build':
+			return {
+				priorities: [
+					'Validate the plan quickly, then move toward a minimal end-to-end implementation milestone.',
+					'Keep verification focused and explicit before stopping.'
+				],
+				completion: [
+					'Stop once the requested path is implemented and verified with the smallest relevant checks.',
+					'Call out any remaining risks or intentionally deferred work.'
+				],
+				avoid: [
+					'Do not expand scope into unrelated cleanup or architecture changes.',
+					'Do not stop at partial implementation when a narrow end-to-end slice is achievable.'
+				]
+			};
+		case 'debug':
+			return {
+				priorities: [
+					'Reproduce or tightly characterize the failing behavior before editing code.',
+					'Identify the root cause and apply the smallest valid fix.'
+				],
+				completion: [
+					'Stop once the root cause is explicit and the fix is verified by the smallest relevant checks.',
+					'Distinguish confirmed causes from remaining hypotheses.'
+				],
+				avoid: [
+					'Do not patch symptoms without explaining the underlying cause.',
+					'Do not run broad verification when a narrow reproduction or focused test is enough.'
+				]
+			};
+		case 'review':
+			return {
+				priorities: [
+					'Lead with correctness, regression risk, and missing verification.',
+					'Keep findings concrete, severity-ordered, and backed by repository evidence.'
+				],
+				completion: [
+					'Stop after findings, open questions, and verification gaps are explicit.',
+					'Keep any summary or suggested edits secondary to the findings.'
+				],
+				avoid: [
+					'Do not rewrite code by default during review.',
+					'Do not dilute real risks with low-signal style commentary.'
+				]
+			};
+		case 'test':
+			return {
+				priorities: [
+					'Select the smallest test surface that proves or disproves the change.',
+					'Only adjust implementation when a failing test or testability issue requires it.'
+				],
+				completion: [
+					'Stop once the focused checks have passed or failed with clear evidence.',
+					'Call out coverage gaps that still matter for regression confidence.'
+				],
+				avoid: [
+					'Do not default to broad suite runs when a focused check is sufficient.',
+					'Do not add coverage that does not reduce a real regression risk.'
+				]
+			};
+	}
+}
+
+function formatPresetProfileSections(preset: WorkflowPreset, headings: {
+	priorities: string;
+	completion: string;
+	avoid: string;
+}): string[] {
+	const profile = getPresetExecutionProfile(preset);
 	return [
-		'## AI Context Orchestrator',
+		headings.priorities,
+		...profile.priorities.map((entry) => `- ${entry}`),
 		'',
+		headings.completion,
+		...profile.completion.map((entry) => `- ${entry}`),
+		'',
+		headings.avoid,
+		...profile.avoid.map((entry) => `- ${entry}`)
+	];
+}
+
+function buildInstructionMetadataLines(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata): string[] {
+	return [
 		`- Workflow preset: ${workflowPlan.preset}`,
 		`- Roles prepared: ${workflowPlan.roles.join(', ')}`,
 		`- Refresh mode: ${workflowPlan.refreshMode}`,
 		`- Cost profile: ${workflowPlan.costProfile}`,
 		`- Context file: ${CONTEXT_FILE_NAME}`,
+		metadata.contextBudgetProfile ? `- Context budget profile: ${metadata.contextBudgetProfile}` : undefined,
+		metadata.contextBudgetSummary ? `- Context budget summary: ${metadata.contextBudgetSummary}` : undefined
+	].filter((value): value is string => value !== undefined);
+}
+
+function buildClaudeInstructionArtifactContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata): string {
+	return [
+		'## AI Context Orchestrator',
 		'',
-		'### Current objective',
+		...buildInstructionMetadataLines(workflowPlan, metadata),
+		'',
+		'<workflow>',
 		workflowPlan.presetDefinition.launchInstruction,
+		...getPresetExecutionProfile(workflowPlan.preset).priorities,
+		'</workflow>',
+		'',
+		'<context>',
+		'Read the generated context pack first and treat it as the primary grounded source for this run.',
+		'Reuse existing project patterns before inventing new abstractions.',
+		'Keep edits minimal and verify with the smallest relevant checks.',
+		metadata.contextBudgetSummary ? `Context budget for this run: ${metadata.contextBudgetSummary}.` : undefined,
+		'</context>',
+		'',
+		'<when_to_delegate>',
+		'Use subagents when work can run in parallel, when isolated context helps, or when a role can return a compact summary.',
+		'Avoid delegating simple sequential work, single-file edits, or tasks where maintaining shared context is more valuable than isolation.',
+		'</when_to_delegate>',
+		'',
+		'### Preset priorities',
+		...formatPresetProfileSections(workflowPlan.preset, {
+			priorities: 'Focus now:',
+			completion: 'Stop when:',
+			avoid: 'Avoid:'
+		}),
 		'',
 		'### Key files',
 		...formatListForMarkdown(metadata.keyFiles, 'No key files detected.'),
@@ -61,13 +212,75 @@ export function buildInstructionArtifactContent(workflowPlan: WorkflowExecutionP
 		...formatListForMarkdown(metadata.commands, 'No package scripts detected.'),
 		'',
 		'### Instruction files already present',
-		...formatListForMarkdown(metadata.instructionFiles, 'No provider-specific instruction files were detected during generation.'),
+		...formatListForMarkdown(metadata.instructionFiles, 'No provider-specific instruction files were detected during generation.')
+	].filter((value): value is string => value !== undefined).join('\n');
+}
+
+function buildGeminiInstructionArtifactContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata): string {
+	return [
+		'## AI Context Orchestrator',
 		'',
-		'### Working rules',
-		'- Read the generated context pack before acting.',
-		'- Reuse existing project patterns before introducing new abstractions.',
-		'- Keep edits minimal and verify with the smallest relevant checks.',
-		'- Escalate to stronger reasoning only if the current role or model policy is insufficient.'
+		...buildInstructionMetadataLines(workflowPlan, metadata),
+		'',
+		'### Context First',
+		'Use the generated context pack as the primary source of truth for repository structure, key files, commands, and constraints.',
+		metadata.contextBudgetSummary ? `This run uses a bounded context budget: ${metadata.contextBudgetSummary}.` : undefined,
+		'Prefer direct, well-structured reasoning with grounded file evidence over speculative expansion.',
+		'',
+		'### Operating Style',
+		'- Keep the workflow explicit instead of blending exploration, planning, implementation, and review together.',
+		'- Work in short iterations and reassess after each concrete finding or edit.',
+		'- Prefer stable project patterns and minimal edits over flexible abstractions.',
+		'',
+		'### Task',
+		workflowPlan.presetDefinition.launchInstruction,
+		'',
+		...formatPresetProfileSections(workflowPlan.preset, {
+			priorities: '### Preset Priorities',
+			completion: '### Completion Criteria',
+			avoid: '### Avoid'
+		}),
+		'',
+		'### Key files',
+		...formatListForMarkdown(metadata.keyFiles, 'No key files detected.'),
+		'',
+		'### Useful commands',
+		...formatListForMarkdown(metadata.commands, 'No package scripts detected.'),
+		'',
+		'### Instruction files already present',
+		...formatListForMarkdown(metadata.instructionFiles, 'No provider-specific instruction files were detected during generation.')
+	].filter((value): value is string => value !== undefined).join('\n');
+}
+
+function buildCopilotInstructionArtifactContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata): string {
+	return [
+		'## AI Context Orchestrator',
+		'',
+		...buildInstructionMetadataLines(workflowPlan, metadata),
+		'',
+		'### Repository-wide rules',
+		'- Read the generated context pack before acting when the workflow references it.',
+		'- Keep repository-wide instructions short here; move reusable procedures into skills and role-specific behavior into agents.',
+		'- Prefer handoffs when another prepared role can complete the next step more precisely.',
+		'- Keep edits minimal and verification explicit.',
+		'',
+		'### Current objective',
+		workflowPlan.presetDefinition.launchInstruction,
+		'',
+		...formatPresetProfileSections(workflowPlan.preset, {
+			priorities: '### Preset priorities',
+			completion: '### Done when',
+			avoid: '### Avoid'
+		}),
+		'',
+		'### Key files',
+		...formatListForMarkdown(metadata.keyFiles, 'No key files detected.'),
+		'',
+		'### Useful commands',
+		...formatListForMarkdown(metadata.commands, 'No package scripts detected.'),
+		'',
+		'### Instruction files already present',
+		...formatListForMarkdown(metadata.instructionFiles, 'No provider-specific instruction files were detected during generation.')
 	].join('\n');
 }
 export function buildAgentArtifact(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata, role: WorkflowRole): GeneratedArtifact {
@@ -268,6 +481,12 @@ export function buildClaudeSkillContent(workflowPlan: WorkflowExecutionPlan, met
 		'- Keep each role scoped to its responsibility and stop after a concrete result.',
 		'- Verify with focused checks before handing back to the user.',
 		'',
+		...formatPresetProfileSections(workflowPlan.preset, {
+			priorities: 'Preset priorities:',
+			completion: 'Completion criteria:',
+			avoid: 'Avoid:'
+		}),
+		'',
 		'Use these roles as references:',
 		...formatListForMarkdown(workflowPlan.roles.map((role) => `orchestrator-${role}`), 'No roles defined.'),
 		'',
@@ -297,6 +516,12 @@ export function buildGeminiSkillContent(workflowPlan: WorkflowExecutionPlan, met
 		'- Read the generated context pack and relevant files first.',
 		'- Work in short iterations with concrete evidence from files or command output.',
 		'- Stop after a role-specific result and hand off if another role is more appropriate.',
+		'',
+		...formatPresetProfileSections(workflowPlan.preset, {
+			priorities: 'Preset priorities:',
+			completion: 'Completion criteria:',
+			avoid: 'Avoid:'
+		}),
 		'',
 		'Roles prepared for this workflow:',
 		...formatListForMarkdown(workflowPlan.roles, 'No roles defined.'),
@@ -328,6 +553,12 @@ export function buildCopilotSkillContent(workflowPlan: WorkflowExecutionPlan, me
 		'- Route the task to the narrowest valid role.',
 		'- Use handoffs when the next step is better owned by another prepared agent.',
 		'- End with verification status, open risks, and the next concrete action.',
+		'',
+		...formatPresetProfileSections(workflowPlan.preset, {
+			priorities: 'Preset priorities:',
+			completion: 'Completion criteria:',
+			avoid: 'Avoid:'
+		}),
 		'',
 		'Workflow roles to invoke or hand off to:',
 		...formatListForMarkdown(workflowPlan.roles.map((role) => `Orchestrator ${capitalize(role)}`), 'No roles defined.'),
@@ -667,28 +898,146 @@ export function buildProviderLaunchPrompt(projectContext: ProjectContext): strin
 	}
 }
 export function buildSharedWorkflowInstruction(projectContext: ProjectContext): string {
+	switch (projectContext.workflowPlan.provider) {
+		case 'claude':
+			return buildClaudeWorkflowInstruction(projectContext);
+		case 'gemini':
+			return buildGeminiWorkflowInstruction(projectContext);
+		case 'copilot':
+		default:
+			return buildCopilotWorkflowInstruction(projectContext);
+	}
+}
+
+function buildWorkflowInstructionCommonParts(projectContext: ProjectContext): {
+	stageFile?: string;
+	stageWriteInstruction: string;
+	providerAccountInstruction: string;
+	providerModelInstruction: string;
+	providerEffortInstruction: string;
+	artifactInstruction: string;
+	budgetInstruction?: string;
+	presetPriorityInstructions: string[];
+	presetCompletionInstructions: string[];
+	presetAvoidInstructions: string[];
+} {
 	const stageFile = projectContext.currentStage?.stageFile;
 	const stageWriteInstruction = stageFile
 		? `Read ${stageFile} and write your findings or results back into that file before stopping.`
 		: 'Write your findings into the shared workflow stage file before stopping.';
+	const presetProfile = getPresetExecutionProfile(projectContext.workflowPlan.preset);
 
+	return {
+		stageFile,
+		stageWriteInstruction,
+		providerAccountInstruction: projectContext.workflowPlan.providerAccountId
+			? `Use the configured ${getProviderLabel(projectContext.workflowPlan.provider)} account ${projectContext.workflowPlan.providerAccountId}.`
+			: `Use the active ${getProviderLabel(projectContext.workflowPlan.provider)} account for this workflow.`,
+		providerModelInstruction: projectContext.workflowPlan.providerModel
+			? `Use provider model ${projectContext.workflowPlan.providerModel}.`
+			: 'Use the provider default model.',
+		providerEffortInstruction: projectContext.workflowPlan.provider === 'claude' && projectContext.workflowPlan.claudeEffort
+			? `Use Claude effort level ${projectContext.workflowPlan.claudeEffort}.`
+			: 'Use the default reasoning effort for the selected provider.',
+		artifactInstruction: projectContext.artifactPlan
+			? `Use the generated ${getProviderLabel(projectContext.workflowPlan.provider)} artifacts when they help.`
+			: 'Work directly from the context pack and shared workflow files.',
+		budgetInstruction: projectContext.metadata.contextBudgetSummary
+			? `This run was generated with a bounded context budget: ${projectContext.metadata.contextBudgetSummary}.`
+			: undefined,
+		presetPriorityInstructions: presetProfile.priorities,
+		presetCompletionInstructions: presetProfile.completion,
+		presetAvoidInstructions: presetProfile.avoid
+	};
+}
+
+function buildClaudeWorkflowInstruction(projectContext: ProjectContext): string {
+	const common = buildWorkflowInstructionCommonParts(projectContext);
+	return [
+		'<workflow>',
+		`Use the ${projectContext.workflowPlan.presetDefinition.label} workflow for this project.`,
+		projectContext.workflowPlan.presetDefinition.launchInstruction,
+		'</workflow>',
+		'',
+		'<context>',
+		`Start by reading ${CONTEXT_FILE_NAME}.`,
+		`Read ${WORKFLOW_SESSION_FILE} if it exists.`,
+		`Read ${WORKFLOW_BRIEF_FILE} if it exists.`,
+		common.stageFile ? `Read upstream handoffs referenced by ${common.stageFile} before acting.` : 'Read any upstream stage handoffs before acting.',
+		common.budgetInstruction,
+		'</context>',
+		'',
+		'<provider>',
+		common.providerAccountInstruction,
+		common.providerModelInstruction,
+		common.providerEffortInstruction,
+		'</provider>',
+		'',
+		'<execution>',
+		...common.presetPriorityInstructions,
+		'Use subagents when work can run in parallel, when isolated context helps, or when another role can return a concise summary.',
+		'Avoid spawning subagents for simple sequential work, single-file edits, or tasks where direct work is faster and keeps context intact.',
+		...common.presetAvoidInstructions,
+		common.artifactInstruction,
+		common.stageWriteInstruction,
+		...common.presetCompletionInstructions,
+		'</execution>'
+	].filter((value): value is string => value !== undefined).join('\n');
+}
+
+function buildGeminiWorkflowInstruction(projectContext: ProjectContext): string {
+	const common = buildWorkflowInstructionCommonParts(projectContext);
+	return [
+		'## Context',
+		`Start by reading ${CONTEXT_FILE_NAME}.`,
+		`Read ${WORKFLOW_SESSION_FILE} if it exists.`,
+		`Read ${WORKFLOW_BRIEF_FILE} if it exists.`,
+		common.stageFile ? `Read upstream handoffs referenced by ${common.stageFile} before acting.` : 'Read any upstream stage handoffs before acting.',
+		common.budgetInstruction,
+		'',
+		'## Provider',
+		common.providerAccountInstruction,
+		common.providerModelInstruction,
+		'Prefer concise, direct reasoning grounded in the provided repository context.',
+		'',
+		'## Constraints',
+		'- Keep the workflow explicit instead of blending unrelated stages together.',
+		'- Re-evaluate after each concrete finding or edit.',
+		'- Prefer grounded file evidence and minimal changes.',
+		...common.presetAvoidInstructions.map((entry) => `- ${entry}`),
+		common.artifactInstruction,
+		'',
+		'## Priorities',
+		...common.presetPriorityInstructions.map((entry) => `- ${entry}`),
+		'',
+		'## Task',
+		`Use the ${projectContext.workflowPlan.presetDefinition.label} workflow for this project.`,
+		projectContext.workflowPlan.presetDefinition.launchInstruction,
+		common.stageWriteInstruction,
+		'',
+		'## Done When',
+		...common.presetCompletionInstructions.map((entry) => `- ${entry}`)
+	].filter((value): value is string => value !== undefined).join('\n');
+}
+
+function buildCopilotWorkflowInstruction(projectContext: ProjectContext): string {
+	const common = buildWorkflowInstructionCommonParts(projectContext);
 	return [
 		`Use the ${projectContext.workflowPlan.presetDefinition.label} workflow for this project.`,
 		`Start by reading ${CONTEXT_FILE_NAME}.`,
-		projectContext.workflowPlan.providerAccountId ? `Use the configured ${getProviderLabel(projectContext.workflowPlan.provider)} account ${projectContext.workflowPlan.providerAccountId}.` : `Use the active ${getProviderLabel(projectContext.workflowPlan.provider)} account for this workflow.`,
+		common.providerAccountInstruction,
+		common.providerModelInstruction,
 		`Read ${WORKFLOW_SESSION_FILE} if it exists.`,
 		`Read ${WORKFLOW_BRIEF_FILE} if it exists.`,
-		projectContext.workflowPlan.providerModel
-			? `Use provider model ${projectContext.workflowPlan.providerModel}.`
-			: 'Use the provider default model.',
-		projectContext.workflowPlan.provider === 'claude' && projectContext.workflowPlan.claudeEffort
-			? `Use Claude effort level ${projectContext.workflowPlan.claudeEffort}.`
-			: 'Use the default reasoning effort for the selected provider.',
-		stageFile ? `Read upstream handoffs referenced by ${stageFile} before acting.` : 'Read any upstream stage handoffs before acting.',
-		projectContext.artifactPlan
-			? `Use the generated ${getProviderLabel(projectContext.workflowPlan.provider)} artifacts when they help.`
-			: 'Work directly from the context pack and shared workflow files.',
+		common.stageFile ? `Read upstream handoffs referenced by ${common.stageFile} before acting.` : 'Read any upstream stage handoffs before acting.',
+		common.budgetInstruction,
+		common.artifactInstruction,
+		`Preset priorities: ${serializeList(common.presetPriorityInstructions)}.`,
+		`Done when: ${serializeList(common.presetCompletionInstructions)}.`,
+		`Avoid: ${serializeList(common.presetAvoidInstructions)}.`,
+		'Keep repository-wide instructions concise here; rely on prepared skills and agents for detailed procedures.',
+		'Prefer handoffs when another prepared role can complete the next step more precisely.',
 		projectContext.workflowPlan.presetDefinition.launchInstruction,
-		stageWriteInstruction
-	].join(' ');
+		common.stageWriteInstruction
+	].filter((value): value is string => value !== undefined).join(' ');
 }
