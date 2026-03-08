@@ -41,6 +41,7 @@ export function normalizeProviderAccounts(
 				adminApiKeyEnvVar: account.adminApiKeyEnvVar?.trim() || undefined,
 				workspaceId: account.workspaceId?.trim() || undefined,
 				apiKeyId: account.apiKeyId?.trim() || undefined,
+				usageCommand: account.usageCommand?.trim() || account.quotaCommand?.trim() || undefined,
 				quotaCommand: account.quotaCommand?.trim() || undefined,
 				accountHint: account.accountHint?.trim() || undefined,
 				notes: account.notes?.trim() || undefined

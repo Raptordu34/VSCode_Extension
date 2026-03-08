@@ -42,7 +42,7 @@ This design ensures that adding a new AI provider or a new workflow preset no lo
 - Lets each linked account carry its own default model, and its own default Claude effort when the provider is Claude.
 - Lets you connect Claude and Gemini accounts directly from the extension with guided setup, managed Claude profiles, optional auth-assist commands, and SecretStorage-backed credentials.
 - Lets you switch the active account per provider from the UI.
-- Tracks provider status in the UI, including per-account health and optional quota snapshots.
+- Tracks provider status in the UI, including per-account health and optional usage metric snapshots.
 - Supports refresh strategies: `reuse`, `smart-refresh`, and `full-rebuild`.
 - Supports cost policies: `fast`, `balanced`, and `strong`.
 - Can optionally ask a Copilot model to compress and optimize the generated context pack.
@@ -109,7 +109,7 @@ The extension now contributes an `AI Workflow` view container in the activity ba
 
 - `Workflow Control` is now organized around the current state, the next recommended move, recent stages, and quick file access.
 - `Workflow Control` now sits on a shared design shell that also powers the richer `AI Workflow Studio` panel.
-- `Workflow Control` now also exposes a provider section with linked account management for Claude, Gemini, and Copilot, provider status refresh, configured provider models, per-account default model and effort settings, and per-account quota cards when a quota source is available.
+- `Workflow Control` now also exposes a provider section with linked account management for Claude, Gemini, and Copilot, provider status refresh, configured provider models, per-account default model and effort settings, and per-account usage cards when a usage source is available.
 - `AI Workflow Studio` opens in a wider editor panel and is the first step toward the full design-based experience for provider routing, stage inspection, and future console-oriented workflows.
 - Each provider card now exposes direct actions to connect an account, switch the active account, manage stored credentials, run auth assist, and open the provider portal directly inside the sidebar.
 - `Workflow Control` also lets you preview or copy the exact launch prompt that matches the current stage without launching the provider.
@@ -219,7 +219,7 @@ New workflow settings:
 	"configDir": "C:/Users/you/.claude-work",
 	"authMode": "claudeai",
 	"authCommand": "claude login",
-	"quotaCommand": "node C:/scripts/claude-quota.js",
+	"usageCommand": "node C:/scripts/claude-usage.js",
 	"notes": "Team org account"
 }
 ```
@@ -234,7 +234,7 @@ New workflow settings:
 	"authMode": "api-key",
 	"authCommand": "gemini auth login",
 	"apiKeyEnvVar": "GEMINI_WORK_API_KEY",
-	"quotaCommand": "node C:/scripts/gemini-quota.js",
+	"usageCommand": "node C:/scripts/gemini-usage.js",
 	"accountHint": "workspace-team-a",
 	"notes": "Primary Gemini account for fast build/test loops"
 }
@@ -252,7 +252,7 @@ New workflow settings:
 }
 ```
 
-If `quotaCommand` is provided, it should print JSON to stdout using this shape:
+If `usageCommand` is provided, it should print JSON to stdout using this shape:
 
 ```json
 {
@@ -271,7 +271,7 @@ If `quotaCommand` is provided, it should print JSON to stdout using this shape:
 - Claude workflows require the `claude` CLI to be installed and available in `PATH` if you want to launch Claude directly.
 - Gemini workflows require the `gemini` CLI to be installed and available in `PATH` if you want to launch Gemini directly.
 - Copilot workflows require GitHub Copilot Chat in VS Code.
-- Live Claude quota snapshots require either a custom `quotaCommand` per Claude account or a future Admin API integration path.
+- Live Claude usage snapshots require either a custom `usageCommand` per Claude account or a future Admin API integration path. Legacy `quotaCommand` values are still accepted.
 
 ## Known Limitations
 

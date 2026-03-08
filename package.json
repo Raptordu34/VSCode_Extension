@@ -288,7 +288,7 @@
         "aiContextOrchestrator.claudeAccounts": {
           "type": "array",
           "default": [],
-          "description": "Claude account definitions used for direct account switching, auth assist, SecretStorage-backed credentials, and quota inspection. quotaCommand should print JSON with summary, detail, availability, and metrics.",
+          "description": "Claude account definitions used for direct account switching, auth assist, SecretStorage-backed credentials, and usage inspection. usageCommand should print JSON with summary, detail, availability, and metrics. Legacy quotaCommand values are still accepted.",
           "items": {
             "type": "object",
             "required": [
@@ -344,9 +344,13 @@
                 "type": "string",
                 "description": "Optional Anthropic API key identifier reserved for future analytics filtering."
               },
+              "usageCommand": {
+                "type": "string",
+                "description": "Optional shell command that outputs JSON usage metrics for this account. CLAUDE_CONFIG_DIR is injected into the command environment."
+              },
               "quotaCommand": {
                 "type": "string",
-                "description": "Optional shell command that outputs JSON quota status for this account. CLAUDE_CONFIG_DIR is injected into the command environment."
+                "description": "Legacy alias for usageCommand. Optional shell command that outputs JSON usage metrics for this account."
               },
               "notes": {
                 "type": "string",
@@ -392,8 +396,12 @@
               "apiKeyEnvVar": {
                 "type": "string"
               },
-              "quotaCommand": {
+              "usageCommand": {
                 "type": "string"
+              },
+              "quotaCommand": {
+                "type": "string",
+                "description": "Legacy alias for usageCommand."
               },
               "accountHint": {
                 "type": "string"

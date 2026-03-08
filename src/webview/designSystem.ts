@@ -626,6 +626,90 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		display: block;
 		margin-top: 6px;
 	}
+	.provider-metric-grid {
+		margin-top: 10px;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 8px;
+	}
+	.provider-metric-grid .stat {
+		padding: 10px;
+		border-radius: 12px;
+	}
+	.provider-metric-grid .stat strong {
+		font-size: 0.78rem;
+		margin-bottom: 3px;
+	}
+	.provider-metric-grid .stat span {
+		font-size: 0.73rem;
+	}
+	.provider-metric-grid .tone-warning {
+		border-color: color-mix(in srgb, var(--vscode-testing-iconQueued, #cca700) 40%, var(--glass-border));
+		background: color-mix(in srgb, var(--vscode-testing-iconQueued, #cca700) 12%, var(--panel-soft));
+	}
+	.provider-metric-grid .tone-critical {
+		border-color: color-mix(in srgb, var(--vscode-errorForeground, #f14c4c) 45%, var(--glass-border));
+		background: color-mix(in srgb, var(--vscode-errorForeground, #f14c4c) 12%, var(--panel-soft));
+	}
+	.provider-account-list {
+		display: grid;
+		gap: 8px;
+		margin-top: 10px;
+	}
+	.provider-account {
+		padding: 10px;
+		border-radius: 12px;
+		border: 1px solid rgba(255,255,255,0.07);
+		background: rgba(255,255,255,0.03);
+	}
+	.provider-account.active {
+		border-color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 42%, var(--glass-border));
+		background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 10%, var(--panel-strong));
+	}
+	.provider-account-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.provider-account-header strong {
+		font-size: 0.79rem;
+		color: var(--text-primary);
+	}
+	.provider-account-badges {
+		display: flex;
+		gap: 6px;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+	}
+	.provider-account-badge {
+		font-size: 0.68rem;
+		padding: 2px 7px;
+	}
+	.provider-account-summary {
+		margin-top: 6px;
+		font-size: 0.76rem;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+	.provider-account-detail {
+		display: block;
+		margin-top: 4px;
+	}
+	.provider-refresh-meta {
+		display: block;
+		margin-top: 8px;
+	}
+	.availability-ready {
+		background: color-mix(in srgb, var(--vscode-testing-iconPassed, #73c991) 18%, var(--badge-bg));
+	}
+	.availability-warning,
+	.availability-needs-config {
+		background: color-mix(in srgb, var(--vscode-testing-iconQueued, #cca700) 18%, var(--badge-bg));
+	}
+	.availability-error,
+	.availability-unavailable {
+		background: color-mix(in srgb, var(--vscode-errorForeground, #f14c4c) 20%, var(--badge-bg));
+	}
 	.dense-actions {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}

@@ -7,6 +7,11 @@ import {
 	WORKFLOW_SESSION_FILE,
 	PENDING_COPILOT_PROMPT_KEY
 } from './constants.js';
+import type {
+	MetricDisplay,
+	ProviderAccountStatus,
+	ProviderStatusSnapshot
+} from '../providers/types.js';
 import { WORKFLOW_PRESETS } from './presets.js';
 import type {
 	ExtensionConfiguration,
@@ -376,6 +381,9 @@ export function getWorkflowControlHtml(
 			<span class="history-badge provider-badge">${helpers.escapeHtml(providerStatus.summary)}</span>
 		</div>
 		<span class="small provider-detail">${helpers.escapeHtml(providerStatus.detail)}</span>
+		${buildProviderMetricHtml(providerStatus.metrics, helpers, 3)}
+		${providerStatus.lastCheckedAt ? `<span class="small provider-refresh-meta">Last refresh ${helpers.escapeHtml(formatProviderRefreshTime(providerStatus.lastCheckedAt))}</span>` : ''}
+		${buildProviderAccountsHtml(providerStatus, helpers)}
 		<div class="actions dense-actions" style="margin-top:8px;">
 			<button type="button" class="secondary" data-command="switchProviderAccount" data-provider="${providerStatus.provider}">Switch Active</button>
 			<button type="button" class="secondary" data-command="connectProviderAccount" data-provider="${providerStatus.provider}">Connect</button>
@@ -734,6 +742,66 @@ function buildCopilotBannerHtml(helpers: WorkflowUiHelpers): string {
 		<button type="button" class="secondary" data-command="copyCopilotPrompt">Copy prompt again</button>
 	</div>
 </div>`;
+}
+
+function buildProviderAccountsHtml(providerStatus: ProviderStatusSnapshot, helpers: WorkflowUiHelpers): string {
+	if (!providerStatus.accounts || providerStatus.accounts.length === 0) {
+		return '';
+	}
+
+	const accountsHtml = providerStatus.accounts.map((account) => buildProviderAccountHtml(account, helpers)).join('');
+	return `
+	<div class="provider-account-list">
+		${accountsHtml}
+	</div>`;
+}
+
+function buildProviderAccountHtml(account: ProviderAccountStatus, helpers: WorkflowUiHelpers): string {
+	const refreshLabel = account.lastCheckedAt
+		? `Last refresh ${formatProviderRefreshTime(account.lastCheckedAt)}`
+		: 'Not refreshed yet';
+	return `
+	<div class="provider-account ${account.isActive ? 'active' : ''}">
+		<div class="provider-account-header">
+			<strong>${helpers.escapeHtml(account.label)}</strong>
+			<div class="provider-account-badges">
+				${account.isActive ? '<span class="history-badge provider-account-badge">Active</span>' : ''}
+				<span class="history-badge provider-account-badge availability-${helpers.escapeHtml(account.availability)}">${helpers.escapeHtml(capitalize(account.availability))}</span>
+			</div>
+		</div>
+		<div class="provider-account-summary">${helpers.escapeHtml(account.summary)}</div>
+		<div class="small provider-account-detail">${helpers.escapeHtml(account.detail)}</div>
+		${buildProviderMetricHtml(account.metrics, helpers, 4)}
+		<div class="small provider-refresh-meta">${helpers.escapeHtml(refreshLabel)}</div>
+	</div>`;
+}
+
+function buildProviderMetricHtml(metrics: MetricDisplay[], helpers: WorkflowUiHelpers, limit: number): string {
+	if (metrics.length === 0) {
+		return '';
+	}
+
+	const visibleMetrics = metrics.slice(0, limit);
+	return `
+	<div class="stat-grid provider-metric-grid">
+		${visibleMetrics.map((metric) => `
+		<div class="stat tone-${metric.tone ?? 'normal'}">
+			<strong>${helpers.escapeHtml(metric.label)}</strong>
+			<span>${helpers.escapeHtml(metric.value)}</span>
+		</div>`).join('')}
+	</div>`;
+}
+
+function formatProviderRefreshTime(value: string): string {
+	const timestamp = new Date(value);
+	if (Number.isNaN(timestamp.getTime())) {
+		return value;
+	}
+
+	return new Intl.DateTimeFormat(undefined, {
+		dateStyle: 'short',
+		timeStyle: 'short'
+	}).format(timestamp);
 }
 
 function buildHistorySection(

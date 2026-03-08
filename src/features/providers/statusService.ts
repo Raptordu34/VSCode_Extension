@@ -54,13 +54,14 @@ export function buildDefaultAccountDetail(account: ProviderAccountConfiguration)
 }
 
 export function buildDefaultAccountMetrics(account: ProviderAccountConfiguration): MetricDisplay[] {
+	const usageCommand = account.usageCommand || account.quotaCommand;
 	if (account.provider === 'claude') {
 		return [
 			{ label: 'Model', value: account.defaultModel || 'workspace default', tone: account.defaultModel ? 'normal' : 'warning' },
 			{ label: 'Effort', value: account.defaultClaudeEffort || 'workspace default', tone: account.defaultClaudeEffort ? 'normal' : 'warning' },
 			{ label: 'Config Dir', value: account.configDir || 'not configured', tone: account.configDir ? 'normal' : 'critical' },
 			{ label: 'Auth', value: account.authMode || 'profile login', tone: account.authMode ? 'normal' : 'warning' },
-			{ label: 'Quota', value: account.quotaCommand || account.adminApiKeyEnvVar ? 'refresh available' : 'no data source', tone: account.quotaCommand || account.adminApiKeyEnvVar ? 'normal' : 'warning' }
+			{ label: 'Usage', value: usageCommand || account.adminApiKeyEnvVar ? 'refresh available' : 'no data source', tone: usageCommand || account.adminApiKeyEnvVar ? 'normal' : 'warning' }
 		];
 	}
 
@@ -70,7 +71,7 @@ export function buildDefaultAccountMetrics(account: ProviderAccountConfiguration
 			{ label: 'Auth', value: account.authMode || 'not set', tone: account.authMode ? 'normal' : 'warning' },
 			{ label: 'Auth Assist', value: account.authCommand || 'default available', tone: 'normal' },
 			{ label: 'API Key Env', value: account.apiKeyEnvVar || 'not set', tone: account.apiKeyEnvVar ? 'normal' : 'warning' },
-			{ label: 'Quota', value: account.quotaCommand ? 'refresh available' : 'no data source', tone: account.quotaCommand ? 'normal' : 'warning' }
+			{ label: 'Usage', value: usageCommand ? 'refresh available' : 'no data source', tone: usageCommand ? 'normal' : 'warning' }
 		];
 	}
 
@@ -110,8 +111,8 @@ export function buildDefaultProviderStatuses(configuration: ExtensionConfigurati
 			availability: claudeAccounts.length > 0 ? 'ready' : 'needs-config',
 			summary: claudeAccounts.length > 0 ? `${claudeAccounts.length} account(s) configured` : 'No Claude accounts configured',
 			detail: claudeAccounts.length > 0
-				? 'Account switching uses CLAUDE_CONFIG_DIR. Quota can come from a custom command or Anthropic Admin API.'
-				: 'Add Claude accounts in the UI to enable switching and quota tracking.',
+				? 'Account switching uses CLAUDE_CONFIG_DIR. Usage metrics can come from a custom command or Anthropic Admin API.'
+				: 'Add Claude accounts in the UI to enable switching and usage tracking.',
 			metrics: claudeAccounts.length > 0
 				? [
 					{ label: 'Active Account', value: findProviderAccount(configuration, 'claude', configuration.activeClaudeAccountId)?.label ?? claudeAccounts[0].label },
@@ -126,7 +127,7 @@ export function buildDefaultProviderStatuses(configuration: ExtensionConfigurati
 			availability: geminiAccounts.length > 0 ? 'ready' : 'needs-config',
 			summary: geminiAccounts.length > 0 ? `${geminiAccounts.length} account(s) configured` : 'No Gemini accounts configured',
 			detail: geminiAccounts.length > 0
-				? 'Gemini accounts can carry auth mode, API key env references, and an optional quota command.'
+				? 'Gemini accounts can carry auth mode, API key env references, and an optional usage metrics command.'
 				: 'Add Gemini accounts in the UI to keep linked identities and launch context together.',
 			metrics: [
 				{ label: 'Default Model', value: getDefaultProviderModel('gemini', configuration, configuration.activeGeminiAccountId) ?? configuration.defaultGeminiModel },
@@ -182,7 +183,11 @@ export function mergeProviderStatusCache(
 	});
 }
 
-export async function runQuotaCommand(command: string, configDir: string): Promise<{
+function getUsageMetricsCommand(account: ProviderAccountConfiguration): string | undefined {
+	return account.usageCommand || account.quotaCommand;
+}
+
+export async function runUsageMetricsCommand(command: string, configDir: string): Promise<{
 	availability: ProviderStatusAvailability;
 	summary: string;
 	detail: string;
@@ -208,8 +213,8 @@ export async function runQuotaCommand(command: string, configDir: string): Promi
 
 	return {
 		availability: payload.availability ?? 'ready',
-		summary: payload.summary ?? 'Quota refreshed',
-		detail: payload.detail ?? 'Quota command returned successfully.',
+		summary: payload.summary ?? 'Usage metrics refreshed',
+		detail: payload.detail ?? 'Usage metrics command returned successfully.',
 		metrics
 	};
 }
@@ -247,26 +252,27 @@ export async function resolveClaudeAccountStatus(
 		return baseStatus;
 	}
 
-	if (account.quotaCommand) {
+	const usageCommand = getUsageMetricsCommand(account);
+	if (usageCommand) {
 		try {
-			const customQuota = await runQuotaCommand(account.quotaCommand, account.configDir ?? '');
+			const customUsage = await runUsageMetricsCommand(usageCommand, account.configDir ?? '');
 			return {
 				...baseStatus,
-				availability: customQuota.availability,
-				summary: customQuota.summary,
-				detail: customQuota.detail,
-				metrics: [...baseStatus.metrics, ...customQuota.metrics],
+				availability: customUsage.availability,
+				summary: customUsage.summary,
+				detail: customUsage.detail,
+				metrics: [...baseStatus.metrics, ...customUsage.metrics],
 				lastCheckedAt: new Date().toISOString()
 			};
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			outputChannel.appendLine(`[providers] Claude quota command failed for ${account.label}: ${message}`);
+			outputChannel.appendLine(`[providers] Claude usage metrics command failed for ${account.label}: ${message}`);
 			return {
 				...baseStatus,
 				availability: 'warning',
-				summary: 'Account ready, quota command failed',
+				summary: 'Account ready, usage metrics command failed',
 				detail: message,
-				metrics: [...baseStatus.metrics, { label: 'Quota Source', value: 'command error', tone: 'warning' }],
+				metrics: [...baseStatus.metrics, { label: 'Usage Source', value: 'command error', tone: 'warning' }],
 				lastCheckedAt: new Date().toISOString(),
 				errorMessage: message
 			};
@@ -278,8 +284,8 @@ export async function resolveClaudeAccountStatus(
 			...baseStatus,
 			availability: 'warning',
 			summary: 'Admin API key detected',
-			detail: 'Admin API telemetry is configured, but this extension currently expects either a quota command or future Anthropic analytics parsing for live remaining quota.',
-			metrics: [...baseStatus.metrics, { label: 'Quota Source', value: `env:${account.adminApiKeyEnvVar}` }],
+			detail: 'Admin API telemetry is configured, but this extension currently expects either a usage metrics command or future Anthropic analytics parsing for live remaining quota.',
+			metrics: [...baseStatus.metrics, { label: 'Usage Source', value: `env:${account.adminApiKeyEnvVar}` }],
 			lastCheckedAt: new Date().toISOString()
 		};
 	}
@@ -287,9 +293,9 @@ export async function resolveClaudeAccountStatus(
 	return {
 		...baseStatus,
 		availability: 'warning',
-		summary: 'Account ready, quota source missing',
-		detail: 'Add quotaCommand for rolling or weekly Claude quota, or add adminApiKeyEnvVar for API usage telemetry.',
-		metrics: [...baseStatus.metrics, { label: 'Quota Source', value: 'not configured', tone: 'warning' }],
+		summary: 'Account ready, usage source missing',
+		detail: 'Add usageCommand for rolling or weekly Claude usage metrics, or add adminApiKeyEnvVar for API usage telemetry.',
+		metrics: [...baseStatus.metrics, { label: 'Usage Source', value: 'not configured', tone: 'warning' }],
 		lastCheckedAt: new Date().toISOString()
 	};
 }
@@ -326,26 +332,27 @@ export async function resolveGenericAccountStatus(
 		]
 	};
 
-	if (account.quotaCommand) {
+	const usageCommand = getUsageMetricsCommand(account);
+	if (usageCommand) {
 		try {
-			const customQuota = await runQuotaCommand(account.quotaCommand, account.configDir ?? '');
+			const customUsage = await runUsageMetricsCommand(usageCommand, account.configDir ?? '');
 			return {
 				...baseStatus,
-				availability: account.provider === 'copilot' ? 'warning' : customQuota.availability,
-				summary: customQuota.summary,
-				detail: customQuota.detail,
-				metrics: [...baseStatus.metrics, ...customQuota.metrics],
+				availability: account.provider === 'copilot' ? 'warning' : customUsage.availability,
+				summary: customUsage.summary,
+				detail: customUsage.detail,
+				metrics: [...baseStatus.metrics, ...customUsage.metrics],
 				lastCheckedAt: new Date().toISOString()
 			};
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			outputChannel.appendLine(`[providers] ${account.provider} quota command failed for ${account.label}: ${message}`);
+			outputChannel.appendLine(`[providers] ${account.provider} usage metrics command failed for ${account.label}: ${message}`);
 			return {
 				...baseStatus,
 				availability: 'warning',
-				summary: 'Account tracked, quota command failed',
+				summary: 'Account tracked, usage metrics command failed',
 				detail: message,
-				metrics: [...baseStatus.metrics, { label: 'Quota Source', value: 'command error', tone: 'warning' }],
+				metrics: [...baseStatus.metrics, { label: 'Usage Source', value: 'command error', tone: 'warning' }],
 				lastCheckedAt: new Date().toISOString(),
 				errorMessage: message
 			};

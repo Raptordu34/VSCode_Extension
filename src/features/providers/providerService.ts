@@ -474,13 +474,13 @@ export async function promptForProviderAccountDetails(
 		return undefined;
 	}
 
-	const quotaCommand = await vscode.window.showInputBox({
-		title: `${getProviderLabel(provider)} Quota Command`,
-		prompt: 'Optional shell command that prints JSON quota status for this account',
-		value: existing?.quotaCommand,
+	const usageCommand = await vscode.window.showInputBox({
+		title: `${getProviderLabel(provider)} Usage Metrics Command`,
+		prompt: 'Optional shell command that prints JSON usage metrics for this account. Legacy quotaCommand values still work.',
+		value: existing?.usageCommand ?? existing?.quotaCommand,
 		ignoreFocusOut: true
 	});
-	if (quotaCommand === undefined) {
+	if (usageCommand === undefined) {
 		return undefined;
 	}
 
@@ -511,7 +511,8 @@ export async function promptForProviderAccountDetails(
 		adminApiKeyEnvVar: existing?.adminApiKeyEnvVar,
 		workspaceId: existing?.workspaceId,
 		apiKeyId: existing?.apiKeyId,
-		quotaCommand: quotaCommand.trim() || undefined,
+		usageCommand: usageCommand.trim() || undefined,
+		quotaCommand: usageCommand.trim() || undefined,
 		accountHint: accountHint.trim() || undefined,
 		notes: notes.trim() || undefined
 	};

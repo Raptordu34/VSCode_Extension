@@ -56,6 +56,7 @@ export interface ProviderAccountConfiguration {
 	adminApiKeyEnvVar?: string;
 	workspaceId?: string;
 	apiKeyId?: string;
+	usageCommand?: string;
 	quotaCommand?: string;
 	accountHint?: string;
 	notes?: string;

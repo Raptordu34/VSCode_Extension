@@ -58,6 +58,7 @@ export async function writeProviderAccounts(provider: ProviderTarget, accounts: 
 		adminApiKeyEnvVar: account.adminApiKeyEnvVar,
 		workspaceId: account.workspaceId,
 		apiKeyId: account.apiKeyId,
+		usageCommand: account.usageCommand,
 		quotaCommand: account.quotaCommand,
 		accountHint: account.accountHint,
 		notes: account.notes
