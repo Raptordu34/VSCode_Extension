@@ -55,7 +55,7 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 			localResourceRoots: [this.extensionUri]
 		};
 
-		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; stageIndex?: number }) => {
+		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; providerModel?: string; claudeEffort?: string; brief?: string; stageIndex?: number }) => {
 			switch (message.command) {
 				case 'init':
 					await vscode.commands.executeCommand('ai-context-orchestrator.initAI');
@@ -66,9 +66,9 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 						message.preset,
 						{
 							provider: message.provider,
-							providerModel: (message as any).providerModel,
-							claudeEffort: (message as any).claudeEffort,
-							brief: (message as any).brief
+							providerModel: message.providerModel,
+							claudeEffort: message.claudeEffort,
+							brief: message.brief
 						}
 					);
 					this.drawerOpen = false;
