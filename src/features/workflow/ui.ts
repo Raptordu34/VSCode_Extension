@@ -310,7 +310,14 @@ export function getWorkflowControlHtml(
 </div>
 </details>`;
 
+	const claudeModels = ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
+	const geminiModels = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'];
+	const drawerHtml = drawerOpen
+		? buildConfigDrawerHtml(helpers, lastConfig, configuration)
+		: '';
+
 	const contentHtml = `
+${drawerHtml}
 ${heroHtml}
 ${stagesHtml}
 ${providersHtml}
@@ -417,6 +424,82 @@ function buildProviderLaunchFormPreview(
 	}
 
 	return prompt;
+}
+
+function buildConfigDrawerHtml(
+	helpers: WorkflowUiHelpers,
+	lastConfig: LastWorkflowConfig | undefined,
+	configuration: ExtensionConfiguration
+): string {
+	const preset = lastConfig?.preset ?? configuration.defaultPreset;
+	const provider = lastConfig?.provider ?? configuration.defaultProvider;
+	const model = lastConfig?.providerModel ?? '';
+	const effort = lastConfig?.claudeEffort ?? configuration.defaultClaudeEffort;
+	const brief = lastConfig?.brief ?? '';
+
+	const claudeModels = ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
+	const geminiModels = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'];
+
+	const presets = Object.values(WORKFLOW_PRESETS);
+	const presetPills = presets.map((p) =>
+		`<button type="button" class="drawer-pill ${p.preset === preset ? 'active' : ''}" data-field="preset" data-value="${p.preset}">${helpers.escapeHtml(p.label)}</button>`
+	).join('');
+
+	const providers: ProviderTarget[] = ['claude', 'gemini', 'copilot'];
+	const providerPills = providers.map((p) =>
+		`<button type="button" class="drawer-pill ${p === provider ? 'active' : ''}" data-field="provider" data-value="${p}">${helpers.escapeHtml(helpers.getProviderLabel(p))}</button>`
+	).join('');
+
+	const activeModels = provider === 'gemini' ? geminiModels : provider === 'copilot' ? ['default'] : claudeModels;
+	const modelOptions = activeModels.map((m) =>
+		`<option value="${m}" ${m === model ? 'selected' : ''}>${m}</option>`
+	).join('');
+
+	const effortPills = (['low', 'medium', 'high'] as const).map((e) =>
+		`<button type="button" class="drawer-pill ${e === effort ? 'active' : ''}" data-field="effort" data-value="${e}">${e.charAt(0).toUpperCase() + e.slice(1)}</button>`
+	).join('');
+
+	const briefPlaceholder = preset === 'explore' ? 'Quelle zone explorer ?' : 'Décris l\'objectif de cette étape…';
+
+	return `
+<div class="mc-backdrop" id="mc-backdrop"></div>
+<div class="mc-drawer" id="mc-drawer">
+	<div class="drawer-header">
+		<span class="drawer-title">Nouveau workflow</span>
+		<button type="button" class="drawer-close" id="drawer-close-btn">✕</button>
+	</div>
+	<div class="drawer-body">
+		<div class="drawer-field">
+			<label class="drawer-label">Objectif</label>
+			<div class="drawer-pills" id="preset-pills">${presetPills}</div>
+		</div>
+		<div class="drawer-field" id="brief-field"${preset === 'explore' ? ' style="display:none"' : ''}>
+			<label class="drawer-label">Brief</label>
+			<textarea class="drawer-textarea" id="drawer-brief" placeholder="${helpers.escapeHtml(briefPlaceholder)}">${helpers.escapeHtml(brief)}</textarea>
+		</div>
+		<div class="drawer-field">
+			<label class="drawer-label">Provider</label>
+			<div class="drawer-pills" id="provider-pills">${providerPills}</div>
+		</div>
+		<div class="drawer-field">
+			<label class="drawer-label">Modèle</label>
+			<select class="drawer-select" id="drawer-model">${modelOptions}</select>
+		</div>
+		<div class="drawer-field" id="effort-field"${provider !== 'claude' ? ' style="display:none"' : ''}>
+			<label class="drawer-label">Effort Claude</label>
+			<div class="drawer-pills" id="effort-pills">${effortPills}</div>
+		</div>
+		<details class="advanced-details">
+			<summary>▸ Paramètres avancés</summary>
+			<div style="margin-top:8px;">
+				<button type="button" class="secondary" data-command="init">Configuration complète (QuickPick)…</button>
+			</div>
+		</details>
+	</div>
+	<div class="drawer-footer">
+		<button type="button" id="drawer-launch-btn">Lancer ▶</button>
+	</div>
+</div>`;
 }
 
 export function formatWorkflowRoles(roles: WorkflowRole[]): string {
