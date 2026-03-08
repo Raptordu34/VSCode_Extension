@@ -328,18 +328,31 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		appearance: none;
 		width: 100%;
 		border: 1px solid transparent;
-		border-radius: 12px;
+		border-radius: var(--radius-interactive);
 		padding: 10px 12px;
-		background: var(--button-primary-bg);
+		background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--button-primary-bg) 100%, rgba(255,255,255,0.08)) 0%,
+			var(--button-primary-bg) 100%
+		);
 		color: var(--button-primary-fg);
 		cursor: pointer;
 		text-align: left;
-		box-shadow: none;
-		transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+		box-shadow: var(--btn-highlight), var(--shadow-elev-1);
+		transition: background 120ms ease, border-color 120ms ease, box-shadow 80ms ease, opacity 120ms ease;
 	}
 	button:hover:not(:disabled) {
-		transform: none;
-		background: var(--button-primary-hover);
+		background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--button-primary-hover) 100%, rgba(255,255,255,0.06)) 0%,
+			var(--button-primary-hover) 100%
+		);
+		box-shadow: var(--btn-highlight), var(--shadow-elev-2);
+	}
+	button:active:not(:disabled) {
+		box-shadow: var(--btn-press);
+		transform: translateY(1px);
+		transition: box-shadow 40ms ease, transform 40ms ease;
 	}
 	button:focus-visible,
 	input:focus-visible,
@@ -355,15 +368,29 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	}
 	button.secondary,
 	.linkButton {
-		background: var(--button-secondary-bg);
+		background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--button-secondary-bg) 100%, rgba(255,255,255,0.06)) 0%,
+			var(--button-secondary-bg) 100%
+		);
 		color: var(--button-secondary-fg);
 		border: 1px solid transparent;
-		box-shadow: none;
+		box-shadow: var(--btn-highlight), var(--shadow-elev-1);
 	}
 	button.secondary:hover:not(:disabled),
 	.linkButton:hover:not(:disabled) {
-		background: var(--button-secondary-hover);
+		background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--button-secondary-hover) 100%, rgba(255,255,255,0.06)) 0%,
+			var(--button-secondary-hover) 100%
+		);
 		border-color: transparent;
+		box-shadow: var(--btn-highlight), var(--shadow-elev-2);
+	}
+	button.secondary:active:not(:disabled),
+	.linkButton:active:not(:disabled) {
+		box-shadow: var(--btn-press);
+		transform: translateY(1px);
 	}
 	.linkButton span {
 		display: block;
