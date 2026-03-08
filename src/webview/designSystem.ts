@@ -548,6 +548,53 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	}
 	.stage-pill.completed { border-color: rgba(100,200,100,0.20); background: rgba(100,200,100,0.05); }
 	.stage-pill.in-progress { border-color: rgba(214,117,86,0.30); background: rgba(214,117,86,0.07); }
+	.history-list { display: grid; gap: 8px; }
+	.history-entry {
+		border-radius: 12px;
+		padding: 10px;
+		border: 1px solid rgba(255,255,255,0.07);
+		background: rgba(255,255,255,0.03);
+	}
+	.history-entry.active {
+		border-color: rgba(214,117,86,0.30);
+		background: rgba(214,117,86,0.08);
+	}
+	.history-meta-row {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.history-title {
+		font-size: 0.84rem;
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+	.history-badge {
+		font-size: 0.72rem;
+		font-weight: 700;
+		padding: 3px 8px;
+		border-radius: 999px;
+		background: rgba(214,117,86,0.14);
+		border: 1px solid rgba(214,117,86,0.24);
+		color: #f2b59e;
+		white-space: nowrap;
+	}
+	.history-summary {
+		margin-top: 4px;
+		font-size: 0.76rem;
+		color: var(--text-secondary);
+	}
+	.history-lineage {
+		margin-top: 4px;
+		font-size: 0.74rem;
+		color: var(--text-secondary);
+	}
+	.history-timestamp {
+		margin-top: 2px;
+		font-size: 0.74rem;
+		color: var(--text-secondary);
+	}
 	.pill-label { display: block; font-size: 0.83rem; font-weight: 700; color: var(--text-primary); }
 	.pill-status { display: block; font-size: 0.74rem; color: var(--text-secondary); margin-top: 2px; }
 	.pill-actions { display: flex; gap: 6px; margin-top: 6px; }

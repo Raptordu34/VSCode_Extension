@@ -5,14 +5,16 @@ import { resolveWorkspaceFolder } from '../core/workspaceContext.js';
 import { getExtensionConfiguration } from '../core/configuration.js';
 import { buildDefaultWorkflowPlan, buildSmartDefaultWorkflowPlan, openWorkspaceRelativeFile, promptForWorkflowPlan, promptForWorkflowContinuation, updateSelectedWorkflowStageStatus, buildWorkflowSummaryDocument, saveLastWorkflowConfig, inferTaskType } from '../features/workflow/workflowService.js';
 import { WORKFLOW_PRESETS } from '../features/workflow/presets.js';
-import { gatherProjectContext, readWorkflowSessionState, buildContextGenerationMessage } from '../features/context/contextBuilder.js';
+import { gatherProjectContext, buildContextGenerationMessage } from '../features/context/contextBuilder.js';
+import { readWorkflowBrief, readWorkflowSessionState } from '../features/context/workflowPersistence.js';
 import { launchClaude, launchGemini } from '../features/aiAgents/agentLauncher.js';
 import { buildSharedWorkflowInstruction } from '../features/aiAgents/promptBuilder.js';
 import { refreshProviderStatuses, switchActiveProviderAccount, manageProviderAccounts, connectProviderAccount, configureProviderCredential, runProviderAuthAssist, openProviderAccountPortal } from '../features/providers/providerService.js';
 import { WORKFLOW_BRIEF_FILE, WORKFLOW_SESSION_FILE, CONTEXT_FILE_NAME } from '../features/workflow/constants.js';
 import { buildWorkflowPromptFromDashboardState, buildWorkflowPromptPreviewDocument, type WorkflowUiHelpers } from '../features/workflow/ui.js';
-import { WorkflowTreeNode, WorkflowDashboardState, ProjectContext, WorkflowQuickPickItem, ProviderTarget, WorkflowPreset, LastWorkflowConfig, ClaudeEffortLevel } from '../features/workflow/types.js';
+import { WorkflowTreeNode, WorkflowDashboardState, ProjectContext, WorkflowQuickPickItem, ProviderTarget, WorkflowPreset, LastWorkflowConfig, ClaudeEffortLevel, WorkflowExecutionPlan } from '../features/workflow/types.js';
 import { buildWorkspaceUri } from '../core/workspace.js';
+import { archiveActiveWorkflowState, buildWorkflowHistoryQuickPickLabel, cleanActiveWorkflowFiles, forkWorkflowFromHistory, forkWorkflowFromHistoryAtStage, readWorkflowArchiveManifest, readWorkflowHistoryIndex, restoreWorkflowFromHistory } from '../features/context/workflowHistory.js';
 
 export function registerAllCommands(
 	context: vscode.ExtensionContext,
@@ -30,14 +32,49 @@ export function registerAllCommands(
 		vscode.commands.registerCommand('ai-context-orchestrator.initAI', async () => {
 			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder to initialize');
 			if (!workspaceFolder) {return;}
-			await runInitAiFlow(workspaceFolder);
+			await runInitAiFlow(context, workspaceFolder);
 			EventBus.fire('refresh');
 		}),
 
 		vscode.commands.registerCommand('ai-context-orchestrator.continueWorkflow', async () => {
 			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose workflow you want to continue');
 			if (!workspaceFolder) {return;}
-			await runContinueWorkflowFlow(workspaceFolder);
+			await runContinueWorkflowFlow(context, workspaceFolder);
+			EventBus.fire('refresh');
+		}),
+
+		vscode.commands.registerCommand('ai-context-orchestrator.restoreWorkflowFromHistory', async (workflowId?: string) => {
+			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose workflow history you want to restore');
+			if (!workspaceFolder) {return;}
+			await runRestoreWorkflowFromHistoryFlow(workspaceFolder, workflowId);
+			EventBus.fire('refresh');
+		}),
+
+		vscode.commands.registerCommand('ai-context-orchestrator.forkWorkflowFromHistory', async (workflowId?: string) => {
+			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose workflow should be forked');
+			if (!workspaceFolder) {return;}
+			await runForkWorkflowFromHistoryFlow(workspaceFolder, workflowId);
+			EventBus.fire('refresh');
+		}),
+
+		vscode.commands.registerCommand('ai-context-orchestrator.forkWorkflowFromStage', async (stageIndex?: number) => {
+			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose workflow stage should be forked');
+			if (!workspaceFolder) {return;}
+			await runForkWorkflowFromStageFlow(workspaceFolder, stageIndex);
+			EventBus.fire('refresh');
+		}),
+
+		vscode.commands.registerCommand('ai-context-orchestrator.forkWorkflowFromArchivedStage', async (workflowId?: string) => {
+			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose archived workflow stage should be forked');
+			if (!workspaceFolder) {return;}
+			await runForkWorkflowFromArchivedStageFlow(workspaceFolder, workflowId);
+			EventBus.fire('refresh');
+		}),
+
+		vscode.commands.registerCommand('ai-context-orchestrator.cleanActiveWorkflowFiles', async () => {
+			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose generated workflow files should be cleaned');
+			if (!workspaceFolder) {return;}
+			await runCleanActiveWorkflowFilesFlow(workspaceFolder);
 			EventBus.fire('refresh');
 		}),
 
@@ -124,7 +161,7 @@ export function registerAllCommands(
 				claudeEffort: overrides.claudeEffort as ClaudeEffortLevel | undefined,
 				brief: overrides.brief
 			} : undefined;
-			await runSmartInitAiFlow(resolvedPreset, workspaceFolder, resolvedOverrides);
+			await runSmartInitAiFlow(context, resolvedPreset, workspaceFolder, resolvedOverrides);
 			if (resolvedOverrides) {
 				await saveLastWorkflowConfig(context, {
 					preset: resolvedPreset,
@@ -154,25 +191,25 @@ export function registerAllCommands(
 		}),
 
 		vscode.commands.registerCommand('ai-context-orchestrator.manageProviderAccounts', async (provider?: ProviderTarget) => {
-			await manageProviderAccounts(provider);
+			await manageProviderAccounts(context, provider);
 			await refreshProviderStatuses(context, Logger.getChannel());
 			EventBus.fire('refresh');
 		}),
 
 		vscode.commands.registerCommand('ai-context-orchestrator.connectProviderAccount', async (provider?: ProviderTarget) => {
-			await connectProviderAccount(provider);
+			await connectProviderAccount(context, provider);
 			await refreshProviderStatuses(context, Logger.getChannel());
 			EventBus.fire('refresh');
 		}),
 
 		vscode.commands.registerCommand('ai-context-orchestrator.configureProviderCredential', async (provider?: ProviderTarget) => {
-			await configureProviderCredential(provider);
+			await configureProviderCredential(context, provider);
 			await refreshProviderStatuses(context, Logger.getChannel());
 			EventBus.fire('refresh');
 		}),
 
 		vscode.commands.registerCommand('ai-context-orchestrator.runProviderAuthAssist', async (provider?: ProviderTarget) => {
-			await runProviderAuthAssist(provider);
+			await runProviderAuthAssist(context, provider);
 			await refreshProviderStatuses(context, Logger.getChannel());
 			EventBus.fire('refresh');
 		}),
@@ -206,6 +243,7 @@ export function registerAllCommands(
 }
 
 async function runSmartInitAiFlow(
+	context: vscode.ExtensionContext,
 	preset: WorkflowPreset,
 	workspaceFolder: vscode.WorkspaceFolder,
 	overrides?: {
@@ -217,6 +255,7 @@ async function runSmartInitAiFlow(
 ): Promise<void> {
 	const configuration = getExtensionConfiguration();
 	const workflowPlan = buildSmartDefaultWorkflowPlan(preset, configuration);
+	workflowPlan.startNewWorkflow = true;
 	if (overrides?.provider) { workflowPlan.provider = overrides.provider; }
 	if (overrides?.providerModel !== undefined) { workflowPlan.providerModel = overrides.providerModel; }
 	if (overrides?.claudeEffort) { workflowPlan.claudeEffort = overrides.claudeEffort; }
@@ -232,25 +271,16 @@ async function runSmartInitAiFlow(
 	const projectContext = await gatherProjectContext(false, workflowPlan, workspaceFolder);
 	if (!projectContext) {return;}
 
-	switch (workflowPlan.provider) {
-		case 'claude':
-			launchClaude(projectContext);
-			break;
-		case 'gemini':
-			launchGemini(projectContext);
-			break;
-		case 'copilot':
-			await launchCopilot(projectContext);
-			break;
-	}
+	await launchProvider(context, workflowPlan, projectContext);
 
 	Logger.info(`[launch] Smart-init workflow ${workflowPlan.preset} with provider ${workflowPlan.provider}`);
 }
 
-async function runInitAiFlow(workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
+async function runInitAiFlow(context: vscode.ExtensionContext, workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
 	const configuration = getExtensionConfiguration();
 	const workflowPlan = await promptForWorkflowPlan(configuration);
 	if (!workflowPlan) {return;}
+	workflowPlan.startNewWorkflow = true;
 
 	const projectContext = await gatherProjectContext(false, workflowPlan, workspaceFolder);
 	if (!projectContext) {return;}
@@ -271,22 +301,12 @@ async function runInitAiFlow(workspaceFolder: vscode.WorkspaceFolder): Promise<v
 		return;
 	}
 
-	switch (workflowPlan.provider) {
-		case 'claude':
-			launchClaude(projectContext);
-			break;
-		case 'gemini':
-			launchGemini(projectContext);
-			break;
-		case 'copilot':
-			await launchCopilot(projectContext);
-			break;
-	}
+	await launchProvider(context, workflowPlan, projectContext);
 
 	Logger.info(`[launch] Started workflow ${workflowPlan.preset} with provider ${workflowPlan.provider}`);
 }
 
-async function runContinueWorkflowFlow(workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
+async function runContinueWorkflowFlow(context: vscode.ExtensionContext, workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
 	const configuration = getExtensionConfiguration();
 	const existingSession = await readWorkflowSessionState(workspaceFolder.uri);
 	if (!existingSession) {
@@ -296,6 +316,9 @@ async function runContinueWorkflowFlow(workspaceFolder: vscode.WorkspaceFolder):
 
 	const workflowPlan = await promptForWorkflowContinuation(configuration, existingSession);
 	if (!workflowPlan) {return;}
+	workflowPlan.startNewWorkflow = false;
+	workflowPlan.workflowId = existingSession.workflowId;
+	workflowPlan.branchId = existingSession.branchId;
 
 	const projectContext = await gatherProjectContext(false, workflowPlan, workspaceFolder);
 	if (!projectContext) {return;}
@@ -316,19 +339,227 @@ async function runContinueWorkflowFlow(workspaceFolder: vscode.WorkspaceFolder):
 		return;
 	}
 
-	switch (workflowPlan.provider) {
-		case 'claude':
-			launchClaude(projectContext);
-			break;
-		case 'gemini':
-			launchGemini(projectContext);
-			break;
-		case 'copilot':
-			await launchCopilot(projectContext);
-			break;
-	}
+	await launchProvider(context, workflowPlan, projectContext);
 
 	Logger.info(`[launch] Continued workflow from ${existingSession.currentPreset} to ${workflowPlan.preset} with provider ${workflowPlan.provider}`);
+}
+
+async function runRestoreWorkflowFromHistoryFlow(workspaceFolder: vscode.WorkspaceFolder, workflowId?: string): Promise<void> {
+	const historyIndex = await readWorkflowHistoryIndex(workspaceFolder.uri);
+	if (historyIndex.entries.length === 0) {
+		void vscode.window.showInformationMessage('No archived workflows are available yet.');
+		return;
+	}
+
+	if (workflowId) {
+		const entry = historyIndex.entries.find((candidate) => candidate.workflowId === workflowId);
+		if (!entry) {
+			void vscode.window.showWarningMessage('The requested workflow archive could not be found.');
+			return;
+		}
+		await restoreArchivedWorkflow(workspaceFolder, workflowId);
+		return;
+	}
+
+	const selection = await vscode.window.showQuickPick(
+		historyIndex.entries.map((entry) => ({
+			label: buildWorkflowHistoryQuickPickLabel(entry),
+			description: entry.updatedAt,
+			detail: `${entry.stageCount} stage(s)${historyIndex.activeWorkflowId === entry.workflowId ? ' · active' : ''}`,
+			workflowId: entry.workflowId
+		})),
+		{
+			title: 'Restore Workflow History',
+			placeHolder: 'Choose the archived workflow to restore into the active workspace',
+			ignoreFocusOut: true
+		}
+	);
+	if (!selection?.workflowId) {
+		return;
+	}
+
+	await restoreArchivedWorkflow(workspaceFolder, selection.workflowId);
+}
+
+
+async function restoreArchivedWorkflow(workspaceFolder: vscode.WorkspaceFolder, workflowId: string): Promise<void> {
+	const currentSession = await readWorkflowSessionState(workspaceFolder.uri);
+	if (currentSession && currentSession.workflowId !== workflowId) {
+		await archiveActiveWorkflowState(workspaceFolder, currentSession, await readWorkflowBrief(workspaceFolder.uri));
+	}
+
+	const restoredManifest = await restoreWorkflowFromHistory(workspaceFolder, workflowId);
+	if (!restoredManifest) {
+		void vscode.window.showWarningMessage('The selected workflow archive could not be restored.');
+		return;
+	}
+
+	void vscode.window.showInformationMessage(`Workflow restored: ${restoredManifest.label}.`);
+}
+
+async function runCleanActiveWorkflowFilesFlow(workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
+	const currentSession = await readWorkflowSessionState(workspaceFolder.uri);
+	if (currentSession) {
+		await archiveActiveWorkflowState(workspaceFolder, currentSession, await readWorkflowBrief(workspaceFolder.uri));
+	}
+
+	const cleaned = await cleanActiveWorkflowFiles(workspaceFolder);
+	if (!cleaned) {
+		void vscode.window.showInformationMessage('No active archived workflow was found to clean.');
+		return;
+	}
+
+	void vscode.window.showInformationMessage('Active workflow-generated files cleaned from the workspace.');
+}
+
+async function runForkWorkflowFromHistoryFlow(workspaceFolder: vscode.WorkspaceFolder, workflowId?: string): Promise<void> {
+	const historyIndex = await readWorkflowHistoryIndex(workspaceFolder.uri);
+	if (historyIndex.entries.length === 0) {
+		void vscode.window.showInformationMessage('No archived workflows are available yet to fork.');
+		return;
+	}
+
+	let sourceWorkflowId = workflowId;
+	if (!sourceWorkflowId) {
+		const selection = await vscode.window.showQuickPick(
+			historyIndex.entries.map((entry) => ({
+				label: buildWorkflowHistoryQuickPickLabel(entry),
+				description: entry.updatedAt,
+				detail: `${entry.stageCount} stage(s)${historyIndex.activeWorkflowId === entry.workflowId ? ' · active' : ''}`,
+				workflowId: entry.workflowId
+			})),
+			{
+				title: 'Fork Workflow History',
+				placeHolder: 'Choose the workflow to fork into a new lineage',
+				ignoreFocusOut: true
+			}
+		);
+		if (!selection?.workflowId) {
+			return;
+		}
+		sourceWorkflowId = selection.workflowId;
+	}
+
+	const currentSession = await readWorkflowSessionState(workspaceFolder.uri);
+	if (currentSession?.workflowId === sourceWorkflowId) {
+		await archiveActiveWorkflowState(workspaceFolder, currentSession, await readWorkflowBrief(workspaceFolder.uri));
+	}
+
+	const forkedManifest = await forkWorkflowFromHistory(workspaceFolder, sourceWorkflowId);
+	if (!forkedManifest) {
+		void vscode.window.showWarningMessage('The selected workflow archive could not be forked.');
+		return;
+	}
+
+	const restoredFork = await restoreWorkflowFromHistory(workspaceFolder, forkedManifest.workflowId);
+	if (!restoredFork) {
+		void vscode.window.showWarningMessage('The fork was created but could not be restored as the active workflow.');
+		return;
+	}
+
+	void vscode.window.showInformationMessage(`Workflow forked: ${restoredFork.label}.`);
+}
+
+async function runForkWorkflowFromStageFlow(workspaceFolder: vscode.WorkspaceFolder, stageIndex?: number): Promise<void> {
+	const currentSession = await readWorkflowSessionState(workspaceFolder.uri);
+	if (!currentSession?.workflowId) {
+		void vscode.window.showInformationMessage('No active workflow is available to fork from a stage.');
+		return;
+	}
+
+	const resolvedStageIndex = stageIndex ?? currentSession.currentStageIndex;
+	const targetStage = currentSession.stages.find((stage) => stage.index === resolvedStageIndex);
+	if (!targetStage) {
+		void vscode.window.showWarningMessage('The selected stage could not be found in the active workflow.');
+		return;
+	}
+
+	await archiveActiveWorkflowState(workspaceFolder, currentSession, await readWorkflowBrief(workspaceFolder.uri));
+
+	const forkedManifest = await forkWorkflowFromHistoryAtStage(workspaceFolder, currentSession.workflowId, resolvedStageIndex);
+	if (!forkedManifest) {
+		void vscode.window.showWarningMessage('The selected workflow stage could not be forked.');
+		return;
+	}
+
+	const restoredFork = await restoreWorkflowFromHistory(workspaceFolder, forkedManifest.workflowId);
+	if (!restoredFork) {
+		void vscode.window.showWarningMessage('The stage fork was created but could not be restored as the active workflow.');
+		return;
+	}
+
+	void vscode.window.showInformationMessage(`Workflow forked from stage ${String(targetStage.index).padStart(2, '0')}: ${restoredFork.label}.`);
+}
+
+async function runForkWorkflowFromArchivedStageFlow(workspaceFolder: vscode.WorkspaceFolder, workflowId?: string): Promise<void> {
+	const historyIndex = await readWorkflowHistoryIndex(workspaceFolder.uri);
+	if (historyIndex.entries.length === 0) {
+		void vscode.window.showInformationMessage('No archived workflows are available yet to fork from a stage.');
+		return;
+	}
+
+	let sourceWorkflowId = workflowId;
+	if (!sourceWorkflowId) {
+		const workflowSelection = await vscode.window.showQuickPick(
+			historyIndex.entries.map((entry) => ({
+				label: buildWorkflowHistoryQuickPickLabel(entry),
+				description: entry.updatedAt,
+				detail: `${entry.stageCount} stage(s)${historyIndex.activeWorkflowId === entry.workflowId ? ' · active' : ''}`,
+				workflowId: entry.workflowId
+			})),
+			{
+				title: 'Fork Archived Workflow From Stage',
+				placeHolder: 'Choose the archived workflow whose stage should become a new workflow lineage',
+				ignoreFocusOut: true
+			}
+		);
+		if (!workflowSelection?.workflowId) {
+			return;
+		}
+		sourceWorkflowId = workflowSelection.workflowId;
+	}
+
+	const sourceManifest = await readWorkflowArchiveManifest(workspaceFolder.uri, sourceWorkflowId);
+	if (!sourceManifest || sourceManifest.session.stages.length === 0) {
+		void vscode.window.showWarningMessage('The selected archived workflow does not contain any stages to fork.');
+		return;
+	}
+
+	const stageSelection = await vscode.window.showQuickPick(
+		sourceManifest.session.stages.map((stage) => ({
+			label: `${String(stage.index).padStart(2, '0')} ${WORKFLOW_PRESETS[stage.preset].label}`,
+			description: stage.providerModel ? `${stage.provider} · ${stage.providerModel}` : stage.provider,
+			detail: stage.briefSummary,
+			stageIndex: stage.index
+		})),
+		{
+			title: 'Fork Archived Workflow From Stage',
+			placeHolder: 'Choose the archived stage that should become the tip of the new workflow lineage',
+			ignoreFocusOut: true
+		}
+	);
+	if (stageSelection?.stageIndex === undefined) {
+		return;
+	}
+
+	const currentSession = await readWorkflowSessionState(workspaceFolder.uri);
+	if (currentSession?.workflowId) {
+		await archiveActiveWorkflowState(workspaceFolder, currentSession, await readWorkflowBrief(workspaceFolder.uri));
+	}
+
+	const forkedManifest = await forkWorkflowFromHistoryAtStage(workspaceFolder, sourceWorkflowId, stageSelection.stageIndex);
+	if (!forkedManifest) {
+		void vscode.window.showWarningMessage('The selected archived workflow stage could not be forked.');
+		return;
+	}
+
+	const restoredFork = await restoreWorkflowFromHistory(workspaceFolder, forkedManifest.workflowId);
+	if (!restoredFork) {
+		void vscode.window.showWarningMessage('The archived stage fork was created but could not be restored as the active workflow.');
+		return;
+	}
+
+	void vscode.window.showInformationMessage(`Workflow forked from archived stage ${String(stageSelection.stageIndex).padStart(2, '0')}: ${restoredFork.label}.`);
 }
 
 async function showWorkflowLaunchSummary(projectContext: ProjectContext): Promise<WorkflowQuickPickItem | undefined> {
@@ -413,5 +644,19 @@ async function launchCopilot(projectContext: ProjectContext): Promise<void> {
 	}
 	if (action === 'Open Context File') {
 		await vscode.window.showTextDocument(projectContext.contextFile);
+	}
+}
+
+async function launchProvider(context: vscode.ExtensionContext, workflowPlan: WorkflowExecutionPlan, projectContext: ProjectContext): Promise<void> {
+	switch (workflowPlan.provider) {
+		case 'claude':
+			launchClaude(context, projectContext);
+			break;
+		case 'gemini':
+			launchGemini(context, projectContext);
+			break;
+		case 'copilot':
+			await launchCopilot(projectContext);
+			break;
 	}
 }

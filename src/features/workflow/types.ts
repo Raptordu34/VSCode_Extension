@@ -9,6 +9,7 @@ export type ArtifactKind = 'instruction' | 'agent' | 'skill';
 export type WorkflowStageStatus = 'prepared' | 'in-progress' | 'completed';
 export type ClaudeEffortLevel = 'low' | 'medium' | 'high';
 export type ProviderStatusAvailability = 'ready' | 'needs-config' | 'warning' | 'error' | 'unavailable';
+export type WorkflowArchivedFileKind = 'full' | 'managed-markdown' | 'session-json' | 'brief-markdown';
 
 export interface MetricDisplay {
 	label: string;
@@ -100,6 +101,9 @@ export interface WorkflowExecutionPlan {
 	provider: ProviderTarget;
 	providerModel?: string;
 	providerAccountId?: string;
+	workflowId?: string;
+	branchId?: string;
+	startNewWorkflow?: boolean;
 	roles: WorkflowRole[];
 	refreshMode: ContextRefreshMode;
 	costProfile: CostProfile;
@@ -142,6 +146,8 @@ export interface ArtifactPlan {
 
 export interface WorkflowStageRecord {
 	index: number;
+	workflowId?: string;
+	branchId?: string;
 	preset: WorkflowPreset;
 	provider: ProviderTarget;
 	providerModel?: string;
@@ -160,6 +166,12 @@ export interface WorkflowStageRecord {
 export interface WorkflowSessionState {
 	workspaceName: string;
 	workspaceFolderId?: string;
+	workflowId?: string;
+	branchId?: string;
+	parentWorkflowId?: string;
+	parentStageIndex?: number;
+	createdAt?: string;
+	label?: string;
 	updatedAt: string;
 	currentStageIndex: number;
 	currentPreset: WorkflowPreset;
@@ -177,6 +189,47 @@ export interface WorkflowBrief {
 	goal: string;
 	constraints: string[];
 	rawText: string;
+}
+
+export interface WorkflowArchivedFile {
+	relativePath: string;
+	kind: WorkflowArchivedFileKind;
+	archivePath?: string;
+	generatedContent?: string;
+}
+
+export interface WorkflowHistoryEntry {
+	workflowId: string;
+	branchId: string;
+	parentWorkflowId?: string;
+	parentStageIndex?: number;
+	label: string;
+	createdAt: string;
+	updatedAt: string;
+	currentStageIndex: number;
+	stageCount: number;
+	currentPreset: WorkflowPreset;
+	currentProvider: ProviderTarget;
+	briefSummary: string;
+	manifestPath: string;
+	latestStageFile?: string;
+}
+
+export interface WorkflowHistoryIndex {
+	version: number;
+	activeWorkflowId?: string;
+	entries: WorkflowHistoryEntry[];
+}
+
+export interface WorkflowArchiveManifest {
+	workflowId: string;
+	branchId: string;
+	label: string;
+	createdAt: string;
+	updatedAt: string;
+	session: WorkflowSessionState;
+	brief?: WorkflowBrief;
+	files: WorkflowArchivedFile[];
 }
 
 export interface ProjectContext {
@@ -234,6 +287,8 @@ export interface WorkflowDashboardState {
 	workspaceSelectionRequired?: boolean;
 	session?: WorkflowSessionState;
 	brief?: WorkflowBrief;
+	historyEntries?: WorkflowHistoryEntry[];
+	activeWorkflowId?: string;
 	latestStage?: WorkflowStageRecord;
 	selectedStage?: WorkflowStageRecord;
 	contextFileExists: boolean;

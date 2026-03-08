@@ -32,6 +32,26 @@
         "title": "AI Context Orchestrator: Continue Workflow"
       },
       {
+        "command": "ai-context-orchestrator.restoreWorkflowFromHistory",
+        "title": "AI Context Orchestrator: Restore Workflow From History"
+      },
+      {
+        "command": "ai-context-orchestrator.forkWorkflowFromHistory",
+        "title": "AI Context Orchestrator: Fork Workflow From History"
+      },
+      {
+        "command": "ai-context-orchestrator.forkWorkflowFromStage",
+        "title": "AI Context Orchestrator: Fork Workflow From Stage"
+      },
+      {
+        "command": "ai-context-orchestrator.forkWorkflowFromArchivedStage",
+        "title": "AI Context Orchestrator: Fork Archived Workflow From Stage"
+      },
+      {
+        "command": "ai-context-orchestrator.cleanActiveWorkflowFiles",
+        "title": "AI Context Orchestrator: Clean Active Workflow Files"
+      },
+      {
         "command": "ai-context-orchestrator.generateContext",
         "title": "AI Context Orchestrator: Generate Context File"
       },

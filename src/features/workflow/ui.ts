@@ -3,6 +3,7 @@ import { renderDesignShellDocument } from '../../webview/designSystem.js';
 import {
 	CONTEXT_FILE_NAME,
 	WORKFLOW_BRIEF_FILE,
+	WORKFLOW_HISTORY_INDEX_FILE,
 	WORKFLOW_SESSION_FILE
 } from './constants.js';
 import { WORKFLOW_PRESETS } from './presets.js';
@@ -13,6 +14,7 @@ import type {
 	ProviderTarget,
 	WorkflowDashboardState,
 	WorkflowStageStatus,
+	WorkflowHistoryEntry,
 	WorkflowRole } from './types.js';
 import { capitalize } from "../../utils/index.js";
 import { readLastWorkflowConfig } from './workflowService.js';
@@ -55,7 +57,7 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 			localResourceRoots: [this.extensionUri]
 		};
 
-		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; providerModel?: string; claudeEffort?: string; brief?: string; stageIndex?: number }) => {
+		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; providerModel?: string; claudeEffort?: string; brief?: string; stageIndex?: number; target?: string }) => {
 			switch (message.command) {
 				case 'init':
 					await vscode.commands.executeCommand('ai-context-orchestrator.initAI');
@@ -109,14 +111,29 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 				case 'openLatestHandoff':
 					await vscode.commands.executeCommand('ai-context-orchestrator.openLatestWorkflowHandoff');
 					return;
-				case 'openStudio':
-					await vscode.commands.executeCommand('ai-context-orchestrator.openWorkflowStudio');
-					return;
 				case 'openContext':
 					await vscode.commands.executeCommand('ai-context-orchestrator.openContextFile');
 					return;
 				case 'openSession':
 					await vscode.commands.executeCommand('ai-context-orchestrator.openWorkflowSession');
+					return;
+				case 'restoreWorkflowFromHistory':
+					await vscode.commands.executeCommand('ai-context-orchestrator.restoreWorkflowFromHistory', message.target);
+					return;
+				case 'cleanActiveWorkflowFiles':
+					await vscode.commands.executeCommand('ai-context-orchestrator.cleanActiveWorkflowFiles');
+					return;
+				case 'forkWorkflowFromHistory':
+					await vscode.commands.executeCommand('ai-context-orchestrator.forkWorkflowFromHistory', message.target);
+					return;
+				case 'forkWorkflowFromArchivedStage':
+					await vscode.commands.executeCommand('ai-context-orchestrator.forkWorkflowFromArchivedStage', message.target);
+					return;
+				case 'forkWorkflowFromStage':
+					await vscode.commands.executeCommand('ai-context-orchestrator.forkWorkflowFromStage', message.stageIndex);
+					return;
+				case 'openStageFile':
+					await vscode.commands.executeCommand('ai-context-orchestrator.openWorkflowTreeNode', message.target ? { relativePath: message.target } : undefined);
 					return;
 				case 'previewPrompt':
 					await vscode.commands.executeCommand('ai-context-orchestrator.previewWorkflowPrompt');
@@ -248,17 +265,16 @@ export function getWorkflowControlHtml(
 		: defaultProvider === 'gemini' ? configuration.defaultGeminiModel : 'Copilot';
 	const recommendedPreset = state.nextSuggestedPresets[0];
 	const latestHandoff = state.latestStage?.stageFile ?? '';
+	const historyEntries = state.historyEntries ?? [];
 
-	// Hero — no session
 	const heroHtml = state.session
 		? buildActiveHero(state, helpers, recommendedPreset)
 		: buildInitHero(helpers, defaultPreset, defaultProvider, defaultModel);
 
-	// Étapes section
 	const stagesHtml = state.session ? `
 <details class="mc-section" open>
 <summary class="mc-section-header">
-	<span class="mc-section-title">Étapes</span>
+	<span class="mc-section-title">Stages</span>
 	<span class="mc-section-badge">${state.session.stages.filter((s) => s.status === 'completed').length}/${state.session.stages.length}</span>
 </summary>
 <div class="mc-section-body">
@@ -268,13 +284,18 @@ export function getWorkflowControlHtml(
 			<span class="pill-label">${String(stage.index).padStart(2, '0')} ${helpers.escapeHtml(WORKFLOW_PRESETS[stage.preset].label)}</span>
 			<span class="pill-status">${getWorkflowStageStatusLabel(stage.status)}</span>
 			<div class="pill-actions">
-				<button type="button" class="secondary small-btn" data-command="openLatestHandoff">Ouvrir</button>
-				<button type="button" class="secondary small-btn" data-command="markCompleted" data-stage-index="${stage.index}">✓ Fait</button>
+				<button type="button" class="secondary small-btn" data-command="openStageFile" data-target="${helpers.escapeHtml(stage.stageFile)}">Open</button>
+				<button type="button" class="secondary small-btn" data-command="forkWorkflowFromStage" data-stage-index="${stage.index}">Fork Here</button>
+				<button type="button" class="secondary small-btn" data-command="markCompleted" data-stage-index="${stage.index}">Mark Done</button>
 			</div>
 		</div>`).join('')}
 	</div>
 </div>
 </details>` : '';
+
+	const historyHtml = historyEntries.length > 0
+		? buildHistorySection(historyEntries, state.activeWorkflowId, helpers)
+		: '';
 
 	// Providers section
 	const providerSummary = state.providerStatuses.map((p) => `${helpers.escapeHtml(helpers.getProviderLabel(p.provider))} · ${helpers.escapeHtml(p.summary)}`).join('  ');
@@ -297,25 +318,28 @@ export function getWorkflowControlHtml(
 <div class="mc-section-body">
 	${providerBody}
 	<div class="actions" style="margin-top:8px;">
-		<button type="button" class="secondary" data-command="refreshProviders">Actualiser les statuts</button>
+		<button type="button" class="secondary" data-command="refreshProviders">Refresh Provider Status</button>
 	</div>
 </div>
 </details>`;
 
-	// Fichiers section
 	const filesHtml = `
 <details class="mc-section">
 <summary class="mc-section-header">
-	<span class="mc-section-title">Fichiers rapides</span>
+	<span class="mc-section-title">Quick Files</span>
+	<span class="mc-section-badge">${helpers.escapeHtml(WORKFLOW_HISTORY_INDEX_FILE)}</span>
 </summary>
 <div class="mc-section-body">
 	<div class="shortcuts">
 		<button type="button" class="linkButton" data-command="openContext" ${state.contextFileExists ? '' : 'disabled'}>Context Pack<span>${helpers.escapeHtml(CONTEXT_FILE_NAME)}</span></button>
-		<button type="button" class="linkButton" data-command="openBrief" ${state.brief ? '' : 'disabled'}>Brief<span>${helpers.escapeHtml(state.brief ? state.brief.taskType : 'Aucun brief')}</span></button>
-		<button type="button" class="linkButton" data-command="openLatestHandoff" ${state.latestStage ? '' : 'disabled'}>Handoff<span>${helpers.escapeHtml(latestHandoff || 'Aucun')}</span></button>
+		<button type="button" class="linkButton" data-command="openBrief" ${state.brief ? '' : 'disabled'}>Brief<span>${helpers.escapeHtml(state.brief ? state.brief.taskType : 'No brief')}</span></button>
+		<button type="button" class="linkButton" data-command="openLatestHandoff" ${state.latestStage ? '' : 'disabled'}>Latest Handoff<span>${helpers.escapeHtml(latestHandoff || 'None')}</span></button>
 		<button type="button" class="linkButton" data-command="openSession" ${state.session ? '' : 'disabled'}>Session<span>${helpers.escapeHtml(WORKFLOW_SESSION_FILE)}</span></button>
-		<button type="button" class="linkButton" data-command="previewPrompt" ${state.session ? '' : 'disabled'}>Prompt<span>Aperçu du prompt</span></button>
-		<button type="button" class="linkButton" data-command="copyPrompt" ${state.session ? '' : 'disabled'}>Copier<span>Copier le prompt</span></button>
+		<button type="button" class="linkButton" data-command="previewPrompt" ${state.session ? '' : 'disabled'}>Prompt<span>Preview launch prompt</span></button>
+		<button type="button" class="linkButton" data-command="copyPrompt" ${state.session ? '' : 'disabled'}>Copy<span>Copy launch prompt</span></button>
+	</div>
+	<div class="actions" style="margin-top:8px;">
+		<button type="button" class="secondary" data-command="cleanActiveWorkflowFiles" ${state.activeWorkflowId ? '' : 'disabled'}>Clean Active Generated Files</button>
 	</div>
 </div>
 </details>`;
@@ -329,11 +353,12 @@ export function getWorkflowControlHtml(
 	const contentHtml = `
 ${drawerHtml}
 ${heroHtml}
+${historyHtml}
 ${stagesHtml}
 ${providersHtml}
 ${filesHtml}
 <div style="margin-top:4px;">
-	<button type="button" data-command="init" class="secondary">+ Nouveau workflow</button>
+	<button type="button" data-command="init" class="secondary">+ New Workflow</button>
 </div>`;
 
 	const scriptBody = `
@@ -385,8 +410,8 @@ function updateBriefVisibility(preset) {
 	if (row) { row.style.display = preset === 'explore' ? 'none' : ''; }
 	var ta = document.getElementById('drawer-brief');
 	if (ta) {
-		var ph = { explore: 'Quelle zone explorer ?', plan: 'Que planifier ?', build: 'Que construire ?', debug: 'Quel bug corriger ?', review: 'Que reviewer ?', test: 'Quelle surface tester ?' };
-		ta.placeholder = ph[preset] || 'Décris l\\'objectif…';
+		var ph = { explore: 'What area to explore?', plan: 'What to plan?', build: 'What to build?', debug: 'What bug to fix?', review: 'What to review?', test: 'What to test?' };
+		ta.placeholder = ph[preset] || 'Describe the objective...';
 	}
 }
 
@@ -443,7 +468,7 @@ if (drawerLaunchBtn) {
 		webview,
 		nonce,
 		title: state.workspaceFolder?.name ?? 'AI Workflow',
-		kicker: state.session ? 'Mission Control' : 'Mission Control',
+		kicker: 'Mission Control',
 		contentHtml,
 		scriptBody,
 		layout: 'sidebar'
@@ -455,36 +480,89 @@ function buildInitHero(helpers: WorkflowUiHelpers, defaultPreset: string, defaul
 	const presetButtons = presets.map((p) => `<button type="button" class="preset-btn ${p.preset === defaultPreset ? 'active' : ''}" data-preset="${p.preset}">${helpers.escapeHtml(p.label)}</button>`).join('');
 	return `
 <section class="card hero">
-	<div class="kicker">Pas de workflow actif</div>
+	<div class="kicker">No active workflow</div>
 	<div class="preset-selector">${presetButtons}</div>
-	<p class="small" style="margin-top:8px;">Avec : ${helpers.escapeHtml(defaultProvider)} · ${helpers.escapeHtml(defaultModel)}</p>
+	<p class="small" style="margin-top:8px;">With: ${helpers.escapeHtml(defaultProvider)} · ${helpers.escapeHtml(defaultModel)}</p>
 	<div class="actions" style="margin-top:10px;">
-		<button type="button" data-command="openConfigDrawer">Lancer ▶</button>
+		<button type="button" data-command="openConfigDrawer">Launch ▶</button>
 	</div>
-	<details class="advanced-details" style="margin-top:8px;">
-		<summary>▸ Configuration complète</summary>
-		<div style="margin-top:8px;">
-			<button type="button" class="secondary" data-command="init">Choisir preset, provider, modèle…</button>
+	<div class="advanced-details" style="margin-top: 14px;">
+		<summary>▸ Full configuration</summary>
+		<div style="margin-top: 8px;">
+			<button type="button" class="secondary" data-command="init">Choose preset, provider, model...</button>
 		</div>
-	</details>
+	</div>
 </section>`;
+}
+
+function buildHistorySection(
+	historyEntries: WorkflowHistoryEntry[],
+	activeWorkflowId: string | undefined,
+	helpers: WorkflowUiHelpers
+): string {
+	const entryById = new Map(historyEntries.map((entry) => [entry.workflowId, entry]));
+	const historyCount = historyEntries.length;
+	const activeEntry = activeWorkflowId ? historyEntries.find((entry) => entry.workflowId === activeWorkflowId) : undefined;
+	return `
+<details class="mc-section" open>
+<summary class="mc-section-header">
+	<span class="mc-section-title">Workflow History</span>
+	<span class="mc-section-badge">${historyCount} archived${activeEntry ? ` · active: ${helpers.escapeHtml(activeEntry.label)}` : ''}</span>
+</summary>
+<div class="mc-section-body">
+	<div class="history-list">
+		${historyEntries.map((entry) => buildHistoryEntryHtml(entry, activeWorkflowId, entryById, helpers)).join('')}
+	</div>
+</div>
+</details>`;
+}
+
+function buildHistoryEntryHtml(
+	entry: WorkflowHistoryEntry,
+	activeWorkflowId: string | undefined,
+	entryById: Map<string, WorkflowHistoryEntry>,
+	helpers: WorkflowUiHelpers
+): string {
+	const isActive = entry.workflowId === activeWorkflowId;
+	const providerLabel = helpers.getProviderLabel(entry.currentProvider);
+	const presetLabel = WORKFLOW_PRESETS[entry.currentPreset].label;
+	const parentEntry = entry.parentWorkflowId ? entryById.get(entry.parentWorkflowId) : undefined;
+	const lineage = parentEntry
+		? `Forked from ${parentEntry.label}${entry.parentStageIndex ? ` @ stage ${entry.parentStageIndex}` : ''}`
+		: undefined;
+	return `
+	<div class="history-entry ${isActive ? 'active' : ''}">
+		<div class="history-meta-row">
+			<span class="history-title">${helpers.escapeHtml(entry.label)}</span>
+			${isActive ? '<span class="history-badge">Active</span>' : ''}
+		</div>
+		<div class="history-summary">${helpers.escapeHtml(presetLabel)} · ${helpers.escapeHtml(providerLabel)} · ${entry.stageCount} stage(s)</div>
+		${lineage ? `<div class="history-lineage">${helpers.escapeHtml(lineage)}</div>` : ''}
+		<div class="history-timestamp">Updated ${helpers.escapeHtml(entry.updatedAt)}</div>
+		<div class="pill-actions">
+			<button type="button" class="secondary small-btn" data-command="forkWorkflowFromHistory" data-target="${helpers.escapeHtml(entry.workflowId)}">Fork</button>
+			<button type="button" class="secondary small-btn" data-command="forkWorkflowFromArchivedStage" data-target="${helpers.escapeHtml(entry.workflowId)}">Fork From Stage</button>
+			<button type="button" class="secondary small-btn" data-command="restoreWorkflowFromHistory" data-target="${helpers.escapeHtml(entry.workflowId)}" ${isActive ? 'disabled' : ''}>Restore</button>
+		</div>
+	</div>`;
 }
 
 function buildActiveHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpers, recommendedPreset: string | undefined): string {
 	const session = state.session!;
 	const presetLabel = WORKFLOW_PRESETS[session.currentPreset].label;
 	const providerLabel = helpers.getProviderLabel(session.currentProvider);
-	const stageLabel = `Étape ${session.currentStageIndex}`;
-	const nextLabel = recommendedPreset && recommendedPreset in WORKFLOW_PRESETS ? WORKFLOW_PRESETS[recommendedPreset as keyof typeof WORKFLOW_PRESETS].label : 'Prochaine étape';
+	const stageLabel = `Stage ${session.currentStageIndex}`;
+	const nextLabel = recommendedPreset && recommendedPreset in WORKFLOW_PRESETS ? WORKFLOW_PRESETS[recommendedPreset as keyof typeof WORKFLOW_PRESETS].label : 'Next stage';
 	const completedCount = session.stages.filter((s) => s.status === 'completed').length;
 	return `
 <section class="card hero">
-	<div class="kicker">Workflow actif</div>
+	<div class="kicker">Active Workflow</div>
 	<p class="lead" style="margin-top:6px;"><strong>${helpers.escapeHtml(presetLabel)}</strong> · ${helpers.escapeHtml(providerLabel)} · ${helpers.escapeHtml(stageLabel)}</p>
-	<p class="small">${completedCount}/${session.stages.length} étapes · Suivant : ${helpers.escapeHtml(nextLabel)}</p>
+	<p class="small">${completedCount}/${session.stages.length} stages · Next: ${helpers.escapeHtml(nextLabel)}</p>
 	${state.brief ? `<p class="small" style="margin-top:4px;">${helpers.escapeHtml(state.brief.goal)}</p>` : ''}
 	<div class="actions" style="margin-top:10px;">
-		<button type="button" data-command="continue">Continuer ▶</button>
+		<button type="button" data-command="continue">Continue ▶</button>
+		<button type="button" class="secondary" data-command="forkWorkflowFromHistory" data-target="${helpers.escapeHtml(session.workflowId ?? '')}" ${session.workflowId ? '' : 'disabled'}>Fork</button>
 		<button type="button" class="secondary" data-command="previewPrompt" ${state.session ? '' : 'disabled'}>Prompt</button>
 	</div>
 </section>`;
@@ -558,18 +636,18 @@ function buildConfigDrawerHtml(
 		`<button type="button" class="drawer-pill ${e === effort ? 'active' : ''}" data-field="effort" data-value="${e}">${e.charAt(0).toUpperCase() + e.slice(1)}</button>`
 	).join('');
 
-	const briefPlaceholder = preset === 'explore' ? 'Quelle zone explorer ?' : 'Décris l\'objectif de cette étape…';
+	const briefPlaceholder = preset === 'explore' ? 'What area to explore?' : 'Describe the objective for this stage...';
 
 	return `
 <div class="mc-backdrop" id="mc-backdrop"></div>
 <div class="mc-drawer" id="mc-drawer">
 	<div class="drawer-header">
-		<span class="drawer-title">Nouveau workflow</span>
+		<span class="drawer-title">New Workflow</span>
 		<button type="button" class="drawer-close" id="drawer-close-btn">✕</button>
 	</div>
 	<div class="drawer-body">
 		<div class="drawer-field">
-			<label class="drawer-label">Objectif</label>
+			<label class="drawer-label">Goal</label>
 			<div class="drawer-pills" id="preset-pills">${presetPills}</div>
 		</div>
 		<div class="drawer-field" id="brief-field"${preset === 'explore' ? ' style="display:none"' : ''}>
@@ -581,22 +659,22 @@ function buildConfigDrawerHtml(
 			<div class="drawer-pills" id="provider-pills">${providerPills}</div>
 		</div>
 		<div class="drawer-field">
-			<label class="drawer-label">Modèle</label>
+			<label class="drawer-label">Model</label>
 			<select class="drawer-select" id="drawer-model">${modelOptions}</select>
 		</div>
 		<div class="drawer-field" id="effort-field"${provider !== 'claude' ? ' style="display:none"' : ''}>
-			<label class="drawer-label">Effort Claude</label>
+			<label class="drawer-label">Claude Effort</label>
 			<div class="drawer-pills" id="effort-pills">${effortPills}</div>
 		</div>
-		<details class="advanced-details">
-			<summary>▸ Paramètres avancés</summary>
-			<div style="margin-top:8px;">
-				<button type="button" class="secondary" data-command="init">Configuration complète (QuickPick)…</button>
+		<div class="advanced-details">
+			<summary>▸ Advanced settings</summary>
+			<div style="margin-top: 8px;">
+				<button type="button" class="secondary" data-command="init">Full configuration (QuickPick)...</button>
 			</div>
-		</details>
+		</div>
 	</div>
 	<div class="drawer-footer">
-		<button type="button" id="drawer-launch-btn">Lancer ▶</button>
+		<button type="button" id="drawer-launch-btn">Launch ▶</button>
 	</div>
 </div>`;
 }

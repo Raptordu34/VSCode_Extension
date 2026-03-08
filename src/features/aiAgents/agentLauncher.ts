@@ -24,7 +24,7 @@ export function buildGeminiLaunchCommand(projectContext: ProjectContext, instruc
 	parts.push(`"${escapeShellArg(instruction)}"`);
 	return parts.join(' ');
 }
-export function launchClaude(projectContext: ProjectContext): void {
+export function launchClaude(context: vscode.ExtensionContext, projectContext: ProjectContext): void {
 	const configuration = getExtensionConfiguration();
 	const claudeAccount = findClaudeAccount(configuration, projectContext.workflowPlan.claudeAccountId);
 	void (async () => {
@@ -32,7 +32,7 @@ export function launchClaude(projectContext: ProjectContext): void {
 			name: claudeAccount ? `Claude Code (${claudeAccount.label})` : 'Claude Code',
 			cwd: projectContext.workspaceFolder.uri.fsPath,
 			env: {
-				...(await buildProviderLaunchEnvironment(claudeAccount)),
+				...(await buildProviderLaunchEnvironment(context, claudeAccount)),
 				...(projectContext.workflowPlan.providerModel ? { ANTHROPIC_MODEL: projectContext.workflowPlan.providerModel } : {}),
 				...(projectContext.workflowPlan.claudeEffort ? { CLAUDE_CODE_EFFORT_LEVEL: projectContext.workflowPlan.claudeEffort } : {})
 			}
@@ -43,14 +43,15 @@ export function launchClaude(projectContext: ProjectContext): void {
 		void vscode.window.showInformationMessage(`Claude Code launched for the ${projectContext.workflowPlan.preset} workflow${claudeAccount ? ` with ${claudeAccount.label}` : ''}.`);
 	})();
 }
-export function launchGemini(projectContext: ProjectContext): void {
+
+export function launchGemini(context: vscode.ExtensionContext, projectContext: ProjectContext): void {
 	const configuration = getExtensionConfiguration();
 	const geminiAccount = findProviderAccount(configuration, 'gemini', projectContext.workflowPlan.providerAccountId);
 	void (async () => {
 		const terminal = vscode.window.createTerminal({
 			name: geminiAccount ? `Gemini CLI (${geminiAccount.label})` : 'Gemini CLI',
 			cwd: projectContext.workspaceFolder.uri.fsPath,
-			env: await buildProviderLaunchEnvironment(geminiAccount)
+			env: await buildProviderLaunchEnvironment(context, geminiAccount)
 		});
 
 		terminal.show(true);

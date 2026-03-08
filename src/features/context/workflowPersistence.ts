@@ -20,6 +20,8 @@ import { buildWorkspaceUri, normalizeWorkspaceRelativePath, readUtf8, relativize
 import { formatProviderModel, getProviderLabel } from '../providers/providerService.js';
 import { replaceManagedBlock } from '../aiAgents/promptBuilder.js';
 import { formatWorkflowRoles } from '../workflow/ui.js';
+import { archiveActiveWorkflowState } from './workflowHistory.js';
+import { createNonce } from '../../utils/index.js';
 
 export interface WorkspaceWriteOperation {
 	uri: vscode.Uri;
@@ -199,10 +201,22 @@ export async function readWorkflowBrief(workspaceUri: vscode.Uri): Promise<Workf
 		const lines = content.split(/\r?\n/);
 		const taskType = lines.find((line) => line.startsWith('Type:'))?.slice('Type:'.length).trim() ?? 'general';
 		const goal = lines.find((line) => line.startsWith('Goal:'))?.slice('Goal:'.length).trim() ?? '';
+
+		const constraintsStartIndex = lines.findIndex((line) => line.startsWith('Constraints:'));
+		const rawStartIndex = lines.findIndex((line) => line.startsWith('Raw:'));
+		let constraints: string[] = [];
+		if (constraintsStartIndex !== -1) {
+			const endIdx = rawStartIndex !== -1 ? rawStartIndex : lines.length;
+			constraints = lines
+				.slice(constraintsStartIndex + 1, endIdx)
+				.filter((line) => line.startsWith('- '))
+				.map((line) => line.slice(2).trim());
+		}
+
 		const brief: WorkflowBrief = {
 			taskType,
 			goal,
-			constraints: lines.filter((line) => line.startsWith('- ')).map((line) => line.slice(2).trim()),
+			constraints,
 			rawText: content.trim()
 		};
 		return isWorkflowBrief(brief) ? brief : undefined;
@@ -350,13 +364,25 @@ export async function persistWorkflowArtifacts(
 	contextContent?: string
 ): Promise<{ session: WorkflowSessionState; stage: WorkflowStageRecord; brief?: WorkflowBrief }> {
 	const existingSession = await readWorkflowSessionState(workspaceFolder.uri);
-	const brief = workflowPlan.brief ?? await readWorkflowBrief(workspaceFolder.uri);
+	const existingBrief = await readWorkflowBrief(workspaceFolder.uri);
+	const brief = workflowPlan.brief ?? existingBrief;
+	const isNewWorkflow = workflowPlan.startNewWorkflow ?? !existingSession;
 
-	const nextIndex = (existingSession?.currentStageIndex ?? 0) + 1;
+	if (isNewWorkflow && existingSession) {
+		await archiveActiveWorkflowState(workspaceFolder, existingSession, existingBrief);
+	}
+
+	const nextIndex = isNewWorkflow ? 1 : (existingSession?.currentStageIndex ?? 0) + 1;
 	const stageFile = normalizeWorkspaceRelativePath(`${WORKFLOW_STAGE_DIRECTORY}/${String(nextIndex).padStart(2, '0')}-${workflowPlan.preset}.md`);
-	const upstreamStageFiles = existingSession?.stages.map((stage) => normalizeWorkspaceRelativePath(stage.stageFile)) ?? [];
+	const upstreamStageFiles = isNewWorkflow ? [] : existingSession?.stages.map((stage) => normalizeWorkspaceRelativePath(stage.stageFile)) ?? [];
+	const workflowId = workflowPlan.workflowId ?? (isNewWorkflow ? `workflow-${Date.now().toString(36)}-${createNonce().slice(0, 8)}` : existingSession?.workflowId);
+	const branchId = workflowPlan.branchId ?? existingSession?.branchId ?? 'main';
+	const createdAt = isNewWorkflow ? new Date().toISOString() : existingSession?.createdAt;
+	const label = brief?.goal ?? (workflowPlan.preset === 'explore' ? 'Explore workflow' : `${workflowPlan.presetDefinition.label} workflow`);
 	const stage: WorkflowStageRecord = {
 		index: nextIndex,
+		workflowId,
+		branchId,
 		preset: workflowPlan.preset,
 		provider: workflowPlan.provider,
 		providerModel: workflowPlan.providerModel,
@@ -375,6 +401,12 @@ export async function persistWorkflowArtifacts(
 	const session: WorkflowSessionState = {
 		workspaceName: workspaceFolder.name,
 		workspaceFolderId: workspaceFolder.uri.toString(),
+		workflowId,
+		branchId,
+		parentWorkflowId: isNewWorkflow ? existingSession?.workflowId : existingSession?.parentWorkflowId,
+		parentStageIndex: isNewWorkflow ? existingSession?.currentStageIndex : existingSession?.parentStageIndex,
+		createdAt,
+		label,
 		updatedAt: new Date().toISOString(),
 		currentStageIndex: nextIndex,
 		currentPreset: workflowPlan.preset,
@@ -384,7 +416,7 @@ export async function persistWorkflowArtifacts(
 		currentClaudeAccountId: workflowPlan.claudeAccountId,
 		currentClaudeEffort: workflowPlan.claudeEffort,
 		briefFile: WORKFLOW_BRIEF_FILE,
-		stages: [...(existingSession?.stages ?? []), stage]
+		stages: isNewWorkflow ? [stage] : [...(existingSession?.stages ?? []), stage]
 	};
 
 	const operations: WorkspaceWriteOperation[] = [];
@@ -416,5 +448,6 @@ export async function persistWorkflowArtifacts(
 	}
 
 	await commitWorkspaceWriteTransaction(operations);
+	await archiveActiveWorkflowState(workspaceFolder, session, brief);
 	return { session, stage, brief };
 }

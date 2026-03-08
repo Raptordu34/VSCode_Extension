@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import {
 	CONTEXT_FILE_NAME,
 	WORKFLOW_CONTROL_VIEW_ID,
+	WORKFLOW_HISTORY_INDEX_FILE,
 	WORKFLOW_SESSION_FILE
 } from './features/workflow/constants.js';
 import type { WorkflowDashboardState } from './features/workflow/types.js';
@@ -66,6 +67,11 @@ export function activate(context: vscode.ExtensionContext) {
 	sessionWatcher.onDidChange(() => refreshDebouncer.enqueue('session-change', refreshWorkflowUi));
 	sessionWatcher.onDidDelete(() => refreshDebouncer.enqueue('session-delete', refreshWorkflowUi));
 
+	const historyIndexWatcher = vscode.workspace.createFileSystemWatcher(`**/${WORKFLOW_HISTORY_INDEX_FILE}`);
+	historyIndexWatcher.onDidCreate(() => refreshDebouncer.enqueue('history-index-create', refreshWorkflowUi));
+	historyIndexWatcher.onDidChange(() => refreshDebouncer.enqueue('history-index-change', refreshWorkflowUi));
+	historyIndexWatcher.onDidDelete(() => refreshDebouncer.enqueue('history-index-delete', refreshWorkflowUi));
+
 	const workflowRelayWatcher = vscode.workspace.createFileSystemWatcher('**/.ai-orchestrator/**');
 	workflowRelayWatcher.onDidCreate(() => refreshDebouncer.enqueue('relay-create', refreshWorkflowUi));
 	workflowRelayWatcher.onDidChange(() => refreshDebouncer.enqueue('relay-change', refreshWorkflowUi));
@@ -83,11 +89,11 @@ export function activate(context: vscode.ExtensionContext) {
 			.finally(() => refreshWorkflowUi());
 	}
 
-	EventBus.onDidChange((event) => {
+	context.subscriptions.push(EventBus.onDidChange((event) => {
 		if (event === 'refresh') {
-			refreshWorkflowUi();
+			void refreshWorkflowUi();
 		}
-	});
+	}));
 
 	void refreshWorkflowUi();
 
@@ -96,6 +102,7 @@ export function activate(context: vscode.ExtensionContext) {
 		continueStatusBarItem,
 		refreshDebouncer,
 		sessionWatcher,
+		historyIndexWatcher,
 		workflowRelayWatcher,
 		contextFileWatcher,
 		Logger.getChannel()
@@ -103,5 +110,4 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-	return undefined;
 }

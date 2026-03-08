@@ -20,7 +20,6 @@ import {
 	setStoredProviderCredential
 } from './credentialService.js';
 import { getImplicitWorkspaceFolder } from '../../core/workspaceContext.js';
-import { extensionContextRef } from '../../extension.js';
 
 export * from './accountManager.js';
 export * from './credentialService.js';
@@ -65,7 +64,7 @@ export async function switchActiveProviderAccount(provider?: ProviderTarget): Pr
 	return true;
 }
 
-export async function manageProviderAccounts(provider?: ProviderTarget): Promise<void> {
+export async function manageProviderAccounts(context: vscode.ExtensionContext, provider?: ProviderTarget): Promise<void> {
 	const resolvedProvider = provider ?? await promptForProviderTarget('Choose the provider whose linked accounts you want to manage');
 	if (!resolvedProvider) {
 		return;
@@ -104,17 +103,17 @@ export async function manageProviderAccounts(provider?: ProviderTarget): Promise
 	}
 
 	if (action.label === 'Connect Account') {
-		await connectProviderAccount(resolvedProvider);
+		await connectProviderAccount(context, resolvedProvider);
 		return;
 	}
 
 	if (action.label === 'Configure Stored Credential') {
-		await configureProviderCredential(resolvedProvider);
+		await configureProviderCredential(context, resolvedProvider);
 		return;
 	}
 
 	if (action.label === 'Run Auth Assist') {
-		await runProviderAuthAssist(resolvedProvider);
+		await runProviderAuthAssist(context, resolvedProvider);
 		return;
 	}
 
@@ -129,7 +128,7 @@ export async function manageProviderAccounts(provider?: ProviderTarget): Promise
 	}
 
 	if (action.label === 'Add Account') {
-		const newAccount = await promptForProviderAccountDetails(resolvedProvider);
+		const newAccount = await promptForProviderAccountDetails(context, resolvedProvider);
 		if (!newAccount) {
 			return;
 		}
@@ -158,7 +157,7 @@ export async function manageProviderAccounts(provider?: ProviderTarget): Promise
 		return;
 	}
 
-	const editedAccount = await promptForProviderAccountDetails(resolvedProvider, targetAccount);
+	const editedAccount = await promptForProviderAccountDetails(context, resolvedProvider, targetAccount);
 	if (!editedAccount) {
 		return;
 	}
@@ -167,7 +166,7 @@ export async function manageProviderAccounts(provider?: ProviderTarget): Promise
 	void vscode.window.showInformationMessage(`${getProviderLabel(resolvedProvider)} account ${editedAccount.label} updated.`);
 }
 
-export async function connectProviderAccount(provider?: ProviderTarget): Promise<void> {
+export async function connectProviderAccount(context: vscode.ExtensionContext, provider?: ProviderTarget): Promise<void> {
 	const resolvedProvider = provider ?? await promptForProviderTarget('Choose the provider account to connect');
 	if (!resolvedProvider) {
 		return;
@@ -194,7 +193,7 @@ export async function connectProviderAccount(provider?: ProviderTarget): Promise
 	const existingAccount = selection.label === 'New Account'
 		? undefined
 		: accounts.find((account) => account.label === selection.label);
-	const nextAccount = await promptForProviderAccountDetails(resolvedProvider, existingAccount);
+	const nextAccount = await promptForProviderAccountDetails(context, resolvedProvider, existingAccount);
 	if (!nextAccount) {
 		return;
 	}
@@ -206,7 +205,7 @@ export async function connectProviderAccount(provider?: ProviderTarget): Promise
 	await updateActiveProviderAccountId(resolvedProvider, nextAccount.id);
 
 	if (resolvedProvider !== 'copilot') {
-		await promptForStoredCredential(nextAccount, existingAccount ? 'update' : 'connect');
+		await promptForStoredCredential(context, nextAccount, existingAccount ? 'update' : 'connect');
 	}
 
 	const nextStep = await vscode.window.showQuickPick([
@@ -220,7 +219,7 @@ export async function connectProviderAccount(provider?: ProviderTarget): Promise
 	});
 
 	if (nextStep?.label === 'Run Auth Assist') {
-		await runProviderAuthAssist(resolvedProvider, nextAccount.id);
+		await runProviderAuthAssist(context, resolvedProvider, nextAccount.id);
 		return;
 	}
 
@@ -232,7 +231,7 @@ export async function connectProviderAccount(provider?: ProviderTarget): Promise
 	void vscode.window.showInformationMessage(`${getProviderLabel(resolvedProvider)} account ${nextAccount.label} connected and activated.`);
 }
 
-export async function configureProviderCredential(provider?: ProviderTarget, accountId?: string): Promise<void> {
+export async function configureProviderCredential(context: vscode.ExtensionContext, provider?: ProviderTarget, accountId?: string): Promise<void> {
 	const resolvedProvider = provider ?? await promptForProviderTarget('Choose the provider credential to configure');
 	if (!resolvedProvider) {
 		return;
@@ -257,7 +256,7 @@ export async function configureProviderCredential(provider?: ProviderTarget, acc
 		return;
 	}
 
-	const existingCredential = await getStoredProviderCredential(targetAccount);
+	const existingCredential = await getStoredProviderCredential(context, targetAccount);
 	const action = await vscode.window.showQuickPick([
 		{ label: existingCredential ? 'Update Stored Credential' : 'Store Credential', detail: 'Save the provider secret in VS Code SecretStorage and inject it when this account launches.' },
 		{ label: 'Remove Stored Credential', detail: existingCredential ? 'Delete the stored provider secret for this account.' : 'No stored credential exists yet.', alwaysShow: true },
@@ -272,15 +271,15 @@ export async function configureProviderCredential(provider?: ProviderTarget, acc
 	}
 
 	if (action.label === 'Remove Stored Credential') {
-		await setStoredProviderCredential(targetAccount, undefined);
+		await setStoredProviderCredential(context, targetAccount, undefined);
 		void vscode.window.showInformationMessage(`Stored credential removed for ${targetAccount.label}.`);
 		return;
 	}
 
-	await promptForStoredCredential(targetAccount, existingCredential ? 'update' : 'connect');
+	await promptForStoredCredential(context, targetAccount, existingCredential ? 'update' : 'connect');
 }
 
-export async function runProviderAuthAssist(provider?: ProviderTarget, accountId?: string): Promise<void> {
+export async function runProviderAuthAssist(context: vscode.ExtensionContext, provider?: ProviderTarget, accountId?: string): Promise<void> {
 	const resolvedProvider = provider ?? await promptForProviderTarget('Choose the provider account to authenticate');
 	if (!resolvedProvider) {
 		return;
@@ -318,7 +317,7 @@ export async function runProviderAuthAssist(provider?: ProviderTarget, accountId
 			ignoreFocusOut: true
 		});
 		if (action?.label === 'Store Credential') {
-			await configureProviderCredential(resolvedProvider, targetAccount.id);
+			await configureProviderCredential(context, resolvedProvider, targetAccount.id);
 			return;
 		}
 		if (action?.label === 'Open Provider Portal') {
@@ -329,8 +328,8 @@ export async function runProviderAuthAssist(provider?: ProviderTarget, accountId
 
 	const terminal = vscode.window.createTerminal({
 		name: `${getProviderLabel(resolvedProvider)} Auth (${targetAccount.label})`,
-		cwd: getImplicitWorkspaceFolder(extensionContextRef)?.uri.fsPath,
-		env: await buildProviderLaunchEnvironment(targetAccount)
+		cwd: getImplicitWorkspaceFolder(context)?.uri.fsPath,
+		env: await buildProviderLaunchEnvironment(context, targetAccount)
 	});
 	terminal.show(true);
 	terminal.sendText(authCommand, true);
@@ -357,24 +356,26 @@ export async function promptForExistingProviderAccount(
 	actionLabel: string
 ): Promise<ProviderAccountConfiguration | undefined> {
 	const selection = await vscode.window.showQuickPick(accounts.map((account) => ({
+		id: account.id,
 		label: account.label,
 		description: account.accountHint,
 		detail: account.configDir || account.apiKeyEnvVar || account.notes
-	})), {
+	} as vscode.QuickPickItem & { id: string })), {
 		title: `${actionLabel} ${getProviderLabel(provider)} Account`,
 		placeHolder: `Choose the ${getProviderLabel(provider)} account to ${actionLabel.toLowerCase()}`,
 		ignoreFocusOut: true
 	});
 
-	return accounts.find((account) => account.label === selection?.label);
+	return accounts.find((account) => account.id === selection?.id);
 }
 
 export async function promptForProviderAccountDetails(
+	context: vscode.ExtensionContext,
 	provider: ProviderTarget,
 	existing?: ProviderAccountConfiguration
 ): Promise<ProviderAccountConfiguration | undefined> {
 	const id = existing?.id ?? `${provider}-account-${Date.now()}`;
-	const managedClaudePath = provider === 'claude' ? getManagedClaudeConfigDir(id)?.fsPath : undefined;
+	const managedClaudePath = provider === 'claude' ? getManagedClaudeConfigDir(context, id)?.fsPath : undefined;
 	const label = await vscode.window.showInputBox({
 		title: `${existing ? 'Edit' : 'Add'} ${getProviderLabel(provider)} Account`,
 		prompt: 'Account label shown in the UI',
@@ -492,7 +493,7 @@ export async function promptForProviderAccountDetails(
 	}
 
 	const normalizedConfigDir = provider === 'claude'
-		? (configDir.trim().length > 0 ? configDir.trim() : await ensureManagedClaudeConfigDir(id))
+		? (configDir.trim().length > 0 ? configDir.trim() : await ensureManagedClaudeConfigDir(context, id))
 		: (configDir.trim() || undefined);
 
 	return {
@@ -572,8 +573,7 @@ export async function promptForProviderModel(
 		return customModel?.trim();
 	}
 
-	const { getProviderModelOptions: getOpts } = await import('./accountManager.js');
-	const opts = getOpts(provider, configuration, preferredModel);
+	const opts = getProviderModelOptions(provider, configuration, preferredModel);
 	const matchedOption = opts.find((option) => option.label === selection.label);
 	return matchedOption?.value;
 }
@@ -606,7 +606,7 @@ export async function promptForProviderAccount(
 	return accounts.find((account) => account.label === selection?.label)?.id;
 }
 
-export async function promptForStoredCredential(account: ProviderAccountConfiguration, mode: 'connect' | 'update'): Promise<void> {
+export async function promptForStoredCredential(context: vscode.ExtensionContext, account: ProviderAccountConfiguration, mode: 'connect' | 'update'): Promise<void> {
 	const providerLabel = getProviderLabel(account.provider);
 	const action = await vscode.window.showQuickPick([
 		{ label: 'Store Credential In Extension', detail: `Save the ${providerLabel} secret in VS Code SecretStorage for ${account.label}.` },
@@ -634,7 +634,7 @@ export async function promptForStoredCredential(account: ProviderAccountConfigur
 		return;
 	}
 
-	await setStoredProviderCredential(account, credential);
+	await setStoredProviderCredential(context, account, credential);
 	void vscode.window.showInformationMessage(`${providerLabel} credential stored for ${account.label}.`);
 }
 
@@ -670,16 +670,17 @@ export async function promptForClaudeAccount(configuration: ExtensionConfigurati
 	}
 
 	const items = configuration.claudeAccounts.map((account) => ({
+		id: account.id,
 		label: account.label,
 		description: account.id === (preferredId ?? configuration.activeClaudeAccountId) ? 'Active account' : undefined,
 		detail: account.configDir,
 		picked: account.id === (preferredId ?? configuration.activeClaudeAccountId)
-	}));
+	} as vscode.QuickPickItem & { id: string }));
 	const selection = await vscode.window.showQuickPick(items, {
 		title: 'Claude Account',
 		placeHolder: 'Choose which Claude account/config should own this workflow',
 		ignoreFocusOut: true
 	});
 
-	return configuration.claudeAccounts.find((account) => account.label === selection?.label)?.id;
+	return configuration.claudeAccounts.find((account) => account.id === selection?.id)?.id;
 }

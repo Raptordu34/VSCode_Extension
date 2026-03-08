@@ -63,7 +63,7 @@ export function buildRawContextContent(
 		'## Additional AI Instruction Files',
 		additionalSections.length > 0 ? additionalSections.join('\n\n') : 'No assistant-specific instruction files found.',
 		''
-	].filter((value): value is string => Boolean(value)).join('\n');
+	].filter((value): value is string => value !== undefined).join('\n');
 }
 export function buildContextFileContent(metadata: ContextMetadata, optimizedContent: string, optimization: OptimizationResult): string {
 	return [
@@ -176,28 +176,33 @@ export async function optimizeContextWithCopilot(
 			].join('\n'))
 		];
 
-		const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
-		let optimized = '';
-		for await (const fragment of response.text) {
-			optimized += fragment;
-		}
+		const tokenSource = new vscode.CancellationTokenSource();
+		try {
+			const response = await model.sendRequest(messages, {}, tokenSource.token);
+			let optimized = '';
+			for await (const fragment of response.text) {
+				optimized += fragment;
+			}
 
-		const trimmed = optimized.trim();
-		if (trimmed.length === 0) {
+			const trimmed = optimized.trim();
+			if (trimmed.length === 0) {
+				return {
+					content: rawContext,
+					applied: false,
+					reason: 'Copilot returned an empty optimization result.',
+					modelName: model.name
+				};
+			}
+
 			return {
-				content: rawContext,
-				applied: false,
-				reason: 'Copilot returned an empty optimization result.',
-				modelName: model.name
+				content: trimmed,
+				applied: true,
+				modelName: model.name,
+				reason: 'Copilot rewrote the raw workflow context successfully.'
 			};
+		} finally {
+			tokenSource.dispose();
 		}
-
-		return {
-			content: trimmed,
-			applied: true,
-			modelName: model.name,
-			reason: 'Copilot rewrote the raw workflow context successfully.'
-		};
 	} catch (error) {
 		if (error instanceof vscode.LanguageModelError) {
 			return {

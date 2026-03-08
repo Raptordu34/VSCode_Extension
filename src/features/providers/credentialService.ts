@@ -1,36 +1,31 @@
 import * as vscode from 'vscode';
 import { PROVIDER_ACCOUNT_SECRET_PREFIX } from '../workflow/constants.js';
 import type { ProviderAccountConfiguration, ProviderTarget } from '../workflow/types.js';
-import { extensionContextRef } from '../../extension.js';
 
 export function getAccountSecretStorageKey(account: ProviderAccountConfiguration): string {
 	return `${PROVIDER_ACCOUNT_SECRET_PREFIX}:${account.provider}:${account.id}`;
 }
 
-export async function getStoredProviderCredential(account: ProviderAccountConfiguration): Promise<string | undefined> {
-	return extensionContextRef?.secrets.get(getAccountSecretStorageKey(account));
+export async function getStoredProviderCredential(context: vscode.ExtensionContext, account: ProviderAccountConfiguration): Promise<string | undefined> {
+	return context.secrets.get(getAccountSecretStorageKey(account));
 }
 
-export async function setStoredProviderCredential(account: ProviderAccountConfiguration, value: string | undefined): Promise<void> {
-	if (!extensionContextRef) {
-		throw new Error('Extension context is not available.');
-	}
-
+export async function setStoredProviderCredential(context: vscode.ExtensionContext, account: ProviderAccountConfiguration, value: string | undefined): Promise<void> {
 	const storageKey = getAccountSecretStorageKey(account);
 	if (value && value.trim().length > 0) {
-		await extensionContextRef.secrets.store(storageKey, value.trim());
+		await context.secrets.store(storageKey, value.trim());
 		return;
 	}
 
-	await extensionContextRef.secrets.delete(storageKey);
+	await context.secrets.delete(storageKey);
 }
 
 export function getEnvProviderCredential(account: ProviderAccountConfiguration): string | undefined {
 	return account.apiKeyEnvVar ? process.env[account.apiKeyEnvVar] : undefined;
 }
 
-export async function getResolvedProviderCredential(account: ProviderAccountConfiguration): Promise<string | undefined> {
-	const storedCredential = await getStoredProviderCredential(account);
+export async function getResolvedProviderCredential(context: vscode.ExtensionContext, account: ProviderAccountConfiguration): Promise<string | undefined> {
+	const storedCredential = await getStoredProviderCredential(context, account);
 	if (storedCredential) {
 		return storedCredential;
 	}
@@ -38,16 +33,12 @@ export async function getResolvedProviderCredential(account: ProviderAccountConf
 	return getEnvProviderCredential(account);
 }
 
-export function getManagedClaudeConfigDir(accountId: string): vscode.Uri | undefined {
-	if (!extensionContextRef) {
-		return undefined;
-	}
-
-	return vscode.Uri.joinPath(extensionContextRef.globalStorageUri, 'claude-profiles', accountId);
+export function getManagedClaudeConfigDir(context: vscode.ExtensionContext, accountId: string): vscode.Uri | undefined {
+	return vscode.Uri.joinPath(context.globalStorageUri, 'claude-profiles', accountId);
 }
 
-export async function ensureManagedClaudeConfigDir(accountId: string): Promise<string> {
-	const managedUri = getManagedClaudeConfigDir(accountId);
+export async function ensureManagedClaudeConfigDir(context: vscode.ExtensionContext, accountId: string): Promise<string> {
+	const managedUri = getManagedClaudeConfigDir(context, accountId);
 	if (!managedUri) {
 		throw new Error('Extension storage is not available yet for managed Claude profiles.');
 	}
@@ -84,12 +75,12 @@ export function buildDefaultAuthAssistCommand(provider: ProviderTarget, authMode
 	return undefined;
 }
 
-export async function buildProviderLaunchEnvironment(account: ProviderAccountConfiguration | undefined): Promise<Record<string, string>> {
+export async function buildProviderLaunchEnvironment(context: vscode.ExtensionContext, account: ProviderAccountConfiguration | undefined): Promise<Record<string, string>> {
 	if (!account) {
 		return {};
 	}
 
-	const resolvedCredential = await getResolvedProviderCredential(account);
+	const resolvedCredential = await getResolvedProviderCredential(context, account);
 	if (account.provider === 'claude') {
 		return {
 			...(account.configDir ? { CLAUDE_CONFIG_DIR: account.configDir } : {}),

@@ -215,12 +215,13 @@ export async function runQuotaCommand(command: string, configDir: string): Promi
 }
 
 export async function resolveClaudeAccountStatus(
+	context: vscode.ExtensionContext,
 	account: ProviderAccountConfiguration,
 	configuration: ExtensionConfiguration,
 	outputChannel: vscode.OutputChannel
 ): Promise<ProviderAccountStatus> {
 	const configDirExists = account.configDir ? await fileExists(vscode.Uri.file(account.configDir)) : false;
-	const storedCredential = await getStoredProviderCredential(account);
+	const storedCredential = await getStoredProviderCredential(context, account);
 	const envCredential = getEnvProviderCredential(account);
 	const baseStatus: ProviderAccountStatus = {
 		id: account.id,
@@ -294,13 +295,14 @@ export async function resolveClaudeAccountStatus(
 }
 
 export async function resolveGenericAccountStatus(
+	context: vscode.ExtensionContext,
 	account: ProviderAccountConfiguration,
 	configuration: ExtensionConfiguration,
 	outputChannel: vscode.OutputChannel
 ): Promise<ProviderAccountStatus> {
 	const isActive = account.id === getActiveProviderAccountId(configuration, account.provider) || (!getActiveProviderAccountId(configuration, account.provider) && getProviderAccounts(configuration, account.provider)[0]?.id === account.id);
 	const envVarValue = getEnvProviderCredential(account);
-	const storedCredential = await getStoredProviderCredential(account);
+	const storedCredential = await getStoredProviderCredential(context, account);
 	const baseStatus: ProviderAccountStatus = {
 		id: account.id,
 		provider: account.provider,
@@ -372,6 +374,7 @@ export async function resolveGenericAccountStatus(
 }
 
 export async function resolveClaudeProviderStatus(
+	context: vscode.ExtensionContext,
 	configuration: ExtensionConfiguration,
 	outputChannel: vscode.OutputChannel
 ): Promise<ProviderStatusSnapshot> {
@@ -379,7 +382,7 @@ export async function resolveClaudeProviderStatus(
 		return buildDefaultProviderStatuses(configuration).find((status) => status.provider === 'claude') as ProviderStatusSnapshot;
 	}
 
-	const accounts = await Promise.all(configuration.claudeAccounts.map((account) => resolveClaudeAccountStatus(account, configuration, outputChannel)));
+	const accounts = await Promise.all(configuration.claudeAccounts.map((account) => resolveClaudeAccountStatus(context, account, configuration, outputChannel)));
 	const activeAccount = accounts.find((account) => account.isActive) ?? accounts[0];
 	const healthyAccounts = accounts.filter((account) => account.availability === 'ready' || account.availability === 'warning').length;
 	return {
@@ -400,6 +403,7 @@ export async function resolveClaudeProviderStatus(
 }
 
 export async function resolveGenericProviderStatus(
+	context: vscode.ExtensionContext,
 	provider: 'gemini' | 'copilot',
 	configuration: ExtensionConfiguration,
 	outputChannel: vscode.OutputChannel
@@ -409,7 +413,7 @@ export async function resolveGenericProviderStatus(
 		return buildDefaultProviderStatuses(configuration).find((status) => status.provider === provider) as ProviderStatusSnapshot;
 	}
 
-	const statuses = await Promise.all(accounts.map((account) => resolveGenericAccountStatus(account, configuration, outputChannel)));
+	const statuses = await Promise.all(accounts.map((account) => resolveGenericAccountStatus(context, account, configuration, outputChannel)));
 	const activeAccount = statuses.find((account) => account.isActive) ?? statuses[0];
 	return {
 		provider,
@@ -435,9 +439,9 @@ export async function resolveGenericProviderStatus(
 export async function refreshProviderStatuses(context: vscode.ExtensionContext, outputChannel: vscode.OutputChannel): Promise<void> {
 	const configuration = getExtensionConfiguration();
 	const providerStatuses = await Promise.all([
-		resolveClaudeProviderStatus(configuration, outputChannel),
-		resolveGenericProviderStatus('gemini', configuration, outputChannel),
-		resolveGenericProviderStatus('copilot', configuration, outputChannel)
+		resolveClaudeProviderStatus(context, configuration, outputChannel),
+		resolveGenericProviderStatus(context, 'gemini', configuration, outputChannel),
+		resolveGenericProviderStatus(context, 'copilot', configuration, outputChannel)
 	]);
 	const cache: ProviderStatusCache = {
 		updatedAt: new Date().toISOString(),

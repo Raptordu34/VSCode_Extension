@@ -4,12 +4,13 @@ import { PROVIDER_STATUS_CACHE_KEY, CONTEXT_FILE_NAME, LAST_WORKFLOW_CONFIG_KEY 
 import { getProviderAccounts, getActiveProviderAccountId, findProviderAccount, getDefaultProviderModel, getDefaultClaudeEffort, getProviderLabel, promptForProviderModel, promptForProviderAccount, buildProviderDetail, promptForProviderTarget, formatProviderModel } from "../providers/providerService.js";
 import { buildWorkspaceUri, fileExists, readUtf8 } from "../../core/workspace.js";
 import { getImplicitWorkspaceFolder } from '../../core/workspaceContext.js';
-import { readWorkflowSessionState, readWorkflowBrief, writeWorkflowSessionState, buildSuggestedNextPresets } from "../context/contextBuilder.js";
+import { readWorkflowSessionState, readWorkflowBrief, writeWorkflowSessionState, buildSuggestedNextPresets } from "../context/workflowPersistence.js";
 import { getWorkflowStageStatusLabel, formatWorkflowRoles } from "./ui.js";
 import { getExtensionConfiguration } from "../../core/configuration.js";
 import { mergeProviderStatusCache } from "../providers/providerService.js";
 import { buildProviderLaunchPrompt, buildWorkflowSummary } from "../aiAgents/promptBuilder.js";
 import { WORKFLOW_PRESETS } from "./presets.js";
+import { readWorkflowHistoryIndex } from "../context/workflowHistory.js";
 
 export async function updateContinueWorkflowButtonVisibility(statusBarItem: vscode.StatusBarItem, context: vscode.ExtensionContext): Promise<void> {
 	const workspaceFolder = getImplicitWorkspaceFolder(context);
@@ -43,10 +44,11 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 		};
 	}
 
-	const [session, brief, contextFileExists] = await Promise.all([
+	const [session, brief, contextFileExists, historyIndex] = await Promise.all([
 		readWorkflowSessionState(workspaceFolder.uri),
 		readWorkflowBrief(workspaceFolder.uri),
-		fileExists(vscode.Uri.joinPath(workspaceFolder.uri, CONTEXT_FILE_NAME))
+		fileExists(vscode.Uri.joinPath(workspaceFolder.uri, CONTEXT_FILE_NAME)),
+		readWorkflowHistoryIndex(workspaceFolder.uri)
 	]);
 	const latestStage = session?.stages.at(-1);
 	const artifactCount = session?.stages.reduce((total, stage) => total + stage.artifactFiles.length, 0) ?? 0;
@@ -55,6 +57,8 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 		workspaceFolder,
 		session,
 		brief,
+		historyEntries: historyIndex.entries,
+		activeWorkflowId: historyIndex.activeWorkflowId,
 		latestStage,
 		selectedStage: latestStage,
 		contextFileExists,
@@ -444,7 +448,7 @@ export async function promptForWorkflowContinuation(
 	}
 
 	const brief = await promptForWorkflowBrief(selectedPreset.preset, session);
-		if (!brief) {
+	if (!brief) {
 		return undefined;
 	}
 
