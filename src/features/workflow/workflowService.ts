@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import type { WorkflowDashboardState, WorkflowTreeNode, WorkflowStageStatus, ExtensionConfiguration, WorkflowExecutionPlan, ProjectContext, WorkflowQuickPickItem, ClaudeEffortLevel, WorkflowPreset, WorkflowBrief, WorkflowSessionState, ProviderTarget, LastWorkflowConfig } from "./types.js";
+import type { WorkflowDashboardState, WorkflowTreeNode, WorkflowStageStatus, ExtensionConfiguration, WorkflowExecutionPlan, ProjectContext, WorkflowQuickPickItem, ClaudeEffortLevel, WorkflowPreset, WorkflowBrief, WorkflowSessionState, ProviderTarget, LastWorkflowConfig, ArtifactGovernancePolicy } from "./types.js";
 import type { ProviderStatusCache } from "../providers/types.js";
-import { PROVIDER_STATUS_CACHE_KEY, CONTEXT_FILE_NAME, LAST_WORKFLOW_CONFIG_KEY } from "./constants.js";
+import { PROVIDER_STATUS_CACHE_KEY, CONTEXT_FILE_NAME, LAST_WORKFLOW_CONFIG_KEY, PENDING_COPILOT_PROMPT_KEY } from "./constants.js";
 import { getProviderAccounts, getActiveProviderAccountId, findProviderAccount, getDefaultProviderModel, getDefaultClaudeEffort, getProviderLabel, promptForProviderModel, promptForProviderAccount, buildProviderDetail, promptForProviderTarget, formatProviderModel } from "../providers/providerService.js";
 import { buildWorkspaceUri, fileExists, readUtf8 } from "../../core/workspace.js";
 import { getImplicitWorkspaceFolder } from '../../core/workspaceContext.js';
@@ -11,7 +11,8 @@ import { getExtensionConfiguration } from "../../core/configuration.js";
 import { mergeProviderStatusCache } from "../providers/providerService.js";
 import { buildProviderLaunchPrompt, buildWorkflowSummary } from "../aiAgents/promptBuilder.js";
 import { WORKFLOW_PRESETS } from "./presets.js";
-import { readWorkflowHistoryIndex } from "../context/workflowHistory.js";
+import { readWorkflowHistoryIndex, repairWorkflowHistoryIndex } from "../context/workflowHistory.js";
+import { detectGovernancePolicy } from "./artifactGovernance.js";
 
 export async function updateContinueWorkflowButtonVisibility(statusBarItem: vscode.StatusBarItem, context: vscode.ExtensionContext): Promise<void> {
 	const workspaceFolder = getImplicitWorkspaceFolder(context);
@@ -45,12 +46,15 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 		};
 	}
 
-	const [session, brief, contextFileExists, historyIndex] = await Promise.all([
+	await repairWorkflowHistoryIndex(workspaceFolder);
+	const [session, brief, contextFileExists, historyIndex, artifactGovernance] = await Promise.all([
 		readWorkflowSessionState(workspaceFolder.uri),
 		readWorkflowBrief(workspaceFolder.uri),
 		fileExists(vscode.Uri.joinPath(workspaceFolder.uri, CONTEXT_FILE_NAME)),
-		readWorkflowHistoryIndex(workspaceFolder.uri)
+		readWorkflowHistoryIndex(workspaceFolder.uri),
+		detectGovernancePolicy(workspaceFolder)
 	]);
+	const copilotPendingPrompt = context.globalState.get<string>(PENDING_COPILOT_PROMPT_KEY);
 	const latestStage = session?.stages.at(-1);
 	const artifactCount = session?.stages.reduce((total, stage) => total + stage.artifactFiles.length, 0) ?? 0;
 
@@ -67,7 +71,9 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 		artifactCount,
 		configuration,
 		providerStatuses,
-		providerStatusUpdatedAt: providerStatusCache?.updatedAt
+		providerStatusUpdatedAt: providerStatusCache?.updatedAt,
+		copilotPendingPrompt,
+		artifactGovernance
 	};
 }
 export async function updateSelectedWorkflowStageStatus(
@@ -121,6 +127,50 @@ export function buildSmartDefaultWorkflowPlan(preset: WorkflowPreset, configurat
 		presetDefinition
 	};
 }
+export function buildSmartContinuationWorkflowPlan(
+	session: WorkflowSessionState,
+	configuration: ExtensionConfiguration,
+	overrides?: {
+		preset?: WorkflowPreset;
+		provider?: ProviderTarget;
+		providerModel?: string;
+		claudeEffort?: ClaudeEffortLevel;
+	}
+): WorkflowExecutionPlan {
+	const suggestedPresets = buildSuggestedNextPresets(session.currentPreset);
+	const nextPreset = overrides?.preset ?? suggestedPresets[0] ?? session.currentPreset;
+	const presetDefinition = WORKFLOW_PRESETS[nextPreset];
+	const provider = overrides?.provider ?? session.currentProvider;
+
+	const defaultProviderAccount = findProviderAccount(
+		configuration,
+		provider,
+		getActiveProviderAccountId(configuration, provider)
+	)?.id;
+
+	const claudeAccountId = provider === 'claude'
+		? (findProviderAccount(configuration, 'claude', session.currentClaudeAccountId ?? configuration.activeClaudeAccountId)?.id ?? configuration.claudeAccounts[0]?.id)
+		: undefined;
+
+	return {
+		preset: nextPreset,
+		provider,
+		providerModel: overrides?.providerModel ?? session.currentProviderModel ?? getDefaultProviderModel(provider, configuration, defaultProviderAccount),
+		providerAccountId: session.currentProviderAccountId ?? defaultProviderAccount,
+		workflowId: session.workflowId,
+		branchId: session.branchId,
+		startNewWorkflow: false,
+		roles: [...presetDefinition.roles],
+		refreshMode: configuration.contextRefreshMode,
+		costProfile: configuration.costProfile,
+		optimizeWithCopilot: configuration.optimizeWithCopilot,
+		generateNativeArtifacts: configuration.generateNativeArtifacts,
+		claudeAccountId,
+		claudeEffort: overrides?.claudeEffort ?? session.currentClaudeEffort ?? (provider === 'claude' ? getDefaultClaudeEffort(configuration, claudeAccountId) : undefined),
+		presetDefinition
+	};
+}
+
 export function buildWorkflowSummaryDocument(projectContext: ProjectContext): string {
 	const artifactLines = projectContext.artifactPlan?.files.map((artifact) => `- ${artifact.relativePath}`) ?? ['- none'];
 	const optimizationLine = projectContext.optimization.applied

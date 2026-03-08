@@ -830,6 +830,84 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	.shortcuts {
 		grid-template-columns: 1fr;
 	}
+	/* History tree */
+	.history-entry--child {
+		border-left: 2px solid var(--glass-border);
+		border-radius: 0 12px 12px 0;
+	}
+	.history-entry--orphan {
+		border-style: dashed;
+		opacity: 0.8;
+	}
+	.history-tree-branch {
+		font-size: 0.72rem;
+		color: var(--text-muted);
+		margin-right: 2px;
+		user-select: none;
+	}
+	/* Stage preview */
+	.stage-preview {
+		margin-top: 8px;
+		border-radius: 8px;
+		border: 1px solid var(--glass-border);
+		overflow: hidden;
+	}
+	.stage-preview summary {
+		padding: 6px 10px;
+		font-size: 0.76rem;
+		font-weight: 600;
+		color: var(--text-secondary);
+		cursor: pointer;
+		list-style: none;
+		user-select: none;
+	}
+	.stage-preview summary::-webkit-details-marker { display: none; }
+	.stage-preview summary:hover { color: var(--text-body); background: var(--hover-bg); }
+	.stage-preview-body {
+		padding: 8px 10px;
+		font-family: var(--vscode-editor-font-family, monospace);
+		font-size: 0.74rem;
+		color: var(--text-secondary);
+		white-space: pre-wrap;
+		max-height: 200px;
+		overflow-y: auto;
+		border-top: 1px solid var(--glass-border);
+		background: var(--panel-bg);
+	}
+	/* Copilot banner */
+	.copilot-banner {
+		padding: 12px 14px;
+		border-radius: var(--radius-md);
+		border: 1px solid color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 42%, var(--glass-border));
+		background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 10%, var(--panel-strong));
+		margin-bottom: 6px;
+	}
+	.copilot-banner-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.copilot-banner-title {
+		font-size: 0.84rem;
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+	.copilot-banner-steps {
+		margin: 6px 0 0;
+		font-size: 0.78rem;
+		color: var(--text-secondary);
+	}
+	kbd {
+		display: inline-block;
+		padding: 1px 5px;
+		border-radius: 4px;
+		border: 1px solid var(--glass-border);
+		background: var(--panel-bg);
+		font-family: monospace;
+		font-size: 0.72rem;
+		color: var(--text-body);
+	}
 	@media (max-width: 480px) {
 	  .drawer-header,
 	  .drawer-body,

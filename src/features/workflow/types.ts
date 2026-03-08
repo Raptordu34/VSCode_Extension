@@ -219,6 +219,12 @@ export interface WorkflowQuickPickItem extends vscode.QuickPickItem {
 	action?: 'launch' | 'open-context' | 'inspect-artifacts' | 'stop';
 }
 
+export interface ArtifactGovernancePolicy {
+	gitignoreExists: boolean;
+	hasBlock: boolean;
+	managedPathsCovered: boolean;
+}
+
 export interface WorkflowDashboardState {
 	workspaceFolder?: vscode.WorkspaceFolder;
 	workspaceSelectionRequired?: boolean;
@@ -234,6 +240,8 @@ export interface WorkflowDashboardState {
 	configuration?: ExtensionConfiguration;
 	providerStatuses: ProviderStatusSnapshot[];
 	providerStatusUpdatedAt?: string;
+	copilotPendingPrompt?: string;
+	artifactGovernance?: ArtifactGovernancePolicy;
 }
 
 export interface WorkflowTreeNode {

@@ -406,7 +406,7 @@ export async function archiveActiveWorkflowState(
 		kind: 'write',
 		uri: indexUri,
 		content: toUtf8Bytes(`${JSON.stringify({
-			version: 1,
+			...index,
 			activeWorkflowId: manifest.workflowId,
 			entries: nextEntries
 		}, null, 2)}\n`)
@@ -590,7 +590,7 @@ export async function forkWorkflowFromHistory(
 	const forkedWorkflowId = createWorkflowId();
 	const forkedBranchId = 'main';
 	const now = new Date().toISOString();
-	const forkedLabel = labelOverride?.trim() || `Fork of ${sourceManifest.label}`;
+	const forkedLabel = labelOverride?.trim() || `Branch of ${sourceManifest.label}`;
 	const operations: MutationWriteOperation[] = [];
 
 	const forkedFiles: WorkflowArchivedFile[] = [];
@@ -713,7 +713,7 @@ export async function forkWorkflowFromHistoryAtStage(
 	const forkedWorkflowId = createWorkflowId();
 	const forkedBranchId = 'main';
 	const now = new Date().toISOString();
-	const forkedLabel = labelOverride?.trim() || `Fork of ${sourceManifest.label} @ stage ${String(stageIndex).padStart(2, '0')}`;
+	const forkedLabel = labelOverride?.trim() || `Branch of ${sourceManifest.label} @ stage ${String(stageIndex).padStart(2, '0')}`;
 	const operations: MutationWriteOperation[] = [];
 
 	const forkedFiles: WorkflowArchivedFile[] = [];
@@ -810,6 +810,91 @@ export async function forkWorkflowFromHistoryAtStage(
 
 	await commitWorkspaceMutationTransaction(operations);
 	return forkedManifest;
+}
+
+export async function deleteWorkflowFromHistory(
+	workspaceFolder: vscode.WorkspaceFolder,
+	workflowId: string
+): Promise<boolean> {
+	const index = await readWorkflowHistoryIndex(workspaceFolder.uri);
+	const entryExists = index.entries.some((e) => e.workflowId === workflowId);
+	if (!entryExists) {
+		return false;
+	}
+
+	const operations: MutationOperation[] = [];
+
+	const manifest = await readWorkflowArchiveManifest(workspaceFolder.uri, workflowId);
+	if (manifest) {
+		for (const file of manifest.files) {
+			if (file.archivePath) {
+				const archiveUri = buildWorkspaceUri(workspaceFolder.uri, file.archivePath);
+				if (archiveUri) {
+					operations.push({ kind: 'delete', uri: archiveUri });
+				}
+			}
+		}
+	}
+
+	const manifestPath = buildManifestPath(workflowId);
+	const manifestUri = buildWorkspaceUri(workspaceFolder.uri, manifestPath);
+	if (manifestUri) {
+		operations.push({ kind: 'delete', uri: manifestUri });
+	}
+
+	const nextEntries = index.entries.filter((e) => e.workflowId !== workflowId);
+	const indexUri = buildWorkspaceUri(workspaceFolder.uri, WORKFLOW_HISTORY_INDEX_FILE);
+	if (!indexUri) {
+		throw new Error('Unable to resolve workflow history index path.');
+	}
+
+	operations.push({
+		kind: 'write',
+		uri: indexUri,
+		content: toUtf8Bytes(`${JSON.stringify({
+			...index,
+			activeWorkflowId: index.activeWorkflowId === workflowId ? undefined : index.activeWorkflowId,
+			entries: nextEntries
+		}, null, 2)}\n`)
+	});
+
+	await commitWorkspaceMutationTransaction(operations);
+	return true;
+}
+
+export async function repairWorkflowHistoryIndex(workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
+	const index = await readWorkflowHistoryIndex(workspaceFolder.uri);
+	const validEntries: WorkflowHistoryEntry[] = [];
+
+	for (const entry of index.entries) {
+		const manifestUri = buildWorkspaceUri(workspaceFolder.uri, entry.manifestPath);
+		if (manifestUri && await fileExists(manifestUri)) {
+			validEntries.push(entry);
+		}
+	}
+
+	if (validEntries.length === index.entries.length) {
+		return;
+	}
+
+	const indexUri = buildWorkspaceUri(workspaceFolder.uri, WORKFLOW_HISTORY_INDEX_FILE);
+	if (!indexUri) {
+		return;
+	}
+
+	const repairedActiveWorkflowId = index.activeWorkflowId && validEntries.some((e) => e.workflowId === index.activeWorkflowId)
+		? index.activeWorkflowId
+		: undefined;
+
+	await commitWorkspaceMutationTransaction([{
+		kind: 'write',
+		uri: indexUri,
+		content: toUtf8Bytes(`${JSON.stringify({
+			...index,
+			activeWorkflowId: repairedActiveWorkflowId,
+			entries: validEntries
+		}, null, 2)}\n`)
+	}]);
 }
 
 export function buildWorkflowHistoryQuickPickLabel(entry: WorkflowHistoryEntry): string {

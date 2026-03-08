@@ -6,6 +6,7 @@ import { CONTEXT_FILE_NAME } from "../workflow/constants.js";
 import { getExtensionConfiguration } from "../../core/configuration.js";
 import { findClaudeAccount, findProviderAccount, buildProviderLaunchEnvironment } from "../providers/providerService.js";
 import { escapeShellArg } from "../../utils/index.js";
+import { PENDING_COPILOT_PROMPT_KEY } from "../workflow/constants.js";
 
 export function buildClaudeLaunchCommand(projectContext: ProjectContext, instruction: string): string {
 	const parts = ['claude'];
@@ -44,24 +45,11 @@ export function launchClaude(context: vscode.ExtensionContext, projectContext: P
 	})();
 }
 
-export async function launchCopilot(projectContext: ProjectContext): Promise<void> {
+export async function launchCopilot(context: vscode.ExtensionContext, projectContext: ProjectContext): Promise<void> {
 	const prompt = buildSharedWorkflowInstruction(projectContext);
 	await vscode.env.clipboard.writeText(prompt);
+	await context.globalState.update(PENDING_COPILOT_PROMPT_KEY, prompt);
 	await vscode.commands.executeCommand('workbench.action.chat.open');
-
-	const action = await vscode.window.showInformationMessage(
-		'Copilot Chat opened. The workflow prompt has been copied to the clipboard.',
-		'Copy Prompt Again',
-		'Open Context File'
-	);
-
-	if (action === 'Copy Prompt Again') {
-		await vscode.env.clipboard.writeText(prompt);
-		return;
-	}
-	if (action === 'Open Context File') {
-		await vscode.window.showTextDocument(projectContext.contextFile);
-	}
 }
 
 export async function launchProvider(context: vscode.ExtensionContext, workflowPlan: WorkflowExecutionPlan, projectContext: ProjectContext): Promise<void> {
@@ -73,7 +61,7 @@ export async function launchProvider(context: vscode.ExtensionContext, workflowP
 			launchGemini(context, projectContext);
 			break;
 		case 'copilot':
-			await launchCopilot(projectContext);
+			await launchCopilot(context, projectContext);
 			break;
 	}
 }

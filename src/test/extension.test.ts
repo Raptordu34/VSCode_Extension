@@ -1278,7 +1278,7 @@ suite('workflow control html', () => {
 		assert.ok(html.includes('Workflow History'));
 		assert.ok(html.includes('Workflow A'));
 		assert.ok(html.includes('Clean Active Generated Files'));
-		assert.ok(html.includes('Forked from Workflow A @ stage 2'));
+		assert.ok(html.includes('Branch of Workflow A @ stage 2'));
 		assert.ok(html.includes('data-command="forkWorkflowFromHistory"'));
 		assert.ok(html.includes('data-command="forkWorkflowFromArchivedStage"'));
 		assert.ok(html.includes('data-command="forkWorkflowFromStage"'));
