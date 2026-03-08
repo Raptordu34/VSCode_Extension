@@ -5,6 +5,8 @@ import { WorkflowDashboardState } from '../features/workflow/types.js';
 import { registerWorkflowCommands } from '../features/workflow/commands.js';
 import { registerContextCommands } from '../features/context/commands.js';
 import { registerProviderCommands } from '../features/providers/commands.js';
+import { registerWorkspaceCommands } from '../features/workspace/commands.js';
+import { registerDocumentCommands } from '../features/documents/commands.js';
 
 export function registerAllCommands(
 	context: vscode.ExtensionContext,
@@ -14,6 +16,8 @@ export function registerAllCommands(
 	registerWorkflowCommands(context, loadDashboardState);
 	registerContextCommands(context);
 	registerProviderCommands(context);
+	registerWorkspaceCommands(context);
+	registerDocumentCommands(context);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('ai-context-orchestrator.refreshWorkflowUi', async () => {

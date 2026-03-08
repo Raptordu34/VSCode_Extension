@@ -20,6 +20,7 @@ import { updateContinueWorkflowButtonVisibility, getWorkflowDashboardState, buil
 import { Logger } from './core/logger.js';
 import { EventBus } from './core/eventBus.js';
 import { registerAllCommands } from './commands/index.js';
+import { getWorkspaceModeLabel, getWorkspaceModeState } from './features/workspace/service.js';
 
 export let extensionContextRef: vscode.ExtensionContext | undefined;
 
@@ -56,6 +57,16 @@ export function activate(context: vscode.ExtensionContext) {
 	continueStatusBarItem.hide();
 
 	const refreshWorkflowUi = async (): Promise<void> => {
+		const activeWorkspaceFolder = getImplicitWorkspaceFolder(context);
+		const workspaceModeState = activeWorkspaceFolder ? getWorkspaceModeState(context, activeWorkspaceFolder) : undefined;
+		initStatusBarItem.text = workspaceModeState?.mode === 'code'
+			? '$(hubot) Init Workflow'
+			: workspaceModeState
+				? '$(book) Init Workspace'
+				: '$(hubot) Init Workflow';
+		initStatusBarItem.tooltip = workspaceModeState
+			? `Workspace mode: ${getWorkspaceModeLabel(workspaceModeState.mode)}. Start the appropriate AI workflow or document flow.`
+			: 'Start a new workflow: generate a context pack, prepare artifacts, and launch a provider';
 		await updateContinueWorkflowButtonVisibility(continueStatusBarItem, context);
 		workflowControlViewProvider.refresh();
 	};
@@ -85,7 +96,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const configuration = getExtensionConfiguration();
 	const startupWorkspaceFolder = getImplicitWorkspaceFolder(context);
 	if (configuration.autoGenerateOnStartup && startupWorkspaceFolder) {
-		void gatherProjectContext(true, buildDefaultWorkflowPlan(configuration), startupWorkspaceFolder)
+		void gatherProjectContext(context, true, buildDefaultWorkflowPlan(configuration), startupWorkspaceFolder)
 			.finally(() => refreshWorkflowUi());
 	}
 

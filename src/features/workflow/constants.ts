@@ -53,6 +53,7 @@ export const GEMINI_DEFAULT_MODELS = [
 export const WORKFLOW_CONTROL_VIEW_ID = 'aiContextOrchestrator.workflowControl';
 
 export const LAST_WORKFLOW_CONFIG_KEY = 'aiContextOrchestrator.lastWorkflowConfig';
+export const WORKFLOW_HISTORY_COLLAPSE_STATE_KEY = 'aiContextOrchestrator.workflowHistoryCollapseState';
 export const PENDING_COPILOT_PROMPT_KEY = 'aiContextOrchestrator.pendingCopilotPrompt';
 
 export const GITIGNORE_MANAGED_PATHS = [

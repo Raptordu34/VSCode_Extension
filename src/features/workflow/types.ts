@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import type { ProviderTarget, ProviderAccountConfiguration, ProviderStatusSnapshot } from '../providers/types.js';
+import type { WorkspaceModeState } from '../workspace/types.js';
+import type { LearningDocumentRecord } from '../documents/types.js';
 
 export type { ProviderTarget, ProviderAccountConfiguration, ProviderStatusSnapshot };
 
@@ -53,6 +55,9 @@ export interface WorkflowExecutionPlan {
 export interface ContextMetadata {
 	generatedAt: string;
 	signature: string;
+	workspaceMode?: string;
+	activeLearningDocumentTitle?: string;
+	activeLearningDocumentPath?: string;
 	preset: WorkflowPreset;
 	provider: ProviderTarget;
 	providerModel?: string;
@@ -150,6 +155,7 @@ export interface WorkflowHistoryEntry {
 	briefSummary: string;
 	manifestPath: string;
 	latestStageFile?: string;
+	isCollapsed?: boolean;
 }
 
 export interface WorkflowHistoryIndex {
@@ -228,6 +234,9 @@ export interface ArtifactGovernancePolicy {
 export interface WorkflowDashboardState {
 	workspaceFolder?: vscode.WorkspaceFolder;
 	workspaceSelectionRequired?: boolean;
+	workspaceModeState?: WorkspaceModeState;
+	learningDocuments?: LearningDocumentRecord[];
+	activeLearningDocument?: LearningDocumentRecord;
 	session?: WorkflowSessionState;
 	brief?: WorkflowBrief;
 	historyEntries?: WorkflowHistoryEntry[];

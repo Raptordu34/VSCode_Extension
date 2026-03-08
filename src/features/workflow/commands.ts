@@ -13,6 +13,7 @@ import { WorkflowDashboardState, ProjectContext, WorkflowQuickPickItem, Provider
 import { buildWorkspaceUri } from '../../core/workspace.js';
 import { archiveActiveWorkflowState, buildWorkflowHistoryQuickPickLabel, cleanActiveWorkflowFiles, deleteWorkflowFromHistory, forkWorkflowFromHistory, forkWorkflowFromHistoryAtStage, readWorkflowArchiveManifest, readWorkflowHistoryIndex, restoreWorkflowFromHistory } from '../context/workflowHistory.js';
 import { appendGitignoreRules } from './artifactGovernance.js';
+import { ensureWorkspaceMode, getWorkspaceModeDefinition, supportsLearningDocuments } from '../workspace/service.js';
 
 export function registerWorkflowCommands(
 	context: vscode.ExtensionContext,
@@ -116,15 +117,26 @@ export function registerWorkflowCommands(
 			EventBus.fire('refresh');
 		}),
 
-		vscode.commands.registerCommand('ai-context-orchestrator.smartContinueAI', async (overrides?: { preset?: string; provider?: string; providerModel?: string; claudeEffort?: string }) => {
+		vscode.commands.registerCommand('ai-context-orchestrator.smartContinueAI', async (overrides?: { preset?: string; provider?: string; providerModel?: string; claudeEffort?: string; brief?: string }) => {
 			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder to continue');
 			if (!workspaceFolder) {return;}
 			await runSmartContinueAiFlow(context, workspaceFolder, overrides ? {
 				preset: overrides.preset as WorkflowPreset | undefined,
 				provider: overrides.provider as ProviderTarget | undefined,
 				providerModel: overrides.providerModel,
-				claudeEffort: overrides.claudeEffort as ClaudeEffortLevel | undefined
+				claudeEffort: overrides.claudeEffort as ClaudeEffortLevel | undefined,
+				brief: overrides.brief
 			} : undefined);
+			if (overrides) {
+				const configuration = getExtensionConfiguration();
+				await saveLastWorkflowConfig(context, {
+					preset: (overrides.preset as WorkflowPreset | undefined) ?? configuration.defaultPreset,
+					provider: (overrides.provider as ProviderTarget | undefined) ?? configuration.defaultProvider,
+					providerModel: overrides.providerModel,
+					claudeEffort: overrides.claudeEffort as ClaudeEffortLevel | undefined,
+					brief: overrides.brief
+				});
+			}
 			EventBus.fire('refresh');
 		}),
 
@@ -168,6 +180,11 @@ async function runSmartInitAiFlow(
 		brief?: string;
 	}
 ): Promise<void> {
+	const workspaceModeState = await ensureWorkspaceMode(context, workspaceFolder);
+	if (!workspaceModeState) {
+		return;
+	}
+
 	const configuration = getExtensionConfiguration();
 	const workflowPlan = buildSmartDefaultWorkflowPlan(preset, configuration);
 	workflowPlan.startNewWorkflow = true;
@@ -183,7 +200,7 @@ async function runSmartInitAiFlow(
 		};
 	}
 	workflowPlan.presetDefinition = WORKFLOW_PRESETS[preset];
-	const projectContext = await gatherProjectContext(false, workflowPlan, workspaceFolder);
+	const projectContext = await gatherProjectContext(context, false, workflowPlan, workspaceFolder);
 	if (!projectContext) {return;}
 
 	await launchProvider(context, workflowPlan, projectContext);
@@ -199,6 +216,7 @@ async function runSmartContinueAiFlow(
 		provider?: ProviderTarget;
 		providerModel?: string;
 		claudeEffort?: ClaudeEffortLevel;
+		brief?: string;
 	}
 ): Promise<void> {
 	const configuration = getExtensionConfiguration();
@@ -209,7 +227,15 @@ async function runSmartContinueAiFlow(
 	}
 
 	const workflowPlan = buildSmartContinuationWorkflowPlan(existingSession, configuration, overrides);
-	const projectContext = await gatherProjectContext(false, workflowPlan, workspaceFolder);
+	if (overrides?.brief) {
+		workflowPlan.brief = {
+			taskType: inferTaskType(workflowPlan.preset, overrides.brief),
+			goal: overrides.brief,
+			constraints: [],
+			rawText: overrides.brief
+		};
+	}
+	const projectContext = await gatherProjectContext(context, false, workflowPlan, workspaceFolder);
 	if (!projectContext) {return;}
 
 	await launchProvider(context, workflowPlan, projectContext);
@@ -218,12 +244,55 @@ async function runSmartContinueAiFlow(
 }
 
 async function runInitAiFlow(context: vscode.ExtensionContext, workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
+	const workspaceModeState = await ensureWorkspaceMode(context, workspaceFolder);
+	if (!workspaceModeState) {
+		return;
+	}
+
+	if (supportsLearningDocuments(workspaceModeState.mode)) {
+		const action = await vscode.window.showQuickPick([
+			{
+				label: 'Créer un compte rendu learning-kit',
+				description: 'Initialiser un document documentaire structuré',
+				action: 'create-document'
+			},
+			{
+				label: 'Lancer l’assistant IA',
+				description: 'Conserver le workflow IA tout en injectant le contexte documentaire',
+				action: 'launch-assistant'
+			},
+			{
+				label: 'Changer le type de workspace',
+				description: `Mode actuel: ${getWorkspaceModeDefinition(workspaceModeState.mode).label}`,
+				action: 'change-mode'
+			}
+		], {
+			title: 'Initialisation du workspace',
+			placeHolder: 'Choisissez l’action principale pour ce workspace documentaire',
+			ignoreFocusOut: true
+		});
+
+		if (!action) {
+			return;
+		}
+
+		if (action.action === 'change-mode') {
+			await vscode.commands.executeCommand('ai-context-orchestrator.selectWorkspaceMode');
+			return;
+		}
+
+		if (action.action === 'create-document') {
+			await vscode.commands.executeCommand('ai-context-orchestrator.createLearningDocument');
+			return;
+		}
+	}
+
 	const configuration = getExtensionConfiguration();
 	const workflowPlan = await promptForWorkflowPlan(configuration);
 	if (!workflowPlan) {return;}
 	workflowPlan.startNewWorkflow = true;
 
-	const projectContext = await gatherProjectContext(false, workflowPlan, workspaceFolder);
+	const projectContext = await gatherProjectContext(context, false, workflowPlan, workspaceFolder);
 	if (!projectContext) {return;}
 
 	const summaryAction = await showWorkflowLaunchSummary(projectContext);
@@ -261,7 +330,7 @@ async function runContinueWorkflowFlow(context: vscode.ExtensionContext, workspa
 	workflowPlan.workflowId = existingSession.workflowId;
 	workflowPlan.branchId = existingSession.branchId;
 
-	const projectContext = await gatherProjectContext(false, workflowPlan, workspaceFolder);
+	const projectContext = await gatherProjectContext(context, false, workflowPlan, workspaceFolder);
 	if (!projectContext) {return;}
 
 	const summaryAction = await showWorkflowLaunchSummary(projectContext);

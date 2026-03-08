@@ -16,10 +16,14 @@ import { getProviderLabel } from "../providers/providerService.js";
 import { formatWorkflowRoles } from "../workflow/ui.js";
 import { buildContextBudget, formatContextBudgetSummary } from "../providers/providerCatalog.js";
 import { readWorkflowSessionState, readWorkflowBrief, buildSuggestedNextPresets, buildContextGenerationMessage, persistWorkflowArtifacts } from './workflowPersistence.js';
+import { getWorkspaceModeLabel, getWorkspaceModeState } from '../workspace/service.js';
+import { getActiveLearningDocument } from '../documents/service.js';
 
 export function buildRawContextContent(
 	workflowPlan: WorkflowExecutionPlan,
 	workspaceFolder: vscode.WorkspaceFolder,
+	workspaceModeLabel: string | undefined,
+	activeLearningDocumentSummary: string | undefined,
 	detectedTech: string[],
 	readmeLines: string[],
 	packageDetails: PackageDetails,
@@ -31,6 +35,8 @@ export function buildRawContextContent(
 		'# AI Workflow Context Pack',
 		'',
 		`Workspace: ${workspaceFolder.name}`,
+		workspaceModeLabel ? `Workspace mode: ${workspaceModeLabel}` : undefined,
+		activeLearningDocumentSummary ? `Active learning document: ${activeLearningDocumentSummary}` : undefined,
 		`Workflow preset: ${workflowPlan.presetDefinition.label}`,
 		`Target provider: ${workflowPlan.provider}`,
 		`Provider model: ${formatProviderModel(workflowPlan.provider, workflowPlan.providerModel)}`,
@@ -48,6 +54,7 @@ export function buildRawContextContent(
 		`Brief file: ${WORKFLOW_BRIEF_FILE}`,
 		`Stage directory: ${WORKFLOW_STAGE_DIRECTORY}`,
 		workflowPlan.brief ? `Current brief: ${workflowPlan.brief.goal}` : 'Current brief: none provided for this stage',
+		activeLearningDocumentSummary ? 'Document instruction: Respect the active learning-kit structure and imported sources when generating output.' : undefined,
 		'',
 		'## Project Summary',
 		detectedTech.length > 0 ? `Detected stack: ${detectedTech.join(', ')}` : 'Detected stack: Unknown',
@@ -74,6 +81,9 @@ export function buildContextFileContent(metadata: ContextMetadata, optimizedCont
 		'',
 		`Generated at: ${metadata.generatedAt}`,
 		`Context signature: ${metadata.signature}`,
+		`Workspace mode: ${metadata.workspaceMode ?? 'default'}`,
+		`Active learning document: ${metadata.activeLearningDocumentTitle ?? 'none'}`,
+		`Active learning document path: ${metadata.activeLearningDocumentPath ?? 'none'}`,
 		`Workflow preset: ${metadata.preset}`,
 		`Workflow provider: ${metadata.provider}`,
 		`Workflow provider model: ${metadata.providerModel ?? 'default'}`,
@@ -133,6 +143,9 @@ export function parseContextMetadata(content: string): ContextMetadata | undefin
 	return {
 		generatedAt,
 		signature,
+		workspaceMode: values.get('Workspace mode') || undefined,
+		activeLearningDocumentTitle: values.get('Active learning document') || undefined,
+		activeLearningDocumentPath: values.get('Active learning document path') || undefined,
 		preset,
 		provider,
 		providerModel,
@@ -372,6 +385,7 @@ export function getOptimizationSelector(costProfile: CostProfile): { vendor: str
 	}
 }
 export async function gatherProjectContext(
+	context: vscode.ExtensionContext,
 	isStartupAutoGeneration: boolean,
 	workflowPlan: WorkflowExecutionPlan,
 	workspaceFolderOverride?: vscode.WorkspaceFolder
@@ -393,6 +407,8 @@ export async function gatherProjectContext(
 		}
 
 		const configuration = getExtensionConfiguration();
+		const workspaceModeState = getWorkspaceModeState(context, workspaceFolder);
+		const activeLearningDocument = await getActiveLearningDocument(context, workspaceFolder);
 		const contextBudget = buildContextBudget(workflowPlan.provider, workflowPlan.costProfile, configuration);
 		const budgetedConfiguration = applyContextBudgetConfiguration(configuration, contextBudget);
 		const [treeLines, readmeLines, packageDetails, additionalContext, keyFiles] = await Promise.all([
@@ -432,7 +448,22 @@ export async function gatherProjectContext(
 			}
 		}
 
-		const rawContent = buildRawContextContent(workflowPlan, workspaceFolder, detectedTech, readmeLines, packageDetails, treeLines, additionalContext.sections, keyFiles);
+		const workspaceModeLabel = workspaceModeState ? getWorkspaceModeLabel(workspaceModeState.mode) : undefined;
+		const activeLearningDocumentSummary = activeLearningDocument
+			? `${activeLearningDocument.title} (${activeLearningDocument.relativeDirectory})`
+			: undefined;
+		const rawContent = buildRawContextContent(
+			workflowPlan,
+			workspaceFolder,
+			workspaceModeLabel,
+			activeLearningDocumentSummary,
+			detectedTech,
+			readmeLines,
+			packageDetails,
+			treeLines,
+			additionalContext.sections,
+			keyFiles
+		);
 		const optimization = workflowPlan.optimizeWithCopilot
 			? await optimizeContextWithCopilot(rawContent, configuration, workflowPlan.costProfile)
 			: {
@@ -444,6 +475,9 @@ export async function gatherProjectContext(
 		const baseMetadata: ContextMetadata = {
 			generatedAt: new Date().toISOString(),
 			signature,
+			workspaceMode: workspaceModeLabel,
+			activeLearningDocumentTitle: activeLearningDocument?.title,
+			activeLearningDocumentPath: activeLearningDocument?.relativeDirectory,
 			preset: workflowPlan.preset,
 			provider: workflowPlan.provider,
 			providerModel: workflowPlan.providerModel,

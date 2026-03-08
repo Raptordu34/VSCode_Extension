@@ -549,15 +549,29 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		color: var(--badge-fg);
 	}
 	.history-list { display: grid; gap: 8px; }
+	.history-node {
+		margin-left: calc(var(--history-depth, 0) * 16px);
+	}
+	.history-children {
+		display: grid;
+		gap: 8px;
+		margin-top: 8px;
+	}
 	.history-entry {
 		border-radius: 12px;
 		padding: 12px;
 		border: 1px solid rgba(255,255,255,0.07);
 		background: rgba(255,255,255,0.03);
 	}
+	.history-entry--parent {
+		background: color-mix(in srgb, rgba(255,255,255,0.03) 70%, var(--panel-soft));
+	}
 	.history-entry.active {
 		border-color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 42%, var(--glass-border));
 		background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 12%, var(--panel-strong));
+	}
+	.history-entry--collapsed {
+		border-color: rgba(255,255,255,0.12);
 	}
 	.history-meta-row {
 		display: flex;
@@ -565,10 +579,53 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		justify-content: space-between;
 		gap: 8px;
 	}
+	.history-title-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+	}
+	.history-tree-branch {
+		flex: 0 0 auto;
+		color: var(--text-secondary);
+	}
+	.history-tree-branch--root {
+		width: 0.9rem;
+	}
+	.history-toggle,
+	.history-toggle-spacer {
+		width: 1.15rem;
+		height: 1.15rem;
+		flex: 0 0 auto;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.history-toggle {
+		padding: 0;
+		border-radius: 6px;
+		border: 1px solid rgba(255,255,255,0.1);
+		background: rgba(255,255,255,0.04);
+		color: var(--text-secondary);
+		cursor: pointer;
+	}
+	.history-toggle:hover {
+		background: rgba(255,255,255,0.08);
+		color: var(--text-primary);
+	}
+	.history-toggle:focus-visible {
+		outline: 1px solid color-mix(in srgb, var(--vscode-focusBorder, #3794ff) 85%, white);
+		outline-offset: 2px;
+	}
+	.history-toggle-glyph {
+		font-size: 0.78rem;
+		line-height: 1;
+	}
 	.history-title {
 		font-size: 0.84rem;
 		font-weight: 700;
 		color: var(--text-primary);
+		min-width: 0;
 	}
 	.history-badge {
 		font-size: 0.72rem;

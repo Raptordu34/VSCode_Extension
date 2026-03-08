@@ -19,7 +19,7 @@ export function registerContextCommands(context: vscode.ExtensionContext): void 
 			if (!workspaceFolder) {return;}
 			const configuration = getExtensionConfiguration();
 			const workflowPlan = buildDefaultWorkflowPlan(configuration);
-			const projectContext = await gatherProjectContext(false, workflowPlan, workspaceFolder);
+			const projectContext = await gatherProjectContext(context, false, workflowPlan, workspaceFolder);
 			if (!projectContext) {return;}
 			vscode.window.showInformationMessage(buildContextGenerationMessage(projectContext));
 			EventBus.fire('refresh');

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { WorkflowDashboardState, WorkflowTreeNode, WorkflowStageStatus, ExtensionConfiguration, WorkflowExecutionPlan, ProjectContext, WorkflowQuickPickItem, ClaudeEffortLevel, WorkflowPreset, WorkflowBrief, WorkflowSessionState, ProviderTarget, LastWorkflowConfig, ArtifactGovernancePolicy } from "./types.js";
 import type { ProviderStatusCache } from "../providers/types.js";
-import { PROVIDER_STATUS_CACHE_KEY, CONTEXT_FILE_NAME, LAST_WORKFLOW_CONFIG_KEY, PENDING_COPILOT_PROMPT_KEY } from "./constants.js";
+import { PROVIDER_STATUS_CACHE_KEY, CONTEXT_FILE_NAME, LAST_WORKFLOW_CONFIG_KEY, PENDING_COPILOT_PROMPT_KEY, WORKFLOW_HISTORY_COLLAPSE_STATE_KEY } from "./constants.js";
 import { getProviderAccounts, getActiveProviderAccountId, findProviderAccount, getDefaultProviderModel, getDefaultClaudeEffort, getProviderLabel, promptForProviderModel, promptForProviderAccount, buildProviderDetail, promptForProviderTarget, formatProviderModel } from "../providers/providerService.js";
 import { buildWorkspaceUri, fileExists, readUtf8 } from "../../core/workspace.js";
 import { getImplicitWorkspaceFolder } from '../../core/workspaceContext.js';
@@ -13,6 +13,58 @@ import { buildProviderLaunchPrompt, buildWorkflowSummary } from "../aiAgents/pro
 import { WORKFLOW_PRESETS } from "./presets.js";
 import { readWorkflowHistoryIndex, repairWorkflowHistoryIndex } from "../context/workflowHistory.js";
 import { detectGovernancePolicy } from "./artifactGovernance.js";
+import { getWorkspaceModeState } from '../workspace/service.js';
+import { getActiveLearningDocument, getLearningDocuments } from '../documents/service.js';
+
+type WorkflowHistoryCollapseState = Record<string, string[]>;
+
+function getWorkflowHistoryWorkspaceKey(workspaceFolder: vscode.WorkspaceFolder): string {
+	return workspaceFolder.uri.toString();
+}
+
+export function readWorkflowHistoryCollapsedIds(
+	context: vscode.ExtensionContext,
+	workspaceFolder: vscode.WorkspaceFolder
+): string[] {
+	const state = context.globalState.get<WorkflowHistoryCollapseState>(WORKFLOW_HISTORY_COLLAPSE_STATE_KEY) ?? {};
+	const entry = state[getWorkflowHistoryWorkspaceKey(workspaceFolder)];
+	return Array.isArray(entry) ? [...new Set(entry)] : [];
+}
+
+export async function saveWorkflowHistoryCollapsedIds(
+	context: vscode.ExtensionContext,
+	workspaceFolder: vscode.WorkspaceFolder,
+	workflowIds: string[]
+): Promise<void> {
+	const state = context.globalState.get<WorkflowHistoryCollapseState>(WORKFLOW_HISTORY_COLLAPSE_STATE_KEY) ?? {};
+	const workspaceKey = getWorkflowHistoryWorkspaceKey(workspaceFolder);
+	const normalizedIds = [...new Set(workflowIds)].sort();
+	const nextState: WorkflowHistoryCollapseState = { ...state };
+
+	if (normalizedIds.length > 0) {
+		nextState[workspaceKey] = normalizedIds;
+	} else {
+		delete nextState[workspaceKey];
+	}
+
+	await context.globalState.update(WORKFLOW_HISTORY_COLLAPSE_STATE_KEY, nextState);
+}
+
+export async function setWorkflowHistoryCollapsed(
+	context: vscode.ExtensionContext,
+	workspaceFolder: vscode.WorkspaceFolder,
+	workflowId: string,
+	collapsed: boolean
+): Promise<void> {
+	const nextCollapsedIds = new Set(readWorkflowHistoryCollapsedIds(context, workspaceFolder));
+	if (collapsed) {
+		nextCollapsedIds.add(workflowId);
+	} else {
+		nextCollapsedIds.delete(workflowId);
+	}
+
+	await saveWorkflowHistoryCollapsedIds(context, workspaceFolder, [...nextCollapsedIds]);
+}
 
 export async function updateContinueWorkflowButtonVisibility(statusBarItem: vscode.StatusBarItem, context: vscode.ExtensionContext): Promise<void> {
 	const workspaceFolder = getImplicitWorkspaceFolder(context);
@@ -54,15 +106,33 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 		readWorkflowHistoryIndex(workspaceFolder.uri),
 		detectGovernancePolicy(workspaceFolder)
 	]);
+	const [learningDocuments, activeLearningDocument] = await Promise.all([
+		getLearningDocuments(context, workspaceFolder),
+		getActiveLearningDocument(context, workspaceFolder)
+	]);
+	const workspaceModeState = getWorkspaceModeState(context, workspaceFolder);
+	const storedCollapsedIds = readWorkflowHistoryCollapsedIds(context, workspaceFolder);
+	const knownWorkflowIds = new Set(historyIndex.entries.map((entry) => entry.workflowId));
+	const collapsedWorkflowIds = storedCollapsedIds.filter((workflowId) => knownWorkflowIds.has(workflowId));
+	if (collapsedWorkflowIds.length !== storedCollapsedIds.length) {
+		await saveWorkflowHistoryCollapsedIds(context, workspaceFolder, collapsedWorkflowIds);
+	}
+	const collapsedWorkflowIdSet = new Set(collapsedWorkflowIds);
 	const copilotPendingPrompt = context.globalState.get<string>(PENDING_COPILOT_PROMPT_KEY);
 	const latestStage = session?.stages.at(-1);
 	const artifactCount = session?.stages.reduce((total, stage) => total + stage.artifactFiles.length, 0) ?? 0;
 
 	return {
 		workspaceFolder,
+		workspaceModeState,
+		learningDocuments,
+		activeLearningDocument,
 		session,
 		brief,
-		historyEntries: historyIndex.entries,
+		historyEntries: historyIndex.entries.map((entry) => ({
+			...entry,
+			isCollapsed: collapsedWorkflowIdSet.has(entry.workflowId)
+		})),
 		activeWorkflowId: historyIndex.activeWorkflowId,
 		latestStage,
 		selectedStage: latestStage,

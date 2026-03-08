@@ -139,6 +139,26 @@
         "command": "ai-context-orchestrator.switchProviderAccount",
         "title": "AI Context Orchestrator: Switch Provider Account",
         "icon": "$(account)"
+      },
+      {
+        "command": "ai-context-orchestrator.selectWorkspaceMode",
+        "title": "AI Context Orchestrator: Select Workspace Mode"
+      },
+      {
+        "command": "ai-context-orchestrator.createLearningDocument",
+        "title": "AI Context Orchestrator: Create Learning Document"
+      },
+      {
+        "command": "ai-context-orchestrator.switchLearningDocument",
+        "title": "AI Context Orchestrator: Switch Active Learning Document"
+      },
+      {
+        "command": "ai-context-orchestrator.openActiveLearningDocument",
+        "title": "AI Context Orchestrator: Open Active Learning Document"
+      },
+      {
+        "command": "ai-context-orchestrator.addLearningDocumentSources",
+        "title": "AI Context Orchestrator: Add Learning Document Sources"
       }
     ],
     "viewsContainers": {

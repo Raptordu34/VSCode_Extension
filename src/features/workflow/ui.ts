@@ -26,7 +26,8 @@ import type {
 	ClaudeEffortLevel,
 	WorkflowPreset } from './types.js';
 import { capitalize } from "../../utils/index.js";
-import { readLastWorkflowConfig } from './workflowService.js';
+import { readLastWorkflowConfig, setWorkflowHistoryCollapsed } from './workflowService.js';
+import { getWorkspaceModeDefinition } from '../workspace/service.js';
 
 export interface WorkflowUiHelpers {
 	createNonce(): string;
@@ -67,8 +68,23 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 			localResourceRoots: [this.extensionUri]
 		};
 
-		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; providerModel?: string; claudeEffort?: string; brief?: string; stageIndex?: number; target?: string }) => {
+		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; providerModel?: string; claudeEffort?: string; brief?: string; stageIndex?: number; target?: string; collapsed?: boolean }) => {
 			switch (message.command) {
+				case 'selectWorkspaceMode':
+					await vscode.commands.executeCommand('ai-context-orchestrator.selectWorkspaceMode');
+					return;
+				case 'createLearningDocument':
+					await vscode.commands.executeCommand('ai-context-orchestrator.createLearningDocument');
+					return;
+				case 'switchLearningDocument':
+					await vscode.commands.executeCommand('ai-context-orchestrator.switchLearningDocument');
+					return;
+				case 'openActiveLearningDocument':
+					await vscode.commands.executeCommand('ai-context-orchestrator.openActiveLearningDocument');
+					return;
+				case 'addLearningDocumentSources':
+					await vscode.commands.executeCommand('ai-context-orchestrator.addLearningDocumentSources');
+					return;
 				case 'init':
 					await vscode.commands.executeCommand('ai-context-orchestrator.initAI');
 					return;
@@ -93,7 +109,8 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 							preset: message.preset,
 							provider: message.provider,
 							providerModel: message.providerModel,
-							claudeEffort: message.claudeEffort
+							claudeEffort: message.claudeEffort,
+							brief: message.brief
 						}
 					);
 					this.drawerOpen = false;
@@ -187,6 +204,18 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 					this.drawerMode = 'continue';
 					void this.render(this.view!);
 					return;
+				case 'toggleWorkflowHistoryCollapse': {
+					if (!message.target) {
+						return;
+					}
+					const state = await this.loadState();
+					if (!state.workspaceFolder) {
+						return;
+					}
+					await setWorkflowHistoryCollapsed(this.context, state.workspaceFolder, message.target, Boolean(message.collapsed));
+					this.refresh();
+					return;
+				}
 				case 'closeConfigDrawer':
 					this.drawerOpen = false;
 					this.drawerMode = 'new';
@@ -334,7 +363,7 @@ export function getWorkflowControlHtml(
 
 	const heroHtml = state.session
 		? buildActiveHero(state, helpers, recommendedPreset)
-		: buildInitHero(helpers, defaultPreset, defaultProvider, defaultModel, drawerOpen);
+		: buildInitHero(state, helpers, defaultPreset, defaultProvider, defaultModel, drawerOpen);
 
 	const copilotBannerHtml = state.copilotPendingPrompt ? buildCopilotBannerHtml(helpers) : '';
 
@@ -405,6 +434,26 @@ export function getWorkflowControlHtml(
 </div>
 </details>`;
 
+	const learningMode = state.workspaceModeState ? getWorkspaceModeDefinition(state.workspaceModeState.mode) : undefined;
+	const learningDocumentsHtml = learningMode?.supportsLearningDocuments ? `
+<details class="mc-section" open>
+<summary class="mc-section-header">
+	<span class="mc-section-title">Learning Documents</span>
+	<span class="mc-section-badge">${state.learningDocuments?.length ?? 0} document(s)</span>
+</summary>
+<div class="mc-section-body">
+	<p class="section-footnote">Le mode ${helpers.escapeHtml(learningMode.label)} active la création de documents et l’import de sources locales.</p>
+	<div class="shortcuts">
+		<button type="button" class="linkButton" data-command="openActiveLearningDocument" ${state.activeLearningDocument ? '' : 'disabled'}>Document actif<span>${helpers.escapeHtml(state.activeLearningDocument?.title ?? 'Aucun')}</span></button>
+		<button type="button" class="linkButton" data-command="switchLearningDocument" ${(state.learningDocuments?.length ?? 0) > 0 ? '' : 'disabled'}>Changer<span>${helpers.escapeHtml(state.activeLearningDocument?.relativeDirectory ?? 'Aucun document')}</span></button>
+		<button type="button" class="linkButton" data-command="addLearningDocumentSources" ${state.activeLearningDocument ? '' : 'disabled'}>Sources<span>${helpers.escapeHtml(state.activeLearningDocument ? `${state.activeLearningDocument.sources.length} importée(s)` : 'Aucune')}</span></button>
+	</div>
+	<div class="actions" style="margin-top:8px;">
+		<button type="button" class="secondary" data-command="createLearningDocument">Créer un compte rendu</button>
+	</div>
+</div>
+</details>` : '';
+
 	const quickFilesCount = [state.contextFileExists, Boolean(state.brief), Boolean(state.latestStage), Boolean(state.session)].filter(Boolean).length;
 	const filesHtml = `
 <details class="mc-section">
@@ -437,7 +486,8 @@ export function getWorkflowControlHtml(
 		preset: state.nextSuggestedPresets[0] ?? state.session.currentPreset,
 		provider: state.session.currentProvider,
 		providerModel: state.session.currentProviderModel,
-		claudeEffort: state.session.currentClaudeEffort
+		claudeEffort: state.session.currentClaudeEffort,
+		brief: state.brief?.goal
 	} : undefined;
 
 	const drawerHtml = drawerOpen
@@ -451,6 +501,7 @@ ${heroHtml}
 ${historyHtml}
 ${stagesHtml}
 ${providersHtml}
+${learningDocumentsHtml}
 ${filesHtml}
 ${governanceHtml}
 	${state.session ? `<div style="margin-top:4px;">
@@ -458,6 +509,18 @@ ${governanceHtml}
 </div>` : ''}`;
 
 	const scriptBody = `
+// ── History tree collapse ──
+for (var historyToggle of document.querySelectorAll('.history-toggle')) {
+	historyToggle.addEventListener('click', (function(toggleBtn) { return function() {
+		var nextCollapsed = toggleBtn.getAttribute('data-collapsed') !== 'true';
+		vscode.postMessage({
+			command: 'toggleWorkflowHistoryCollapse',
+			target: toggleBtn.getAttribute('data-workflow-id') || undefined,
+			collapsed: nextCollapsed
+		});
+	}; })(historyToggle));
+}
+
 // ── Stage mark buttons ──
 for (var markBtn of document.querySelectorAll('button[data-stage-index]')) {
 	markBtn.addEventListener('click', (function(b) { return function() {
@@ -530,12 +593,16 @@ function updateBriefVisibility(preset) {
 	}
 	if (help) {
 		help.textContent = visible
-			? 'One sentence on the expected outcome. Keep it concrete.'
+			? (drawerMode === 'continue'
+				? 'Describe the goal for this next stage. Keep it concrete.'
+				: 'One sentence on the expected outcome. Keep it concrete.')
 			: 'Optional for Explore. Leave it empty to start with the current workspace context.';
 	}
 	if (hint) {
 		hint.textContent = visible
-			? 'You can refine scope or constraints here.'
+			? (drawerMode === 'continue'
+				? 'This brief will guide the continuation prompt for the next stage.'
+				: 'You can refine scope or constraints here.')
 			: 'Explore starts faster without a brief.';
 	}
 	var ta = document.getElementById('drawer-brief');
@@ -593,7 +660,7 @@ function updateLaunchState() {
 	var message = document.getElementById('launch-validation');
 	var briefEl = document.getElementById('drawer-brief');
 	if (!launchBtn || !message) { return; }
-	var requiresBrief = drawerMode === 'new' && drawerPreset !== 'explore';
+	var requiresBrief = drawerPreset !== 'explore';
 	var briefValue = briefEl ? briefEl.value.trim() : '';
 	var isValid = !requiresBrief || briefValue.length > 0;
 	launchBtn.disabled = !isValid;
@@ -603,7 +670,8 @@ function updateLaunchState() {
 	}
 
 function focusComposer() {
-	var focusTarget = drawerPreset === 'explore'
+	var briefField = document.getElementById('brief-field');
+	var focusTarget = drawerPreset === 'explore' || (briefField && briefField.hidden)
 		? document.querySelector('.drawer-pill[data-field="provider"].active')
 		: document.getElementById('drawer-brief');
 	if (focusTarget && typeof focusTarget.focus === 'function') {
@@ -659,7 +727,7 @@ function triggerLaunch() {
 		provider: drawerProvider,
 		providerModel: modelEl ? modelEl.value : undefined,
 		claudeEffort: drawerProvider === 'claude' ? drawerEffort : undefined,
-		brief: (cmd === 'smartInit' && briefEl && briefEl.value.trim()) ? briefEl.value.trim() : undefined
+		brief: (briefEl && briefEl.value.trim()) ? briefEl.value.trim() : undefined
 	});
 }
 
@@ -707,25 +775,35 @@ if (document.getElementById('mc-drawer')) {
 	});
 }
 
-function buildInitHero(helpers: WorkflowUiHelpers, defaultPreset: string, defaultProvider: string, defaultModel: string, drawerOpen: boolean): string {
+function buildInitHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpers, defaultPreset: string, defaultProvider: string, defaultModel: string, drawerOpen: boolean): string {
+	const workspaceMode = state.workspaceModeState ? getWorkspaceModeDefinition(state.workspaceModeState.mode) : undefined;
+	const modeLine = workspaceMode
+		? `<div class="stat"><strong>Workspace mode</strong><span>${helpers.escapeHtml(workspaceMode.label)}</span></div>`
+		: `<div class="stat"><strong>Workspace mode</strong><span>Non défini</span></div>`;
+	const secondLine = workspaceMode?.supportsLearningDocuments
+		? `<div class="stat"><strong>Document actif</strong><span>${helpers.escapeHtml(state.activeLearningDocument?.title ?? 'Aucun document')}</span></div>`
+		: `<div class="stat"><strong>Fast path</strong><span>Goal, provider, optional brief, then launch.</span></div>`;
+	const extraActions = workspaceMode?.supportsLearningDocuments
+		? `<button type="button" class="secondary" data-command="createLearningDocument">Créer un compte rendu</button>
+		<button type="button" class="secondary" data-command="addLearningDocumentSources" ${state.activeLearningDocument ? '' : 'disabled'}>Importer des sources</button>`
+		: `<button type="button" class="secondary" data-command="init">Open full setup</button>`;
 	return `
 <section class="card hero">
 	<div class="kicker">No active workflow</div>
 	<h3>Start a workflow from the sidebar</h3>
 	<p class="lead">Use the quick launcher for the common path, then open advanced settings only when you need to change model or provider-specific tuning.</p>
 	<div class="stat-grid" style="margin-top:12px;">
+		${modeLine}
 		<div class="stat">
 			<strong>Default route</strong>
 			<span>${helpers.escapeHtml(defaultPreset)} · ${helpers.escapeHtml(defaultProvider)} · ${helpers.escapeHtml(defaultModel)}</span>
 		</div>
-		<div class="stat">
-			<strong>Fast path</strong>
-			<span>Goal, provider, optional brief, then launch.</span>
-		</div>
+		${secondLine}
 	</div>
 	<div class="actions" style="margin-top:10px;">
+		<button type="button" class="secondary" data-command="selectWorkspaceMode">${workspaceMode ? 'Changer le type de workspace' : 'Choisir le type de workspace'}</button>
 		<button type="button" data-command="${drawerOpen ? 'closeConfigDrawer' : 'openConfigDrawer'}" aria-expanded="${drawerOpen ? 'true' : 'false'}" aria-controls="mc-drawer" ${drawerOpen ? '' : 'autofocus'}>${drawerOpen ? 'Hide launcher' : 'Start workflow'}</button>
-		<button type="button" class="secondary" data-command="init">Open full setup</button>
+		${extraActions}
 	</div>
 </section>`;
 }
@@ -811,6 +889,7 @@ function buildHistorySection(
 ): string {
 	const entryById = new Map(historyEntries.map((entry) => [entry.workflowId, entry]));
 	const childrenByParentId = new Map<string, WorkflowHistoryEntry[]>();
+	const forcedExpandedIds = new Set<string>();
 
 	for (const entry of historyEntries) {
 		if (entry.parentWorkflowId) {
@@ -827,13 +906,24 @@ function buildHistorySection(
 
 	const historyCount = historyEntries.length;
 	const activeEntry = activeWorkflowId ? historyEntries.find((entry) => entry.workflowId === activeWorkflowId) : undefined;
+	let ancestorEntry = activeWorkflowId ? entryById.get(activeWorkflowId) : undefined;
+	while (ancestorEntry?.parentWorkflowId) {
+		forcedExpandedIds.add(ancestorEntry.parentWorkflowId);
+		ancestorEntry = entryById.get(ancestorEntry.parentWorkflowId);
+	}
 
 	function renderEntry(entry: WorkflowHistoryEntry, depth: number): string {
 		const isOrphan = Boolean(entry.parentWorkflowId && !entryById.has(entry.parentWorkflowId));
-		const children = childrenByParentId.get(entry.workflowId) ?? [];
-		const entryHtml = buildHistoryEntryHtml(entry, activeWorkflowId, entryById, helpers, depth, isOrphan);
-		const childrenHtml = depth < 3 ? children.map((child) => renderEntry(child, depth + 1)).join('') : '';
-		return entryHtml + childrenHtml;
+		const visibleChildren = depth < 3 ? (childrenByParentId.get(entry.workflowId) ?? []) : [];
+		const hasChildren = visibleChildren.length > 0;
+		const isCollapsed = hasChildren && !forcedExpandedIds.has(entry.workflowId)
+			? entry.isCollapsed ?? true
+			: false;
+		const entryHtml = buildHistoryEntryHtml(entry, activeWorkflowId, entryById, helpers, depth, isOrphan, hasChildren, isCollapsed);
+		const childrenHtml = hasChildren && !isCollapsed
+			? `<div class="history-children">${visibleChildren.map((child) => renderEntry(child, depth + 1)).join('')}</div>`
+			: '';
+		return `<div class="history-node" style="--history-depth:${depth};">${entryHtml}${childrenHtml}</div>`;
 	}
 
 	const listHtml = roots.map((root) => renderEntry(root, 0)).join('');
@@ -859,7 +949,9 @@ function buildHistoryEntryHtml(
 	entryById: Map<string, WorkflowHistoryEntry>,
 	helpers: WorkflowUiHelpers,
 	depth: number = 0,
-	isOrphan: boolean = false
+	isOrphan: boolean = false,
+	hasChildren: boolean = false,
+	isCollapsed: boolean = false
 ): string {
 	const isActive = entry.workflowId === activeWorkflowId;
 	const providerLabel = helpers.getProviderLabel(entry.currentProvider);
@@ -872,17 +964,23 @@ function buildHistoryEntryHtml(
 	const classes = [
 		'history-entry',
 		isActive ? 'active' : '',
+		hasChildren ? 'history-entry--parent' : '',
+		hasChildren && isCollapsed ? 'history-entry--collapsed' : '',
 		depth > 0 ? 'history-entry--child' : '',
 		isOrphan ? 'history-entry--orphan' : ''
 	].filter(Boolean).join(' ');
 
-	const treePrefix = depth > 0 ? '<span class="history-tree-branch">└─</span> ' : '';
-	const indentStyle = depth > 0 ? `margin-left: ${depth * 16}px;` : '';
+	const treePrefix = depth > 0
+		? '<span class="history-tree-branch" aria-hidden="true">└─</span>'
+		: '<span class="history-tree-branch history-tree-branch--root" aria-hidden="true"></span>';
+	const toggleControl = hasChildren
+		? `<button type="button" class="history-toggle" data-workflow-id="${helpers.escapeHtml(entry.workflowId)}" data-collapsed="${isCollapsed ? 'true' : 'false'}" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? 'Expand workflow' : 'Collapse workflow'}"><span class="history-toggle-glyph" aria-hidden="true">${isCollapsed ? '▸' : '▾'}</span></button>`
+		: '<span class="history-toggle-spacer" aria-hidden="true"></span>';
 
 	return `
-	<div class="${classes}" style="${indentStyle}">
+	<div class="${classes}">
 		<div class="history-meta-row">
-			<span class="history-title">${treePrefix}${helpers.escapeHtml(entry.label)}</span>
+			<div class="history-title-row">${treePrefix}${toggleControl}<span class="history-title">${helpers.escapeHtml(entry.label)}</span></div>
 			${isActive ? '<span class="history-badge">Active</span>' : ''}
 		</div>
 		<div class="history-summary">${helpers.escapeHtml(presetLabel)} · ${helpers.escapeHtml(providerLabel)} · ${entry.stageCount} stage(s)</div>
@@ -911,7 +1009,7 @@ function buildActiveHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpe
 	<p class="small">${completedCount}/${session.stages.length} stages · Next: ${helpers.escapeHtml(nextLabel)}</p>
 	${state.brief ? `<p class="small" style="margin-top:4px;">${helpers.escapeHtml(state.brief.goal)}</p>` : ''}
 	<div class="actions" style="margin-top:10px;">
-		<button type="button" data-command="smartContinue">Continue ▶</button>
+		<button type="button" data-command="openContinueDrawer">Continue ▶</button>
 		<button type="button" class="secondary" data-command="openContinueDrawer">Change settings</button>
 		<button type="button" class="secondary" data-command="previewPrompt" ${state.session ? '' : 'disabled'}>Prompt</button>
 	</div>
@@ -992,13 +1090,13 @@ function buildConfigDrawerHtml(
 	lastConfig: LastWorkflowConfig | undefined,
 	configuration: ExtensionConfiguration,
 	mode: 'new' | 'continue' = 'new',
-	sessionPrefill?: { preset?: WorkflowPreset; provider?: ProviderTarget; providerModel?: string; claudeEffort?: ClaudeEffortLevel }
+	sessionPrefill?: { preset?: WorkflowPreset; provider?: ProviderTarget; providerModel?: string; claudeEffort?: ClaudeEffortLevel; brief?: string }
 ): string {
 	const preset = sessionPrefill?.preset ?? lastConfig?.preset ?? configuration.defaultPreset;
 	const provider = sessionPrefill?.provider ?? lastConfig?.provider ?? configuration.defaultProvider;
 	const model = sessionPrefill?.providerModel ?? lastConfig?.providerModel ?? '';
 	const effort = sessionPrefill?.claudeEffort ?? lastConfig?.claudeEffort ?? configuration.defaultClaudeEffort;
-	const brief = mode === 'continue' ? '' : (lastConfig?.brief ?? '');
+	const brief = sessionPrefill?.brief ?? lastConfig?.brief ?? '';
 
 	const claudeModels = ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
 	const geminiModels = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'];
@@ -1029,12 +1127,12 @@ function buildConfigDrawerHtml(
 		: provider === 'gemini'
 			? 'Good default for broad analysis and faster iteration.'
 			: 'Uses the active Copilot setup. Model selection stays minimal.';
-	const briefVisible = isNewMode && preset !== 'explore';
+	const briefVisible = preset !== 'explore';
 	const selectionSummary = `${WORKFLOW_PRESETS[preset].label} with ${helpers.getProviderLabel(provider)} · ${model || activeModels[0]}${provider === 'claude' ? ` · ${effort} effort` : ''}`;
 	const drawerTitle = isNewMode ? 'New workflow' : 'Resume workflow';
 	const drawerSubtitle = isNewMode
 		? 'Keep the common path short. Advanced settings are available below when needed.'
-		: 'Override the preset, provider, or model for this continuation step.';
+		: 'Override the preset, provider, model, and brief for this continuation step.';
 	const launchBtnLabel = isNewMode ? 'Launch ▶' : 'Continue →';
 
 	return `
@@ -1058,12 +1156,12 @@ function buildConfigDrawerHtml(
 				<p class="drawer-help">Pick the workflow outcome first. This controls whether a brief is required.</p>
 			<div class="drawer-pills" id="preset-pills">${presetPills}</div>
 			</div>
-			${isNewMode ? `<div class="drawer-field" id="brief-field"${briefVisible ? '' : ' hidden aria-hidden="true"'}>
+			<div class="drawer-field" id="brief-field"${briefVisible ? '' : ' hidden aria-hidden="true"'}>
 				<label class="drawer-label" for="drawer-brief">Brief</label>
-				<p class="drawer-help" id="brief-help">${briefVisible ? 'One sentence on the expected outcome. Keep it concrete.' : 'Optional for Explore. Leave it empty to start with the current workspace context.'}</p>
+				<p class="drawer-help" id="brief-help">${briefVisible ? (isNewMode ? 'One sentence on the expected outcome. Keep it concrete.' : 'Describe the goal for this next stage. Keep it concrete.') : 'Optional for Explore. Leave it empty to start with the current workspace context.'}</p>
 				<textarea class="drawer-textarea" id="drawer-brief" placeholder="${helpers.escapeHtml(briefPlaceholder)}" aria-describedby="brief-help brief-hint">${helpers.escapeHtml(brief)}</textarea>
-				<span class="drawer-hint" id="brief-hint">${briefVisible ? 'You can refine scope or constraints here.' : 'Explore starts faster without a brief.'}</span>
-			</div>` : ''}
+				<span class="drawer-hint" id="brief-hint">${briefVisible ? (isNewMode ? 'You can refine scope or constraints here.' : 'This brief will guide the continuation prompt for the next stage.') : 'Explore starts faster without a brief.'}</span>
+			</div>
 		</div>
 		<div class="drawer-group">
 			<div class="drawer-field">
