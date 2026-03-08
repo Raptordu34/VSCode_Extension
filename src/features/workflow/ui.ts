@@ -61,7 +61,17 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 					await vscode.commands.executeCommand('ai-context-orchestrator.initAI');
 					return;
 				case 'smartInit':
-					await vscode.commands.executeCommand('ai-context-orchestrator.smartInitAI', message.preset);
+					await vscode.commands.executeCommand(
+						'ai-context-orchestrator.smartInitAI',
+						message.preset,
+						{
+							provider: message.provider,
+							providerModel: (message as any).providerModel,
+							claudeEffort: (message as any).claudeEffort,
+							brief: (message as any).brief
+						}
+					);
+					this.drawerOpen = false;
 					return;
 				case 'continue':
 					await vscode.commands.executeCommand('ai-context-orchestrator.continueWorkflow');
@@ -327,6 +337,7 @@ ${filesHtml}
 </div>`;
 
 	const scriptBody = `
+// ── Preset selector (hero) ──
 var selectedPreset = '${defaultPreset}';
 for (var btn of document.querySelectorAll('.preset-btn')) {
 	btn.addEventListener('click', (function(b) { return function() {
@@ -334,11 +345,99 @@ for (var btn of document.querySelectorAll('.preset-btn')) {
 		for (var x of document.querySelectorAll('.preset-btn')) { x.classList.toggle('active', x.dataset.preset === selectedPreset); }
 	}; })(btn));
 }
+
+// ── Stage mark buttons ──
 for (var markBtn of document.querySelectorAll('button[data-stage-index]')) {
 	markBtn.addEventListener('click', (function(b) { return function() {
 		vscode.postMessage({ command: b.dataset.command, stageIndex: Number(b.dataset.stageIndex) });
 	}; })(markBtn));
-}`;
+}
+
+// ── Drawer state ──
+var drawerPreset = '${lastConfig?.preset ?? defaultPreset}';
+var drawerProvider = '${lastConfig?.provider ?? defaultProvider}';
+var drawerEffort = '${lastConfig?.claudeEffort ?? 'medium'}';
+var CLAUDE_MODELS = ${JSON.stringify(claudeModels)};
+var GEMINI_MODELS = ${JSON.stringify(geminiModels)};
+
+function getModels(provider) {
+	if (provider === 'gemini') { return GEMINI_MODELS; }
+	if (provider === 'copilot') { return ['default']; }
+	return CLAUDE_MODELS;
+}
+
+function updateModelSelect(provider, currentModel) {
+	var sel = document.getElementById('drawer-model');
+	if (!sel) { return; }
+	var models = getModels(provider);
+	sel.innerHTML = models.map(function(m) {
+		return '<option value="' + m + '"' + (m === currentModel ? ' selected' : '') + '>' + m + '</option>';
+	}).join('');
+}
+
+function updateEffortVisibility(provider) {
+	var row = document.getElementById('effort-field');
+	if (row) { row.style.display = provider === 'claude' ? '' : 'none'; }
+}
+
+function updateBriefVisibility(preset) {
+	var row = document.getElementById('brief-field');
+	if (row) { row.style.display = preset === 'explore' ? 'none' : ''; }
+	var ta = document.getElementById('drawer-brief');
+	if (ta) {
+		var ph = { explore: 'Quelle zone explorer ?', plan: 'Que planifier ?', build: 'Que construire ?', debug: 'Quel bug corriger ?', review: 'Que reviewer ?', test: 'Quelle surface tester ?' };
+		ta.placeholder = ph[preset] || 'Décris l\\'objectif…';
+	}
+}
+
+// Pill clicks (preset / provider / effort)
+for (var pill of document.querySelectorAll('.drawer-pill')) {
+	pill.addEventListener('click', (function(p) { return function() {
+		var field = p.dataset.field;
+		var value = p.dataset.value;
+		var container = p.closest('.drawer-pills');
+		if (container) {
+			for (var s of container.querySelectorAll('.drawer-pill')) { s.classList.remove('active'); }
+		}
+		p.classList.add('active');
+		if (field === 'preset') {
+			drawerPreset = value;
+			updateBriefVisibility(value);
+		} else if (field === 'provider') {
+			drawerProvider = value;
+			var sel = document.getElementById('drawer-model');
+			updateModelSelect(value, sel ? sel.value : '');
+			updateEffortVisibility(value);
+		} else if (field === 'effort') {
+			drawerEffort = value;
+		}
+	}; })(pill));
+}
+
+// Close drawer
+function closeDrawer() { vscode.postMessage({ command: 'closeConfigDrawer' }); }
+var closeBtn = document.getElementById('drawer-close-btn');
+if (closeBtn) { closeBtn.addEventListener('click', closeDrawer); }
+var backdrop = document.getElementById('mc-backdrop');
+if (backdrop) { backdrop.addEventListener('click', closeDrawer); }
+
+// Launch from drawer
+var drawerLaunchBtn = document.getElementById('drawer-launch-btn');
+if (drawerLaunchBtn) {
+	drawerLaunchBtn.addEventListener('click', function() {
+		var modelEl = document.getElementById('drawer-model');
+		var briefEl = document.getElementById('drawer-brief');
+		vscode.postMessage({
+			command: 'smartInit',
+			preset: drawerPreset,
+			provider: drawerProvider,
+			providerModel: modelEl ? modelEl.value : undefined,
+			claudeEffort: drawerProvider === 'claude' ? drawerEffort : undefined,
+			brief: briefEl && briefEl.value.trim() ? briefEl.value.trim() : undefined
+		});
+	});
+}
+`;
 
 	return renderDesignShellDocument({
 		webview,
