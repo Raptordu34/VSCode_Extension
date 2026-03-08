@@ -103,7 +103,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	}
 	::-webkit-scrollbar-thumb {
 		background: color-mix(in srgb, var(--vscode-scrollbarSlider-background, rgba(121,121,121,0.4)) 90%, transparent);
-		border-radius: 999px;
+		border-radius: 0;
 	}
 	::-webkit-scrollbar-thumb:hover {
 		background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100,100,100,0.7));
@@ -478,6 +478,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 			backdrop-filter: none !important;
 			-webkit-backdrop-filter: none !important;
 			background: var(--vscode-editor-background, #1f1f1f) !important;
+			box-shadow: none !important;
 		}
 		.cursor-halo, .blob {
 			display: none !important;
@@ -852,10 +853,15 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	  padding: 7px 11px;
 	  font-size: 0.78rem;
 	  line-height: 1;
-	  background: var(--button-secondary-bg);
+	  background: linear-gradient(
+	    180deg,
+	    color-mix(in srgb, var(--button-secondary-bg) 100%, rgba(255,255,255,0.06)) 0%,
+	    var(--button-secondary-bg) 100%
+	  );
 	  color: var(--button-secondary-fg);
 	  border: 1px solid transparent;
-	  box-shadow: none;
+	  border-radius: var(--radius-interactive);
+	  box-shadow: var(--btn-highlight), var(--shadow-elev-1);
 	}
 	.drawer-close:hover { color: var(--button-secondary-fg); background: var(--button-secondary-hover); transform: none; box-shadow: none; }
 	.drawer-body {
@@ -1014,7 +1020,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	/* History tree */
 	.history-entry--child {
 		border-left: 2px solid var(--glass-border);
-		border-radius: 0 12px 12px 0;
+		border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 	}
 	.history-entry--orphan {
 		border-style: dashed;
