@@ -48,5 +48,4 @@ export const GEMINI_DEFAULT_MODELS = [
 	'gemini-2.5-flash-lite'
 ] as const;
 
-export const WORKFLOW_TREE_VIEW_ID = 'aiContextOrchestrator.workflowState';
 export const WORKFLOW_CONTROL_VIEW_ID = 'aiContextOrchestrator.workflowControl';

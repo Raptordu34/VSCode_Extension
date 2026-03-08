@@ -2,15 +2,11 @@ import * as vscode from 'vscode';
 import {
 	CONTEXT_FILE_NAME,
 	WORKFLOW_CONTROL_VIEW_ID,
-	WORKFLOW_SESSION_FILE,
-	WORKFLOW_TREE_VIEW_ID
+	WORKFLOW_SESSION_FILE
 } from './features/workflow/constants.js';
 import type { WorkflowDashboardState } from './features/workflow/types.js';
 import {
 	WorkflowControlViewProvider,
-	WorkflowTreeDataProvider,
-	buildWorkflowTreeMessage,
-	getWorkflowStudioHtml,
 	type WorkflowUiHelpers
 } from './features/workflow/ui.js';
 import { createNonce, escapeHtml } from "./utils/index.js";
@@ -31,7 +27,6 @@ export function activate(context: vscode.ExtensionContext) {
 	
 	Logger.initialize('AI Context Orchestrator');
 	
-	let selectedStageIndex: number | undefined;
 	const workflowUiHelpers: WorkflowUiHelpers = {
 		createNonce,
 		escapeHtml,
@@ -39,23 +34,12 @@ export function activate(context: vscode.ExtensionContext) {
 		getExtensionConfiguration,
 		findProviderAccount
 	};
-	
-	const loadDashboardState = async (): Promise<WorkflowDashboardState> => getWorkflowDashboardState(selectedStageIndex, context);
-	const workflowTreeDataProvider = new WorkflowTreeDataProvider(loadDashboardState, workflowUiHelpers);
+
+	const loadDashboardState = async (): Promise<WorkflowDashboardState> => getWorkflowDashboardState(context);
 	const workflowControlViewProvider = new WorkflowControlViewProvider(context.extensionUri, loadDashboardState, workflowUiHelpers);
-	
-	let workflowStudioPanel: vscode.WebviewPanel | undefined;
-	const workflowTreeView = vscode.window.createTreeView(WORKFLOW_TREE_VIEW_ID, {
-		treeDataProvider: workflowTreeDataProvider,
-		showCollapseAll: true
-	});
-	
+
 	const refreshDebouncer = new UiRefreshDebouncer();
-	workflowTreeView.onDidChangeSelection((event) => {
-		selectedStageIndex = event.selection[0]?.stageIndex;
-		workflowControlViewProvider.refresh();
-	});
-	
+
 	context.subscriptions.push(vscode.window.registerWebviewViewProvider(WORKFLOW_CONTROL_VIEW_ID, workflowControlViewProvider));
 
 	const initStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -71,42 +55,11 @@ export function activate(context: vscode.ExtensionContext) {
 	continueStatusBarItem.hide();
 
 	const refreshWorkflowUi = async (): Promise<void> => {
-		const dashboardState = await loadDashboardState();
 		await updateContinueWorkflowButtonVisibility(continueStatusBarItem, context);
-		workflowTreeView.badge = dashboardState.session
-			? { value: dashboardState.session.stages.length, tooltip: `${dashboardState.session.stages.length} workflow stage(s)` }
-			: undefined;
-		workflowTreeView.message = buildWorkflowTreeMessage(dashboardState, workflowUiHelpers);
-		workflowTreeDataProvider.refresh();
 		workflowControlViewProvider.refresh();
-		if (workflowStudioPanel) {
-			workflowStudioPanel.webview.html = getWorkflowStudioHtml(workflowStudioPanel.webview, dashboardState, createNonce(), workflowUiHelpers);
-		}
 	};
 
-	const openWorkflowStudio = async () => {
-		const state = await loadDashboardState();
-		if (!workflowStudioPanel) {
-			workflowStudioPanel = vscode.window.createWebviewPanel(
-				'aiContextOrchestrator.workflowStudio',
-				'AI Workflow Studio',
-				vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One,
-				{
-					enableScripts: true,
-					retainContextWhenHidden: true,
-					localResourceRoots: [context.extensionUri]
-				}
-			);
-			workflowStudioPanel.onDidDispose(() => {
-				workflowStudioPanel = undefined;
-			});
-		} else {
-			workflowStudioPanel.reveal(vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One, false);
-		}
-		workflowStudioPanel.webview.html = getWorkflowStudioHtml(workflowStudioPanel.webview, state, createNonce(), workflowUiHelpers);
-	};
-
-	registerAllCommands(context, loadDashboardState, workflowUiHelpers, openWorkflowStudio);
+	registerAllCommands(context, loadDashboardState, workflowUiHelpers);
 
 	const sessionWatcher = vscode.workspace.createFileSystemWatcher(`**/${WORKFLOW_SESSION_FILE}`);
 	sessionWatcher.onDidCreate(() => refreshDebouncer.enqueue('session-create', refreshWorkflowUi));
@@ -145,7 +98,6 @@ export function activate(context: vscode.ExtensionContext) {
 		sessionWatcher,
 		workflowRelayWatcher,
 		contextFileWatcher,
-		workflowTreeView,
 		Logger.getChannel()
 	);
 }

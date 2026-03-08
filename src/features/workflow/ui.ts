@@ -12,7 +12,7 @@ import type {
 	ProviderTarget,
 	WorkflowDashboardState,
 	WorkflowStageStatus,
-	WorkflowTreeNode, WorkflowRole } from './types.js';
+	WorkflowRole } from './types.js';
 import { capitalize } from "../../utils/index.js";
 
 export interface WorkflowUiHelpers {
@@ -25,45 +25,6 @@ export interface WorkflowUiHelpers {
 		provider: ProviderTarget,
 		accountId: string | undefined
 	): ProviderAccountConfiguration | undefined;
-}
-
-export class WorkflowTreeDataProvider implements vscode.TreeDataProvider<WorkflowTreeNode> {
-	private readonly emitter = new vscode.EventEmitter<WorkflowTreeNode | undefined>();
-	readonly onDidChangeTreeData = this.emitter.event;
-
-	constructor(
-		private readonly loadState: () => Promise<WorkflowDashboardState>,
-		private readonly helpers: WorkflowUiHelpers
-	) {}
-
-	refresh(): void {
-		this.emitter.fire(undefined);
-	}
-
-	getTreeItem(element: WorkflowTreeNode): vscode.TreeItem {
-		const item = new vscode.TreeItem(element.label, element.collapsibleState ?? vscode.TreeItemCollapsibleState.None);
-		item.id = element.id;
-		item.description = element.description;
-		item.tooltip = element.tooltip;
-		item.iconPath = element.icon;
-		item.contextValue = element.contextValue;
-		item.command = element.command
-			? {
-				...element.command,
-				arguments: element.command.arguments ?? [element]
-			}
-			: undefined;
-		return item;
-	}
-
-	async getChildren(element?: WorkflowTreeNode): Promise<WorkflowTreeNode[]> {
-		if (element?.children) {
-			return element.children;
-		}
-
-		const state = await this.loadState();
-		return buildWorkflowTreeNodes(state, this.helpers);
-	}
 }
 
 export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
@@ -90,10 +51,13 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 			localResourceRoots: [this.extensionUri]
 		};
 
-		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget }) => {
+		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; stageIndex?: number }) => {
 			switch (message.command) {
 				case 'init':
 					await vscode.commands.executeCommand('ai-context-orchestrator.initAI');
+					return;
+				case 'smartInit':
+					await vscode.commands.executeCommand('ai-context-orchestrator.smartInitAI', message.preset);
 					return;
 				case 'continue':
 					await vscode.commands.executeCommand('ai-context-orchestrator.continueWorkflow');
@@ -147,13 +111,13 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 					await vscode.commands.executeCommand('ai-context-orchestrator.copyWorkflowPrompt');
 					return;
 				case 'markPrepared':
-					await vscode.commands.executeCommand('ai-context-orchestrator.setSelectedStagePrepared');
+					await vscode.commands.executeCommand('ai-context-orchestrator.setSelectedStagePrepared', message.stageIndex !== undefined ? { stageIndex: message.stageIndex } : undefined);
 					return;
 				case 'markInProgress':
-					await vscode.commands.executeCommand('ai-context-orchestrator.setSelectedStageInProgress');
+					await vscode.commands.executeCommand('ai-context-orchestrator.setSelectedStageInProgress', message.stageIndex !== undefined ? { stageIndex: message.stageIndex } : undefined);
 					return;
 				case 'markCompleted':
-					await vscode.commands.executeCommand('ai-context-orchestrator.setSelectedStageCompleted');
+					await vscode.commands.executeCommand('ai-context-orchestrator.setSelectedStageCompleted', message.stageIndex !== undefined ? { stageIndex: message.stageIndex } : undefined);
 					return;
 			}
 		});
@@ -245,546 +209,170 @@ export function getWorkflowStageStatusLabel(status: WorkflowStageStatus): string
 	}
 }
 
-export function buildWorkflowTreeMessage(state: WorkflowDashboardState, helpers: WorkflowUiHelpers): string | undefined {
-	if (state.workspaceSelectionRequired) {
-		return 'Choose a workspace folder by opening a file in that folder or by starting a workflow command.';
-	}
-
-	if (!state.workspaceFolder) {
-		return 'Open a workspace to inspect the orchestrator workflow.';
-	}
-
-	if (!state.session) {
-		return state.contextFileExists
-			? 'Context file ready. Start Init Workflow to create the first stage.'
-			: 'No active workflow. Use Init Workflow to prepare the first stage.';
-	}
-
-	return `${WORKFLOW_PRESETS[state.session.currentPreset].label} with ${helpers.getProviderLabel(state.session.currentProvider)} · ${state.session.stages.length} stage(s)`;
-}
-
-export function buildWorkflowTreeNodes(state: WorkflowDashboardState, helpers: WorkflowUiHelpers): WorkflowTreeNode[] {
-	if (state.workspaceSelectionRequired) {
-		return [{
-			id: 'workflow.select-workspace',
-			label: 'Choose a workspace folder',
-			description: 'Open a file from the target folder or run Init Workflow to select one explicitly.',
-			icon: new vscode.ThemeIcon('folder-library'),
-			contextValue: 'workflow-empty'
-		}];
-	}
-
-	if (!state.workspaceFolder) {
-		return [{
-			id: 'workflow.no-workspace',
-			label: 'Open a workspace',
-			description: 'Workflow data appears here once a folder is open.',
-			icon: new vscode.ThemeIcon('folder-opened'),
-			contextValue: 'workflow-empty'
-		}];
-	}
-
-	const overviewChildren: WorkflowTreeNode[] = [{
-		id: 'workflow.context-file',
-		label: 'Context File',
-		description: state.contextFileExists ? 'Ready' : 'Missing',
-		tooltip: state.contextFileExists ? 'Open the generated context pack.' : 'Generate a context pack to create .ai-context.md.',
-		icon: new vscode.ThemeIcon(state.contextFileExists ? 'file-code' : 'circle-slash'),
-		contextValue: state.contextFileExists ? 'workflow-file' : 'workflow-missing',
-		relativePath: state.contextFileExists ? CONTEXT_FILE_NAME : undefined,
-		command: state.contextFileExists
-			? {
-				title: 'Open Context File',
-				command: 'ai-context-orchestrator.openWorkflowTreeNode'
-			}
-			: undefined
-	}];
-
-	if (state.brief) {
-		overviewChildren.push({
-			id: 'workflow.brief-file',
-			label: 'Workflow Brief',
-			description: state.brief.taskType,
-			tooltip: state.brief.goal,
-			icon: new vscode.ThemeIcon('note'),
-			contextValue: 'workflow-file',
-			relativePath: WORKFLOW_BRIEF_FILE,
-			command: {
-				title: 'Open Workflow Brief',
-				command: 'ai-context-orchestrator.openWorkflowTreeNode'
-			}
-		});
-	}
-
-	if (state.session) {
-		overviewChildren.push({
-			id: 'workflow.session-file',
-			label: 'Workflow Session',
-			description: `Stage ${state.session.currentStageIndex}`,
-			tooltip: `Updated ${new Date(state.session.updatedAt).toLocaleString()}`,
-			icon: new vscode.ThemeIcon('json'),
-			contextValue: 'workflow-file',
-			relativePath: WORKFLOW_SESSION_FILE,
-			command: {
-				title: 'Open Workflow Session',
-				command: 'ai-context-orchestrator.openWorkflowTreeNode'
-			}
-		});
-	}
-
-	const nodes: WorkflowTreeNode[] = [{
-		id: 'workflow.overview',
-		label: 'Overview',
-		description: state.workspaceFolder.name,
-		icon: new vscode.ThemeIcon('dashboard'),
-		contextValue: 'workflow-overview',
-		collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
-		children: overviewChildren
-	}];
-
-	if (!state.session) {
-		nodes.push({
-			id: 'workflow.get-started',
-			label: 'Get Started',
-			description: state.contextFileExists ? 'Create the first workflow stage.' : 'Generate context and start a workflow.',
-			tooltip: 'Run Init Workflow to choose a preset, provider, refresh mode, and artifact strategy.',
-			icon: new vscode.ThemeIcon('play-circle'),
-			contextValue: 'workflow-empty',
-			command: {
-				title: 'Init Workflow',
-				command: 'ai-context-orchestrator.initAI'
-			}
-		});
-		return nodes;
-	}
-
-	nodes.push({
-		id: 'workflow.session',
-		label: `${WORKFLOW_PRESETS[state.session.currentPreset].label} in progress`,
-		description: `${helpers.getProviderLabel(state.session.currentProvider)} · Stage ${state.session.currentStageIndex}`,
-		tooltip: `Last updated ${new Date(state.session.updatedAt).toLocaleString()}`,
-		icon: new vscode.ThemeIcon('run-all'),
-		contextValue: 'workflow-session',
-		collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
-		children: state.session.stages.map((stage) => {
-			const stageId = `workflow.stage.${stage.index}`;
-			const isCurrentStage = stage.index === state.session?.currentStageIndex;
-			const stageChildren: WorkflowTreeNode[] = [
-				buildFileTreeNode(`${stageId}.handoff`, 'Stage Handoff', stage.stageFile, 'output', `${getWorkflowStageStatusLabel(stage.status)} · ${helpers.getProviderLabel(stage.provider)}`, stage.briefSummary),
-				buildFileTreeNode(`${stageId}.context`, 'Context Snapshot', stage.contextFile, 'file-code', CONTEXT_FILE_NAME)
-			];
-
-			for (const artifactPath of stage.artifactFiles) {
-				stageChildren.push(buildFileTreeNode(`${stageId}.artifact.${artifactPath}`, artifactPath.split('/').at(-1) ?? artifactPath, artifactPath, 'tools', 'Native artifact'));
-			}
-
-			return {
-				id: stageId,
-				label: `Stage ${String(stage.index).padStart(2, '0')} ${WORKFLOW_PRESETS[stage.preset].label}`,
-				description: `${helpers.getProviderLabel(stage.provider)} · ${getWorkflowStageStatusLabel(stage.status)}`,
-				tooltip: stage.briefSummary,
-				icon: getWorkflowStageStatusIcon(stage.status, isCurrentStage),
-				contextValue: isCurrentStage ? 'workflow-stage-current' : 'workflow-stage',
-				relativePath: stage.stageFile,
-				stageIndex: stage.index,
-				collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
-				command: {
-					title: 'Open Workflow Handoff',
-					command: 'ai-context-orchestrator.openWorkflowTreeNode'
-				},
-				children: stageChildren
-			};
-		})
-	});
-
-	if (state.latestStage) {
-		nodes.push({
-			id: 'workflow.latest-stage',
-			label: 'Latest Handoff',
-			description: state.latestStage.stageFile,
-			tooltip: state.latestStage.briefSummary,
-			icon: new vscode.ThemeIcon('output'),
-			contextValue: 'workflow-file',
-			relativePath: state.latestStage.stageFile,
-			command: {
-				title: 'Open Latest Workflow Handoff',
-				command: 'ai-context-orchestrator.openWorkflowTreeNode'
-			}
-		});
-	}
-
-	if (state.nextSuggestedPresets.length > 0) {
-		nodes.push({
-			id: 'workflow.next-steps',
-			label: 'Suggested Next Steps',
-			description: 'Recommended transition order',
-			icon: new vscode.ThemeIcon('sparkle'),
-			collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
-			children: state.nextSuggestedPresets.slice(0, 3).map((preset) => ({
-				id: `workflow.next.${preset}`,
-				label: WORKFLOW_PRESETS[preset].label,
-				description: WORKFLOW_PRESETS[preset].description,
-				tooltip: WORKFLOW_PRESETS[preset].detail,
-				icon: new vscode.ThemeIcon('arrow-right'),
-				contextValue: 'workflow-next-step',
-				command: {
-					title: 'Continue Workflow',
-					command: 'ai-context-orchestrator.continueWorkflow'
-				}
-			}))
-		});
-	}
-
-	return nodes;
-}
-
 export function getWorkflowControlHtml(
 	webview: vscode.Webview,
 	state: WorkflowDashboardState,
 	nonce: string,
 	helpers: WorkflowUiHelpers
 ): string {
+	const configuration = state.configuration ?? helpers.getExtensionConfiguration();
+	const defaultPreset = configuration.defaultPreset;
+	const defaultProvider = configuration.defaultProvider;
+	const defaultModel = defaultProvider === 'claude'
+		? configuration.defaultClaudeModel
+		: defaultProvider === 'gemini' ? configuration.defaultGeminiModel : 'Copilot';
 	const recommendedPreset = state.nextSuggestedPresets[0];
-	const selectedStage = state.selectedStage;
-	const currentStageLabel = state.session
-		? `${WORKFLOW_PRESETS[state.session.currentPreset].label} with ${helpers.getProviderLabel(state.session.currentProvider)}`
-		: 'No active workflow';
-	const briefGoal = state.brief?.goal ?? 'No brief captured yet.';
-	const latestHandoff = state.latestStage?.stageFile ?? 'No handoff generated yet.';
-	const updatedAt = state.session ? new Date(state.session.updatedAt).toLocaleString() : 'Not started';
-	const stageCount = state.session?.stages.length ?? 0;
-	const artifactCount = state.artifactCount;
-	const suggestions = state.nextSuggestedPresets.length > 0
-		? state.nextSuggestedPresets.slice(0, 3).map((preset) => WORKFLOW_PRESETS[preset].label).join(' · ')
-		: 'Plan · Build · Review';
-	const workspaceName = state.workspaceFolder?.name ?? 'No workspace';
-	const primaryActionTitle = state.session
-		? `Continue toward ${recommendedPreset ? WORKFLOW_PRESETS[recommendedPreset].label : 'the next stage'}`
-		: 'Start the first workflow';
-	const providerStatusTimestamp = state.providerStatusUpdatedAt ? new Date(state.providerStatusUpdatedAt).toLocaleString() : 'Not refreshed yet';
-	const providerCards = state.providerStatuses.map((providerStatus) => {
-		const accountRows = providerStatus.accounts?.map((account) => `
-			<div class="account-card">
-				<div class="account-header">
-					<strong>${helpers.escapeHtml(account.label)}${account.isActive ? ' · active' : ''}</strong>
-					<span>${helpers.escapeHtml(account.summary)}</span>
-				</div>
-				<span>${helpers.escapeHtml(account.detail)}</span>
-				${account.lastCheckedAt ? `<span class="small">Last refresh: ${helpers.escapeHtml(new Date(account.lastCheckedAt).toLocaleString())}</span>` : ''}
-				<div class="grid account-metrics">
-					${account.metrics.map((metric) => `
-						<div class="stat">
-							<strong>${helpers.escapeHtml(metric.value)}</strong>
-							<span>${helpers.escapeHtml(metric.label)}</span>
-						</div>`).join('')}
-				</div>
-			</div>`).join('') ?? '';
-		return `
-			<section class="card">
-				<h2>${helpers.escapeHtml(helpers.getProviderLabel(providerStatus.provider))}</h2>
-				<p class="lead">${helpers.escapeHtml(providerStatus.summary)}</p>
-				<p class="small">${helpers.escapeHtml(providerStatus.detail)}</p>
-				<div class="actions" style="margin-top: 12px;">
-					<button type="button" class="secondary" data-command="connectProviderAccount" data-provider="${providerStatus.provider}">Connect Account</button>
-					<button type="button" class="secondary" data-command="switchProviderAccount" data-provider="${providerStatus.provider}">Switch Active</button>
-					<button type="button" class="secondary" data-command="configureProviderCredential" data-provider="${providerStatus.provider}">Stored Credential</button>
-					<button type="button" class="secondary" data-command="runProviderAuthAssist" data-provider="${providerStatus.provider}">Auth Assist</button>
-					<button type="button" class="secondary" data-command="openProviderPortal" data-provider="${providerStatus.provider}">Open Portal</button>
-				</div>
-				<div class="grid" style="margin-top: 12px;">
-					${providerStatus.metrics.map((metric) => `
-						<div class="stat">
-							<strong>${helpers.escapeHtml(metric.value)}</strong>
-							<span>${helpers.escapeHtml(metric.label)}</span>
-						</div>`).join('')}
-				</div>
-				${accountRows ? `<div class="grid" style="margin-top: 12px;">${accountRows}</div>` : ''}
-			</section>`;
-	}).join('');
-	const completionRatio = state.session && stageCount > 0
-		? `${state.session.stages.filter((stage) => stage.status === 'completed').length}/${stageCount}`
-		: '0/0';
-	const stageTimeline = state.session
-		? state.session.stages.slice(-4).reverse().map((stage) => `
-			<li class="timeline-item">
-				<div class="timeline-marker ${stage.index === state.session?.currentStageIndex ? 'current' : ''} ${stage.status === 'completed' ? 'completed' : ''}"></div>
-				<div>
-					<strong>${helpers.escapeHtml(`Stage ${String(stage.index).padStart(2, '0')} ${WORKFLOW_PRESETS[stage.preset].label}`)}</strong>
-					<span>${helpers.escapeHtml(`${helpers.getProviderLabel(stage.provider)} · ${getWorkflowStageStatusLabel(stage.status)}`)}</span>
-				</div>
-			</li>`).join('')
-		: '<li class="timeline-item empty"><div><strong>No stages yet</strong><span>Run Init Workflow to create the first handoff.</span></div></li>';
+	const latestHandoff = state.latestStage?.stageFile ?? '';
+
+	// Hero — no session
+	const heroHtml = state.session
+		? buildActiveHero(state, helpers, recommendedPreset)
+		: buildInitHero(helpers, defaultPreset, defaultProvider, defaultModel);
+
+	// Étapes section
+	const stagesHtml = state.session ? `
+<details class="mc-section" open>
+<summary class="mc-section-header">
+	<span class="mc-section-title">Étapes</span>
+	<span class="mc-section-badge">${state.session.stages.filter((s) => s.status === 'completed').length}/${state.session.stages.length}</span>
+</summary>
+<div class="mc-section-body">
+	<div class="stage-pills">
+		${state.session.stages.map((stage) => `
+		<div class="stage-pill ${stage.status}">
+			<span class="pill-label">${String(stage.index).padStart(2, '0')} ${helpers.escapeHtml(WORKFLOW_PRESETS[stage.preset].label)}</span>
+			<span class="pill-status">${getWorkflowStageStatusLabel(stage.status)}</span>
+			<div class="pill-actions">
+				<button type="button" class="secondary small-btn" data-command="openLatestHandoff">Ouvrir</button>
+				<button type="button" class="secondary small-btn" data-command="markCompleted" data-stage-index="${stage.index}">✓ Fait</button>
+			</div>
+		</div>`).join('')}
+	</div>
+</div>
+</details>` : '';
+
+	// Providers section
+	const providerSummary = state.providerStatuses.map((p) => `${helpers.escapeHtml(helpers.getProviderLabel(p.provider))} · ${helpers.escapeHtml(p.summary)}`).join('  ');
+	const providerBody = state.providerStatuses.map((providerStatus) => `
+	<div class="provider-row">
+		<strong>${helpers.escapeHtml(helpers.getProviderLabel(providerStatus.provider))}</strong>
+		<span class="small">${helpers.escapeHtml(providerStatus.detail)}</span>
+		<div class="actions" style="margin-top:8px;">
+			<button type="button" class="secondary" data-command="switchProviderAccount" data-provider="${providerStatus.provider}">Switch Active</button>
+			<button type="button" class="secondary" data-command="connectProviderAccount" data-provider="${providerStatus.provider}">Connect</button>
+		</div>
+	</div>`).join('');
+
+	const providersHtml = `
+<details class="mc-section">
+<summary class="mc-section-header">
+	<span class="mc-section-title">Providers</span>
+	<span class="mc-section-badge small">${helpers.escapeHtml(providerSummary)}</span>
+</summary>
+<div class="mc-section-body">
+	${providerBody}
+	<div class="actions" style="margin-top:8px;">
+		<button type="button" class="secondary" data-command="refreshProviders">Actualiser les statuts</button>
+	</div>
+</div>
+</details>`;
+
+	// Fichiers section
+	const filesHtml = `
+<details class="mc-section">
+<summary class="mc-section-header">
+	<span class="mc-section-title">Fichiers rapides</span>
+</summary>
+<div class="mc-section-body">
+	<div class="shortcuts">
+		<button type="button" class="linkButton" data-command="openContext" ${state.contextFileExists ? '' : 'disabled'}>Context Pack<span>${helpers.escapeHtml(CONTEXT_FILE_NAME)}</span></button>
+		<button type="button" class="linkButton" data-command="openBrief" ${state.brief ? '' : 'disabled'}>Brief<span>${helpers.escapeHtml(state.brief ? state.brief.taskType : 'Aucun brief')}</span></button>
+		<button type="button" class="linkButton" data-command="openLatestHandoff" ${state.latestStage ? '' : 'disabled'}>Handoff<span>${helpers.escapeHtml(latestHandoff || 'Aucun')}</span></button>
+		<button type="button" class="linkButton" data-command="openSession" ${state.session ? '' : 'disabled'}>Session<span>${helpers.escapeHtml(WORKFLOW_SESSION_FILE)}</span></button>
+		<button type="button" class="linkButton" data-command="previewPrompt" ${state.session ? '' : 'disabled'}>Prompt<span>Aperçu du prompt</span></button>
+		<button type="button" class="linkButton" data-command="copyPrompt" ${state.session ? '' : 'disabled'}>Copier<span>Copier le prompt</span></button>
+	</div>
+</div>
+</details>`;
 
 	const contentHtml = `
-	<div class="tab-panel active" data-tab-panel="ctrl-overview">
-		<section class="card hero">
-			<div class="kicker">${helpers.escapeHtml(state.session ? 'Active workflow' : 'Guided setup')}</div>
-			<h2>${helpers.escapeHtml(workspaceName)}</h2>
-			<p class="lead">${helpers.escapeHtml(primaryActionTitle)}. This view keeps the current state, the likely next move, and the key files one click away.</p>
-			<div class="actions" style="margin-top: 12px;">
-				<button type="button" data-command="${state.session ? 'continue' : 'init'}">${helpers.escapeHtml(primaryActionTitle)}</button>
-				<button type="button" class="secondary" data-command="openStudio">Open Workflow Studio</button>
-			</div>
-		</section>
-		<section class="card">
-			<h2>Current State</h2>
-			<div class="grid">
-				<div class="stat">
-					<strong>${helpers.escapeHtml(currentStageLabel)}</strong>
-					<span>${state.session ? `${stageCount} stage(s) recorded` : 'Start with Init Workflow'}</span>
-				</div>
-				<div class="stat">
-					<strong>${helpers.escapeHtml(state.contextFileExists ? 'Context ready' : 'Context missing')}</strong>
-					<span>${helpers.escapeHtml(latestHandoff)}</span>
-				</div>
-				<div class="stat">
-					<strong>${helpers.escapeHtml(updatedAt)}</strong>
-					<span>Last session update</span>
-				</div>
-				<div class="stat">
-					<strong>${artifactCount}</strong>
-					<span>native artifact file(s) across all stages</span>
-				</div>
-				<div class="stat">
-					<strong>${helpers.escapeHtml(completionRatio)}</strong>
-					<span>completed stage(s)</span>
-				</div>
-			</div>
-		</section>
-		<section class="card">
-			<h2>Next Move</h2>
-			<p class="lead">${helpers.escapeHtml(recommendedPreset ? `${WORKFLOW_PRESETS[recommendedPreset].label}: ${WORKFLOW_PRESETS[recommendedPreset].description}` : 'Use Continue Workflow to choose the next stage.')}</p>
-			<p class="small">Suggested flow: ${helpers.escapeHtml(suggestions)}</p>
-		</section>
-	</div>
-	<div class="tab-panel" data-tab-panel="ctrl-providers">
-		<section class="card">
-			<h2>Providers</h2>
-			<p class="lead">Connect provider accounts directly from the extension, store optional credentials in SecretStorage, and run auth assists without leaving the workflow panel.</p>
-			<p class="small">Last provider refresh: ${helpers.escapeHtml(providerStatusTimestamp)}</p>
-			<div class="actions" style="margin-top: 12px;">
-				<button type="button" class="secondary" data-command="refreshProviders">Refresh Provider Status</button>
-				<button type="button" class="secondary" data-command="connectProviderAccount" data-provider="claude">Connect Claude</button>
-				<button type="button" class="secondary" data-command="connectProviderAccount" data-provider="gemini">Connect Gemini</button>
-			</div>
-		</section>
-		${providerCards}
-	</div>
-	<div class="tab-panel" data-tab-panel="ctrl-stage">
-		<section class="card">
-			<h2>Selected Stage</h2>
-			<p class="lead">${helpers.escapeHtml(selectedStage ? `${WORKFLOW_PRESETS[selectedStage.preset].label} with ${helpers.getProviderLabel(selectedStage.provider)}` : 'Select a stage in the tree to inspect it here.')}</p>
-			<p class="small">${helpers.escapeHtml(selectedStage ? selectedStage.briefSummary : 'The latest stage is shown by default until you select another one.')}</p>
-			<div class="grid" style="margin-top: 12px;">
-				<div class="stat">
-					<strong>${helpers.escapeHtml(selectedStage ? getWorkflowStageStatusLabel(selectedStage.status) : 'No selection')}</strong>
-					<span>Status</span>
-				</div>
-				<div class="stat">
-					<strong>${helpers.escapeHtml(selectedStage ? selectedStage.stageFile : 'No handoff')}</strong>
-					<span>Handoff file</span>
-				</div>
-				<div class="stat">
-					<strong>${selectedStage ? selectedStage.artifactFiles.length : 0}</strong>
-					<span>artifact file(s)</span>
-				</div>
-				<div class="stat">
-					<strong>${selectedStage ? selectedStage.upstreamStageFiles.length : 0}</strong>
-					<span>upstream handoff(s)</span>
-				</div>
-			</div>
-			<div class="actions" style="margin-top: 12px;">
-				<button type="button" class="secondary" data-command="markPrepared" ${selectedStage ? '' : 'disabled'}>Mark Prepared</button>
-				<button type="button" class="secondary" data-command="markInProgress" ${selectedStage ? '' : 'disabled'}>Mark In Progress</button>
-				<button type="button" class="secondary" data-command="markCompleted" ${selectedStage ? '' : 'disabled'}>Mark Completed</button>
-			</div>
-		</section>
-		<section class="card">
-			<h2>Brief</h2>
-			<p class="lead">${helpers.escapeHtml(briefGoal)}</p>
-		</section>
-		<section class="card">
-			<h2>Recent Stages</h2>
-			<ul class="timeline">${stageTimeline}</ul>
-		</section>
-	</div>
-	<div class="tab-panel" data-tab-panel="ctrl-files">
-		<section class="card">
-			<h2>Quick Access</h2>
-			<div class="shortcuts">
-				<button type="button" class="linkButton" data-command="openContext" ${state.contextFileExists ? '' : 'disabled'}>Context Pack<span>${helpers.escapeHtml(CONTEXT_FILE_NAME)}</span></button>
-				<button type="button" class="linkButton" data-command="openBrief" ${state.brief ? '' : 'disabled'}>Current Brief<span>${helpers.escapeHtml(state.brief ? state.brief.taskType : 'No brief yet')}</span></button>
-				<button type="button" class="linkButton" data-command="openLatestHandoff" ${state.latestStage ? '' : 'disabled'}>Latest Handoff<span>${helpers.escapeHtml(latestHandoff)}</span></button>
-				<button type="button" class="linkButton" data-command="openSession" ${state.session ? '' : 'disabled'}>Session State<span>${helpers.escapeHtml(WORKFLOW_SESSION_FILE)}</span></button>
-				<button type="button" class="linkButton" data-command="previewPrompt" ${state.session ? '' : 'disabled'}>Prompt Preview<span>Open the current launch instruction</span></button>
-				<button type="button" class="linkButton" data-command="copyPrompt" ${state.session ? '' : 'disabled'}>Copy Prompt<span>Copy the current launch instruction</span></button>
-			</div>
-		</section>
-	</div>
-	<div class="tab-panel" data-tab-panel="ctrl-actions">
-		<section class="card">
-			<h2>Actions</h2>
-			<div class="actions">
-				<button type="button" data-command="init">Init Workflow</button>
-				<button type="button" data-command="continue" ${state.session ? '' : 'disabled'}>Continue Workflow</button>
-				<button type="button" class="secondary" data-command="previewPrompt" ${state.session ? '' : 'disabled'}>Preview Current Prompt</button>
-				<button type="button" class="secondary" data-command="copyPrompt" ${state.session ? '' : 'disabled'}>Copy Current Prompt</button>
-				<button type="button" class="secondary" data-command="openBrief" ${state.brief ? '' : 'disabled'}>Open Brief</button>
-				<button type="button" class="secondary" data-command="openLatestHandoff" ${state.latestStage ? '' : 'disabled'}>Open Latest Handoff</button>
-				<button type="button" class="secondary" data-command="openSession" ${state.session ? '' : 'disabled'}>Open Session File</button>
-				<button type="button" class="secondary" data-command="openContext" ${state.contextFileExists ? '' : 'disabled'}>Open Context File</button>
-				<button type="button" class="secondary" data-command="refresh">Refresh View</button>
-			</div>
-		</section>
-	</div>
-	`;
+${heroHtml}
+${stagesHtml}
+${providersHtml}
+${filesHtml}
+<div style="margin-top:4px;">
+	<button type="button" data-command="init" class="secondary">+ Nouveau workflow</button>
+</div>`;
 
-	const tabBarHtml = buildWorkflowControlTabBar([
-		{ id: 'ctrl-overview', label: 'Overview' },
-		{ id: 'ctrl-providers', label: 'Providers' },
-		{ id: 'ctrl-stage', label: 'Stage' },
-		{ id: 'ctrl-files', label: 'Files' },
-		{ id: 'ctrl-actions', label: 'Actions' }
-	]);
+	const scriptBody = `
+var selectedPreset = '${defaultPreset}';
+for (var btn of document.querySelectorAll('.preset-btn')) {
+	btn.addEventListener('click', (function(b) { return function() {
+		selectedPreset = b.dataset.preset;
+		for (var x of document.querySelectorAll('.preset-btn')) { x.classList.toggle('active', x.dataset.preset === selectedPreset); }
+	}; })(btn));
+}
+var launchBtn = document.getElementById('mc-launch-btn');
+if (launchBtn) {
+	launchBtn.addEventListener('click', function() {
+		vscode.postMessage({ command: 'smartInit', preset: selectedPreset });
+	});
+}
+for (var markBtn of document.querySelectorAll('button[data-stage-index]')) {
+	markBtn.addEventListener('click', (function(b) { return function() {
+		vscode.postMessage({ command: b.dataset.command, stageIndex: Number(b.dataset.stageIndex) });
+	}; })(markBtn));
+}`;
 
 	return renderDesignShellDocument({
 		webview,
 		nonce,
-		title: workspaceName,
-		subtitle: 'Workflow Control keeps the current state, provider routing, and next actions aligned in one place.',
-		kicker: state.session ? 'Active workflow' : 'Guided setup',
-		contentHtml: tabBarHtml + contentHtml,
+		title: state.workspaceFolder?.name ?? 'AI Workflow',
+		kicker: state.session ? 'Mission Control' : 'Mission Control',
+		contentHtml,
+		scriptBody,
 		layout: 'sidebar'
 	});
 }
 
-export function getWorkflowStudioHtml(
-	webview: vscode.Webview,
-	state: WorkflowDashboardState,
-	nonce: string,
-	helpers: WorkflowUiHelpers
-): string {
-	const recommendedPreset = state.nextSuggestedPresets[0];
-	const currentStageLabel = state.session
-		? `${WORKFLOW_PRESETS[state.session.currentPreset].label} with ${helpers.getProviderLabel(state.session.currentProvider)}`
-		: 'No active workflow';
-	const updatedAt = state.session ? new Date(state.session.updatedAt).toLocaleString() : 'Not started';
-	const providerStatusTimestamp = state.providerStatusUpdatedAt ? new Date(state.providerStatusUpdatedAt).toLocaleString() : 'Not refreshed yet';
-	const selectedStage = state.selectedStage;
-	const latestStage = state.latestStage;
-	const studioSummary = state.providerStatuses.map((providerStatus) => `
-		<div class="stat">
-			<strong>${helpers.escapeHtml(providerStatus.summary)}</strong>
-			<span>${helpers.escapeHtml(`${helpers.getProviderLabel(providerStatus.provider)} · ${providerStatus.detail}`)}</span>
-		</div>`).join('');
-	const accountColumns = state.providerStatuses.map((providerStatus) => `
-		<section class="card">
-			<h3>${helpers.escapeHtml(helpers.getProviderLabel(providerStatus.provider))}</h3>
-			<p class="small">${helpers.escapeHtml(providerStatus.detail)}</p>
-			<div class="actions" style="margin-top: 12px;">
-				<button type="button" data-command="switchProviderAccount" data-provider="${providerStatus.provider}">Switch Active</button>
-				<button type="button" class="secondary" data-command="manageProviderAccounts" data-provider="${providerStatus.provider}">Manage Accounts</button>
-			</div>
-			<div class="grid" style="margin-top: 12px;">
-				${(providerStatus.accounts ?? []).map((account) => `
-					<div class="stat">
-						<strong>${helpers.escapeHtml(account.label)}${account.isActive ? ' · active' : ''}</strong>
-						<span>${helpers.escapeHtml(account.metrics.slice(0, 3).map((metric) => `${metric.label}: ${metric.value}`).join(' · ') || account.summary)}</span>
-					</div>`).join('') || '<div class="stat"><strong>No linked accounts</strong><span>Add an account to configure this provider.</span></div>'}
-			</div>
-		</section>`).join('');
-	const stageList = state.session?.stages.map((stage) => `
-		<div class="stat">
-			<strong>${helpers.escapeHtml(`Stage ${String(stage.index).padStart(2, '0')} · ${WORKFLOW_PRESETS[stage.preset].label}`)}</strong>
-			<span>${helpers.escapeHtml(`${helpers.getProviderLabel(stage.provider)} · ${getWorkflowStageStatusLabel(stage.status)} · ${stage.stageFile}`)}</span>
-		</div>`).join('') ?? '<div class="stat"><strong>No stages yet</strong><span>Run Init Workflow to create the first handoff.</span></div>';
+function buildInitHero(helpers: WorkflowUiHelpers, defaultPreset: string, defaultProvider: string, defaultModel: string): string {
+	const presets = Object.values(WORKFLOW_PRESETS);
+	const presetButtons = presets.map((p) => `<button type="button" class="preset-btn ${p.preset === defaultPreset ? 'active' : ''}" data-preset="${p.preset}">${helpers.escapeHtml(p.label)}</button>`).join('');
+	return `
+<section class="card hero">
+	<div class="kicker">Pas de workflow actif</div>
+	<div class="preset-selector">${presetButtons}</div>
+	<p class="small" style="margin-top:8px;">Avec : ${helpers.escapeHtml(defaultProvider)} · ${helpers.escapeHtml(defaultModel)}</p>
+	<div class="actions" style="margin-top:10px;">
+		<button type="button" id="mc-launch-btn">Lancer ▶</button>
+	</div>
+	<details class="advanced-details" style="margin-top:8px;">
+		<summary>▸ Configuration complète</summary>
+		<div style="margin-top:8px;">
+			<button type="button" class="secondary" data-command="init">Choisir preset, provider, modèle…</button>
+		</div>
+	</details>
+</section>`;
+}
 
-	const contentHtml = `
-	<div class="tab-panel active" data-tab-panel="studio-overview">
-		<section class="card hero">
-			<div class="kicker">Workflow Studio</div>
-			<h2>${helpers.escapeHtml(state.workspaceFolder?.name ?? 'No workspace')}</h2>
-			<p class="lead">A larger surface for the orchestrator design system: workflow state, provider routing, detailed account views, and future AI console work can live here without the width constraints of the sidebar.</p>
-			<div class="actions" style="margin-top: 12px;">
-				<button type="button" data-command="${state.session ? 'continue' : 'init'}">${helpers.escapeHtml(state.session ? 'Continue Current Workflow' : 'Start First Workflow')}</button>
-				<button type="button" class="secondary" data-command="refresh">Refresh Studio</button>
-			</div>
-		</section>
-		<section class="card">
-			<h2>Workflow Snapshot</h2>
-			<div class="grid">
-				<div class="stat"><strong>${helpers.escapeHtml(currentStageLabel)}</strong><span>Current stage</span></div>
-				<div class="stat"><strong>${helpers.escapeHtml(updatedAt)}</strong><span>Last session update</span></div>
-				<div class="stat"><strong>${state.artifactCount}</strong><span>Native artifact file(s)</span></div>
-				<div class="stat"><strong>${helpers.escapeHtml(providerStatusTimestamp)}</strong><span>Last provider refresh</span></div>
-			</div>
-			<div class="grid" style="margin-top: 12px;">${studioSummary}</div>
-		</section>
+function buildActiveHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpers, recommendedPreset: string | undefined): string {
+	const session = state.session!;
+	const presetLabel = WORKFLOW_PRESETS[session.currentPreset].label;
+	const providerLabel = helpers.getProviderLabel(session.currentProvider);
+	const stageLabel = `Étape ${session.currentStageIndex}`;
+	const nextLabel = recommendedPreset && recommendedPreset in WORKFLOW_PRESETS ? WORKFLOW_PRESETS[recommendedPreset as keyof typeof WORKFLOW_PRESETS].label : 'Prochaine étape';
+	const completedCount = session.stages.filter((s) => s.status === 'completed').length;
+	return `
+<section class="card hero">
+	<div class="kicker">Workflow actif</div>
+	<p class="lead" style="margin-top:6px;"><strong>${helpers.escapeHtml(presetLabel)}</strong> · ${helpers.escapeHtml(providerLabel)} · ${helpers.escapeHtml(stageLabel)}</p>
+	<p class="small">${completedCount}/${session.stages.length} étapes · Suivant : ${helpers.escapeHtml(nextLabel)}</p>
+	${state.brief ? `<p class="small" style="margin-top:4px;">${helpers.escapeHtml(state.brief.goal)}</p>` : ''}
+	<div class="actions" style="margin-top:10px;">
+		<button type="button" data-command="continue">Continuer ▶</button>
+		<button type="button" class="secondary" data-command="previewPrompt" ${state.session ? '' : 'disabled'}>Prompt</button>
 	</div>
-	<div class="tab-panel" data-tab-panel="studio-providers">
-		<section class="card">
-			<h2>Provider Routing</h2>
-			<p class="lead">This area is the first implementation slice of the richer design. It gives each provider more horizontal space and will become the natural home for deeper account, quota, and console experiences.</p>
-			<div class="actions" style="margin-top: 12px;">
-				<button type="button" class="secondary" data-command="refreshProviders">Refresh Provider Status</button>
-				<button type="button" class="secondary" data-command="connectProviderAccount" data-provider="claude">Connect Claude</button>
-				<button type="button" class="secondary" data-command="connectProviderAccount" data-provider="gemini">Connect Gemini</button>
-			</div>
-			<div class="grid" style="margin-top: 12px;">${accountColumns}</div>
-		</section>
-	</div>
-	<div class="tab-panel" data-tab-panel="studio-stage-detail">
-		<section class="card">
-			<h2>Selected Stage Detail</h2>
-			<div class="grid">
-				<div class="stat"><strong>${helpers.escapeHtml(selectedStage ? `${WORKFLOW_PRESETS[selectedStage.preset].label} with ${helpers.getProviderLabel(selectedStage.provider)}` : 'No selection')}</strong><span>Focus</span></div>
-				<div class="stat"><strong>${helpers.escapeHtml(selectedStage ? getWorkflowStageStatusLabel(selectedStage.status) : 'No selection')}</strong><span>Status</span></div>
-				<div class="stat"><strong>${helpers.escapeHtml(selectedStage?.stageFile ?? latestStage?.stageFile ?? 'No handoff yet')}</strong><span>Stage handoff</span></div>
-				<div class="stat"><strong>${helpers.escapeHtml(recommendedPreset ? WORKFLOW_PRESETS[recommendedPreset].label : 'No suggestion')}</strong><span>Suggested next move</span></div>
-			</div>
-			<p class="lead" style="margin-top: 12px;">${helpers.escapeHtml(selectedStage?.briefSummary ?? state.brief?.goal ?? 'No brief captured yet.')}</p>
-			<div class="actions" style="margin-top: 12px;">
-				<button type="button" class="secondary" data-command="openLatestHandoff" ${latestStage ? '' : 'disabled'}>Open Latest Handoff</button>
-				<button type="button" class="secondary" data-command="previewPrompt" ${state.session ? '' : 'disabled'}>Preview Current Prompt</button>
-				<button type="button" class="secondary" data-command="copyPrompt" ${state.session ? '' : 'disabled'}>Copy Current Prompt</button>
-			</div>
-		</section>
-	</div>
-	<div class="tab-panel" data-tab-panel="studio-stage-history">
-		<section class="card">
-			<h2>Stage History</h2>
-			<div class="grid">${stageList}</div>
-		</section>
-	</div>
-	<div class="tab-panel" data-tab-panel="studio-files">
-		<section class="card">
-			<h2>Quick Files</h2>
-			<div class="shortcuts">
-				<button type="button" class="linkButton" data-command="openContext" ${state.contextFileExists ? '' : 'disabled'}>Context Pack<span>${helpers.escapeHtml(CONTEXT_FILE_NAME)}</span></button>
-				<button type="button" class="linkButton" data-command="openBrief" ${state.brief ? '' : 'disabled'}>Current Brief<span>${helpers.escapeHtml(state.brief?.taskType ?? 'No brief yet')}</span></button>
-				<button type="button" class="linkButton" data-command="openLatestHandoff" ${latestStage ? '' : 'disabled'}>Latest Handoff<span>${helpers.escapeHtml(latestStage?.stageFile ?? 'No handoff')}</span></button>
-				<button type="button" class="linkButton" data-command="openSession" ${state.session ? '' : 'disabled'}>Session State<span>${helpers.escapeHtml(WORKFLOW_SESSION_FILE)}</span></button>
-			</div>
-		</section>
-	</div>
-	`;
-
-	return renderDesignShellDocument({
-		webview,
-		nonce,
-		title: state.workspaceFolder?.name ?? 'AI Workflow Studio',
-		subtitle: 'A wider orchestrator surface for navigation, provider management, stage review, and future console-oriented workflows.',
-		kicker: 'Design system preview',
-		navigationHtml: buildWorkflowTabNavigation([
-			{ id: 'studio-overview', label: 'Overview', detail: currentStageLabel, emphasis: true },
-			{ id: 'studio-providers', label: 'Provider Routing', detail: providerStatusTimestamp },
-			{ id: 'studio-stage-detail', label: 'Stage Detail', detail: selectedStage ? getWorkflowStageStatusLabel(selectedStage.status) : 'No selection' },
-			{ id: 'studio-stage-history', label: 'Stage History', detail: state.session ? `${state.session.stages.length} stage(s)` : 'No session' },
-			{ id: 'studio-files', label: 'Quick Files', detail: state.contextFileExists ? 'Context ready' : 'Context missing' }
-		]),
-		contentHtml,
-		layout: 'panel'
-	});
+</section>`;
 }
 
 function buildProviderLaunchFormPreview(
@@ -822,46 +410,6 @@ function buildProviderLaunchFormPreview(
 	return prompt;
 }
 
-function getWorkflowStageStatusIcon(status: WorkflowStageStatus, isCurrentStage: boolean): vscode.ThemeIcon {
-	if (status === 'completed') {
-		return new vscode.ThemeIcon('pass-filled');
-	}
-
-	if (status === 'in-progress' || isCurrentStage) {
-		return new vscode.ThemeIcon('play-circle');
-	}
-
-	return new vscode.ThemeIcon('history');
-}
-
-function buildFileTreeNode(id: string, label: string, relativePath: string, icon: string, description?: string, tooltip?: string): WorkflowTreeNode {
-	return {
-		id,
-		label,
-		description,
-		tooltip: tooltip ?? relativePath,
-		icon: new vscode.ThemeIcon(icon),
-		contextValue: 'workflow-file',
-		relativePath,
-		command: {
-			title: 'Open Workflow File',
-			command: 'ai-context-orchestrator.openWorkflowTreeNode'
-		}
-	};
-}
-
-function buildWorkflowTabNavigation(items: Array<{ id: string; label: string; detail: string; emphasis?: boolean }>): string {
-	return items.map((item, index) => `
-		<button type="button" class="nav-btn ${index === 0 ? 'active' : ''}" data-tab-target="${item.id}" ${item.emphasis ? 'data-emphasis="strong"' : ''}>
-			<strong>${item.label}</strong>
-			<span>${item.detail}</span>
-		</button>`).join('');
-}
-
-function buildWorkflowControlTabBar(items: Array<{ id: string; label: string }>): string {
-	const buttons = items.map((item, index) => `<button type="button" class="tab-bar-btn ${index === 0 ? 'active' : ''}" data-tab-target="${item.id}">${item.label}</button>`).join('');
-	return `<div class="tab-bar">${buttons}</div>`;
-}
 export function formatWorkflowRoles(roles: WorkflowRole[]): string {
 	return roles.map((role) => capitalize(role)).join(', ');
 }

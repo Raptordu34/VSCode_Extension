@@ -64,11 +64,6 @@
         "title": "AI Context Orchestrator: Copy Workflow Prompt"
       },
       {
-        "command": "ai-context-orchestrator.openWorkflowStudio",
-        "title": "AI Context Orchestrator: Open Workflow Studio",
-        "icon": "$(layout-sidebar-right)"
-      },
-      {
         "command": "ai-context-orchestrator.setSelectedStagePrepared",
         "title": "AI Context Orchestrator: Mark Selected Stage Prepared"
       },
@@ -139,14 +134,9 @@
       "aiContextOrchestrator": [
         {
           "id": "aiContextOrchestrator.workflowControl",
-          "name": "Workflow Control",
+          "name": "Mission Control",
           "type": "webview",
           "icon": "$(hubot)"
-        },
-        {
-          "id": "aiContextOrchestrator.workflowState",
-          "name": "Workflow State",
-          "icon": "$(list-tree)"
         }
       ]
     },
@@ -154,85 +144,23 @@
       "view/title": [
         {
           "command": "ai-context-orchestrator.initAI",
-          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "when": "view == aiContextOrchestrator.workflowControl",
           "group": "navigation@1"
         },
         {
           "command": "ai-context-orchestrator.continueWorkflow",
-          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "when": "view == aiContextOrchestrator.workflowControl",
           "group": "navigation@2"
         },
         {
           "command": "ai-context-orchestrator.refreshWorkflowUi",
-          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "when": "view == aiContextOrchestrator.workflowControl",
           "group": "navigation@3"
         },
         {
           "command": "ai-context-orchestrator.refreshProviderStatus",
-          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
+          "when": "view == aiContextOrchestrator.workflowControl",
           "group": "navigation@4"
-        },
-        {
-          "command": "ai-context-orchestrator.previewWorkflowPrompt",
-          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
-          "group": "navigation@5"
-        },
-        {
-          "command": "ai-context-orchestrator.openWorkflowStudio",
-          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
-          "group": "navigation@6"
-        },
-        {
-          "command": "ai-context-orchestrator.switchClaudeAccount",
-          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
-          "group": "navigation@7"
-        },
-        {
-          "command": "ai-context-orchestrator.manageProviderAccounts",
-          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
-          "group": "navigation@8"
-        },
-        {
-          "command": "ai-context-orchestrator.setSelectedStageCompleted",
-          "when": "view == aiContextOrchestrator.workflowState || view == aiContextOrchestrator.workflowControl",
-          "group": "navigation@9"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "ai-context-orchestrator.openWorkflowTreeNode",
-          "when": "view == aiContextOrchestrator.workflowState && viewItem == workflow-file",
-          "group": "inline"
-        },
-        {
-          "command": "ai-context-orchestrator.openWorkflowTreeNode",
-          "when": "view == aiContextOrchestrator.workflowState && (viewItem == workflow-stage || viewItem == workflow-stage-current)",
-          "group": "inline"
-        },
-        {
-          "command": "ai-context-orchestrator.continueWorkflow",
-          "when": "view == aiContextOrchestrator.workflowState && (viewItem == workflow-session || viewItem == workflow-stage-current)",
-          "group": "navigation"
-        },
-        {
-          "command": "ai-context-orchestrator.refreshWorkflowUi",
-          "when": "view == aiContextOrchestrator.workflowState",
-          "group": "navigation@1"
-        },
-        {
-          "command": "ai-context-orchestrator.setSelectedStageInProgress",
-          "when": "view == aiContextOrchestrator.workflowState && (viewItem == workflow-stage || viewItem == workflow-stage-current)",
-          "group": "status@1"
-        },
-        {
-          "command": "ai-context-orchestrator.setSelectedStageCompleted",
-          "when": "view == aiContextOrchestrator.workflowState && (viewItem == workflow-stage || viewItem == workflow-stage-current)",
-          "group": "status@2"
-        },
-        {
-          "command": "ai-context-orchestrator.setSelectedStagePrepared",
-          "when": "view == aiContextOrchestrator.workflowState && (viewItem == workflow-stage || viewItem == workflow-stage-current)",
-          "group": "status@3"
         }
       ]
     },

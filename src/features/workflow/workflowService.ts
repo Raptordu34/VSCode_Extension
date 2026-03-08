@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { WorkflowDashboardState, WorkflowTreeNode, WorkflowStageStatus, ExtensionConfiguration, WorkflowExecutionPlan, ProjectContext, WorkflowQuickPickItem, ClaudeEffortLevel, WorkflowPreset, WorkflowBrief, WorkflowSessionState, ProviderStatusCache, ProviderTarget, WorkflowPresetDefinition } from "./types.js";
+import type { WorkflowDashboardState, WorkflowTreeNode, WorkflowStageStatus, ExtensionConfiguration, WorkflowExecutionPlan, ProjectContext, WorkflowQuickPickItem, ClaudeEffortLevel, WorkflowPreset, WorkflowBrief, WorkflowSessionState, ProviderStatusCache, ProviderTarget } from "./types.js";
 import { PROVIDER_STATUS_CACHE_KEY, CONTEXT_FILE_NAME } from "./constants.js";
 import { getProviderAccounts, getActiveProviderAccountId, findProviderAccount, getDefaultProviderModel, getDefaultClaudeEffort, getProviderLabel, promptForProviderModel, promptForProviderAccount, buildProviderDetail, promptForProviderTarget, formatProviderModel } from "../providers/providerService.js";
 import { buildWorkspaceUri, fileExists, readUtf8 } from "../../core/workspace.js";
@@ -26,7 +26,7 @@ export async function updateContinueWorkflowButtonVisibility(statusBarItem: vsco
 
 	statusBarItem.hide();
 }
-export async function getWorkflowDashboardState(selectedStageIndex: number | undefined, context: vscode.ExtensionContext): Promise<WorkflowDashboardState> {
+export async function getWorkflowDashboardState(context: vscode.ExtensionContext): Promise<WorkflowDashboardState> {
 	const configuration = getExtensionConfiguration();
 	const providerStatusCache = context.globalState.get<ProviderStatusCache>(PROVIDER_STATUS_CACHE_KEY);
 	const providerStatuses = mergeProviderStatusCache(configuration, providerStatusCache);
@@ -49,7 +49,6 @@ export async function getWorkflowDashboardState(selectedStageIndex: number | und
 		fileExists(vscode.Uri.joinPath(workspaceFolder.uri, CONTEXT_FILE_NAME))
 	]);
 	const latestStage = session?.stages.at(-1);
-	const selectedStage = session?.stages.find((stage) => stage.index === selectedStageIndex) ?? latestStage;
 	const artifactCount = session?.stages.reduce((total, stage) => total + stage.artifactFiles.length, 0) ?? 0;
 
 	return {
@@ -57,7 +56,7 @@ export async function getWorkflowDashboardState(selectedStageIndex: number | und
 		session,
 		brief,
 		latestStage,
-		selectedStage,
+		selectedStage: latestStage,
 		contextFileExists,
 		nextSuggestedPresets: session ? buildSuggestedNextPresets(session.currentPreset) : [],
 		artifactCount,
@@ -92,7 +91,10 @@ export async function openWorkspaceRelativeFile(workspaceUri: vscode.Uri, relati
 	await vscode.window.showTextDocument(fileUri);
 }
 export function buildDefaultWorkflowPlan(configuration: ExtensionConfiguration): WorkflowExecutionPlan {
-	const presetDefinition = WORKFLOW_PRESETS[configuration.defaultPreset];
+	return buildSmartDefaultWorkflowPlan(configuration.defaultPreset, configuration);
+}
+export function buildSmartDefaultWorkflowPlan(preset: WorkflowPreset, configuration: ExtensionConfiguration): WorkflowExecutionPlan {
+	const presetDefinition = WORKFLOW_PRESETS[preset];
 	const defaultProviderAccount = findProviderAccount(
 		configuration,
 		configuration.defaultProvider,
