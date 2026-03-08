@@ -136,11 +136,11 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	}
 	.glass-panel {
 		position: relative;
-		background: var(--panel-bg);
+		background: var(--panel-glass);
 		border: 1px solid var(--glass-border);
-		border-top-color: var(--glass-border);
-		border-radius: var(--radius-lg);
-		box-shadow: 0 1px 2px rgba(0,0,0,0.16);
+		border-top-color: color-mix(in srgb, var(--glass-border) 80%, rgba(255,255,255,0.12));
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-elev-2);
 		overflow: hidden;
 		transform: translateZ(0);
 		will-change: transform;
@@ -248,10 +248,10 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	.card {
 		background: var(--panel-strong);
 		border: 1px solid var(--glass-border);
-		border-top-color: var(--glass-border);
-		border-radius: 18px;
+		border-top-color: color-mix(in srgb, var(--glass-border) 70%, rgba(255,255,255,0.10));
+		border-radius: var(--radius-md);
 		padding: 16px;
-		box-shadow: none;
+		box-shadow: var(--shadow-elev-1);
 	}
 	.hero {
 		padding: 18px;
@@ -302,9 +302,10 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	}
 	.stat {
 		padding: 12px;
-		border-radius: 14px;
+		border-radius: var(--radius-sm);
 		background: var(--panel-soft);
 		border: 1px solid var(--glass-border);
+		box-shadow: var(--shadow-elev-1);
 	}
 	.stat strong {
 		display: block;
@@ -465,8 +466,10 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		border-radius: var(--radius-md);
 		background: var(--panel-strong);
 		border: 1px solid var(--glass-border);
+		border-top-color: color-mix(in srgb, var(--glass-border) 70%, rgba(255,255,255,0.10));
 		margin-bottom: 6px;
 		overflow: hidden;
+		box-shadow: var(--shadow-elev-1);
 	}
 	.mc-section-header {
 		display: flex;
@@ -530,10 +533,11 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	}
 	.stage-pills { display: grid; gap: 8px; }
 	.stage-pill {
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		padding: 12px;
 		border: 1px solid rgba(255,255,255,0.07);
-		background: rgba(255,255,255,0.03);
+		background: rgba(255,255,255,0.04);
+		box-shadow: var(--shadow-elev-1);
 	}
 	.stage-pill.completed { border-color: color-mix(in srgb, var(--vscode-testing-iconPassed, #73c991) 40%, var(--glass-border)); background: color-mix(in srgb, var(--vscode-testing-iconPassed, #73c991) 12%, var(--panel-strong)); }
 	.stage-pill.in-progress { border-color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 42%, var(--glass-border)); background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 12%, var(--panel-strong)); }
@@ -563,10 +567,11 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		margin-top: 8px;
 	}
 	.history-entry {
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		padding: 12px;
 		border: 1px solid rgba(255,255,255,0.07);
-		background: rgba(255,255,255,0.03);
+		background: rgba(255,255,255,0.04);
+		box-shadow: var(--shadow-elev-1);
 	}
 	.history-entry--parent {
 		background: color-mix(in srgb, rgba(255,255,255,0.03) 70%, var(--panel-soft));
@@ -665,9 +670,10 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	.provider-row:last-of-type { border-bottom: none; }
 	.provider-card {
 		padding: 12px;
-		border-radius: 14px;
+		border-radius: var(--radius-md);
 		background: var(--panel-soft);
 		border: 1px solid var(--glass-border);
+		box-shadow: var(--shadow-elev-1);
 	}
 	.provider-title-row {
 		display: flex;
@@ -719,9 +725,9 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	}
 	.provider-account {
 		padding: 10px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		border: 1px solid rgba(255,255,255,0.07);
-		background: rgba(255,255,255,0.03);
+		background: rgba(255,255,255,0.04);
 	}
 	.provider-account.active {
 		border-color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 42%, var(--glass-border));
