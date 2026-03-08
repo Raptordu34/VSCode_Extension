@@ -257,3 +257,11 @@ export interface WorkflowTreeNode {
 	command?: vscode.Command;
 	children?: WorkflowTreeNode[];
 }
+
+export interface LastWorkflowConfig {
+  preset: WorkflowPreset;
+  provider: ProviderTarget;
+  providerModel?: string;
+  claudeEffort?: ClaudeEffortLevel;
+  brief?: string;
+}

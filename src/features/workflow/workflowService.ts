@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import type { WorkflowDashboardState, WorkflowTreeNode, WorkflowStageStatus, ExtensionConfiguration, WorkflowExecutionPlan, ProjectContext, WorkflowQuickPickItem, ClaudeEffortLevel, WorkflowPreset, WorkflowBrief, WorkflowSessionState, ProviderStatusCache, ProviderTarget } from "./types.js";
-import { PROVIDER_STATUS_CACHE_KEY, CONTEXT_FILE_NAME } from "./constants.js";
+import type { WorkflowDashboardState, WorkflowTreeNode, WorkflowStageStatus, ExtensionConfiguration, WorkflowExecutionPlan, ProjectContext, WorkflowQuickPickItem, ClaudeEffortLevel, WorkflowPreset, WorkflowBrief, WorkflowSessionState, ProviderStatusCache, ProviderTarget, LastWorkflowConfig } from "./types.js";
+import { PROVIDER_STATUS_CACHE_KEY, CONTEXT_FILE_NAME, LAST_WORKFLOW_CONFIG_KEY } from "./constants.js";
 import { getProviderAccounts, getActiveProviderAccountId, findProviderAccount, getDefaultProviderModel, getDefaultClaudeEffort, getProviderLabel, promptForProviderModel, promptForProviderAccount, buildProviderDetail, promptForProviderTarget, formatProviderModel } from "../providers/providerService.js";
 import { buildWorkspaceUri, fileExists, readUtf8 } from "../../core/workspace.js";
 import { getImplicitWorkspaceFolder } from '../../core/workspaceContext.js';
@@ -588,4 +588,12 @@ export async function updateWorkflowStageStatus(
 	} catch {
 		return;
 	}
+}
+
+export function readLastWorkflowConfig(context: vscode.ExtensionContext): LastWorkflowConfig | undefined {
+  return context.globalState.get<LastWorkflowConfig>(LAST_WORKFLOW_CONFIG_KEY);
+}
+
+export async function saveLastWorkflowConfig(context: vscode.ExtensionContext, config: LastWorkflowConfig): Promise<void> {
+  await context.globalState.update(LAST_WORKFLOW_CONFIG_KEY, config);
 }

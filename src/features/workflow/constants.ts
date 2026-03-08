@@ -49,3 +49,5 @@ export const GEMINI_DEFAULT_MODELS = [
 ] as const;
 
 export const WORKFLOW_CONTROL_VIEW_ID = 'aiContextOrchestrator.workflowControl';
+
+export const LAST_WORKFLOW_CONFIG_KEY = 'aiContextOrchestrator.lastWorkflowConfig';
