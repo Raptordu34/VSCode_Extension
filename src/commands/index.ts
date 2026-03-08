@@ -3,14 +3,15 @@ import { EventBus } from '../core/eventBus.js';
 import { Logger } from '../core/logger.js';
 import { resolveWorkspaceFolder } from '../core/workspaceContext.js';
 import { getExtensionConfiguration } from '../core/configuration.js';
-import { buildDefaultWorkflowPlan, buildSmartDefaultWorkflowPlan, openWorkspaceRelativeFile, promptForWorkflowPlan, promptForWorkflowContinuation, updateSelectedWorkflowStageStatus, buildWorkflowSummaryDocument } from '../features/workflow/workflowService.js';
+import { buildDefaultWorkflowPlan, buildSmartDefaultWorkflowPlan, openWorkspaceRelativeFile, promptForWorkflowPlan, promptForWorkflowContinuation, updateSelectedWorkflowStageStatus, buildWorkflowSummaryDocument, saveLastWorkflowConfig, inferTaskType } from '../features/workflow/workflowService.js';
+import { WORKFLOW_PRESETS } from '../features/workflow/presets.js';
 import { gatherProjectContext, readWorkflowSessionState, buildContextGenerationMessage } from '../features/context/contextBuilder.js';
 import { launchClaude, launchGemini } from '../features/aiAgents/agentLauncher.js';
 import { buildSharedWorkflowInstruction } from '../features/aiAgents/promptBuilder.js';
 import { refreshProviderStatuses, switchActiveProviderAccount, manageProviderAccounts, connectProviderAccount, configureProviderCredential, runProviderAuthAssist, openProviderAccountPortal } from '../features/providers/providerService.js';
 import { WORKFLOW_BRIEF_FILE, WORKFLOW_SESSION_FILE, CONTEXT_FILE_NAME } from '../features/workflow/constants.js';
 import { buildWorkflowPromptFromDashboardState, buildWorkflowPromptPreviewDocument, type WorkflowUiHelpers } from '../features/workflow/ui.js';
-import { WorkflowTreeNode, WorkflowDashboardState, ProjectContext, WorkflowQuickPickItem, ProviderTarget, WorkflowPreset } from '../features/workflow/types.js';
+import { WorkflowTreeNode, WorkflowDashboardState, ProjectContext, WorkflowQuickPickItem, ProviderTarget, WorkflowPreset, LastWorkflowConfig, ClaudeEffortLevel } from '../features/workflow/types.js';
 import { buildWorkspaceUri } from '../core/workspace.js';
 
 export function registerAllCommands(
@@ -112,12 +113,27 @@ export function registerAllCommands(
 			void vscode.window.showInformationMessage('The current workflow prompt has been copied to the clipboard.');
 		}),
 
-		vscode.commands.registerCommand('ai-context-orchestrator.smartInitAI', async (preset?: string) => {
+		vscode.commands.registerCommand('ai-context-orchestrator.smartInitAI', async (preset?: string, overrides?: { provider?: string; providerModel?: string; claudeEffort?: string; brief?: string }) => {
 			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder to initialize');
 			if (!workspaceFolder) {return;}
 			const configuration = getExtensionConfiguration();
 			const resolvedPreset: WorkflowPreset = (preset as WorkflowPreset | undefined) ?? configuration.defaultPreset;
-			await runSmartInitAiFlow(resolvedPreset, workspaceFolder);
+			const resolvedOverrides = overrides ? {
+				provider: overrides.provider as ProviderTarget | undefined,
+				providerModel: overrides.providerModel,
+				claudeEffort: overrides.claudeEffort as ClaudeEffortLevel | undefined,
+				brief: overrides.brief
+			} : undefined;
+			await runSmartInitAiFlow(resolvedPreset, workspaceFolder, resolvedOverrides);
+			if (resolvedOverrides) {
+				await saveLastWorkflowConfig(context, {
+					preset: resolvedPreset,
+					provider: resolvedOverrides.provider ?? configuration.defaultProvider,
+					providerModel: resolvedOverrides.providerModel,
+					claudeEffort: resolvedOverrides.claudeEffort,
+					brief: resolvedOverrides.brief
+				});
+			}
 			EventBus.fire('refresh');
 		}),
 
@@ -189,9 +205,30 @@ export function registerAllCommands(
 	);
 }
 
-async function runSmartInitAiFlow(preset: WorkflowPreset, workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
+async function runSmartInitAiFlow(
+	preset: WorkflowPreset,
+	workspaceFolder: vscode.WorkspaceFolder,
+	overrides?: {
+		provider?: ProviderTarget;
+		providerModel?: string;
+		claudeEffort?: ClaudeEffortLevel;
+		brief?: string;
+	}
+): Promise<void> {
 	const configuration = getExtensionConfiguration();
 	const workflowPlan = buildSmartDefaultWorkflowPlan(preset, configuration);
+	if (overrides?.provider) { workflowPlan.provider = overrides.provider; }
+	if (overrides?.providerModel !== undefined) { workflowPlan.providerModel = overrides.providerModel; }
+	if (overrides?.claudeEffort) { workflowPlan.claudeEffort = overrides.claudeEffort; }
+	if (overrides?.brief) {
+		workflowPlan.brief = {
+			taskType: inferTaskType(preset, overrides.brief),
+			goal: overrides.brief,
+			constraints: [],
+			rawText: overrides.brief
+		};
+	}
+	workflowPlan.presetDefinition = WORKFLOW_PRESETS[preset];
 	const projectContext = await gatherProjectContext(false, workflowPlan, workspaceFolder);
 	if (!projectContext) {return;}
 
