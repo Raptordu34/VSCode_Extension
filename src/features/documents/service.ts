@@ -9,7 +9,7 @@ import type {
 } from './types.js';
 
 const LEARNING_DOCUMENT_STORAGE_PREFIX = 'aiContextOrchestrator.learningDocuments';
-const LEARNING_DOCUMENTS_ROOT = 'learning-documents';
+export const LEARNING_DOCUMENTS_ROOT = 'learning-documents';
 const TEMPLATE_ROOT_SEGMENTS = ['learning-kit-global', 'learning-kit'];
 
 export const LEARNING_DOCUMENT_DEFINITIONS: Record<LearningDocumentType, LearningDocumentDefinition> = {
@@ -18,8 +18,68 @@ export const LEARNING_DOCUMENT_DEFINITIONS: Record<LearningDocumentType, Learnin
 		label: 'Compte rendu',
 		description: 'Document de cours structuré avec sidebar, sections détaillées et mode résumé.',
 		templateFolderName: 'compte-rendu'
+	},
+	presentation: {
+		type: 'presentation',
+		label: 'Présentation',
+		description: 'Slides pédagogiques structurées à partir des contenus sources.',
+		templateFolderName: 'presentation'
+	},
+	'fiche-revision': {
+		type: 'fiche-revision',
+		label: 'Fiche de révision',
+		description: 'Synthèse dense pour révision rapide avec hiérarchie claire.',
+		templateFolderName: 'fiche-revision'
+	},
+	'td-exercice': {
+		type: 'td-exercice',
+		label: 'TD / exercice',
+		description: 'Exercices, questions et solutions structurées.',
+		templateFolderName: 'td-exercice'
+	},
+	'synthese-article': {
+		type: 'synthese-article',
+		label: 'Synthèse d’article',
+		description: 'Résumé structuré d’un papier ou document scientifique.',
+		templateFolderName: 'synthese-article'
+	},
+	'rapport-projet': {
+		type: 'rapport-projet',
+		label: 'Rapport projet',
+		description: 'Rapport formel avec sections, callouts et résultats.',
+		templateFolderName: 'rapport-projet'
+	},
+	comparatif: {
+		type: 'comparatif',
+		label: 'Comparatif',
+		description: 'Document comparatif orienté arbitrage et décision.',
+		templateFolderName: 'comparatif'
+	},
+	'one-pager': {
+		type: 'one-pager',
+		label: 'One-pager',
+		description: 'Synthèse condensée sur une seule page.',
+		templateFolderName: 'one-pager'
+	},
+	'cheat-sheet': {
+		type: 'cheat-sheet',
+		label: 'Cheat-sheet',
+		description: 'Référence rapide et structurée.',
+		templateFolderName: 'cheat-sheet'
 	}
 };
+
+export function getLearningDocumentDefinitions(): LearningDocumentDefinition[] {
+	return Object.values(LEARNING_DOCUMENT_DEFINITIONS);
+}
+
+export function getLearningDocumentDefinition(type: LearningDocumentType): LearningDocumentDefinition {
+	return LEARNING_DOCUMENT_DEFINITIONS[type];
+}
+
+export function getLearningDocumentTypeLabel(type: LearningDocumentType): string {
+	return getLearningDocumentDefinition(type).label;
+}
 
 interface LearningDocumentManifest {
 	title: string;
@@ -68,8 +128,27 @@ function getTemplateRootUri(extensionUri: vscode.Uri): vscode.Uri {
 }
 
 function getDocumentTemplateUri(extensionUri: vscode.Uri, type: LearningDocumentType): vscode.Uri {
-	const definition = LEARNING_DOCUMENT_DEFINITIONS[type];
+	const definition = getLearningDocumentDefinition(type);
 	return vscode.Uri.joinPath(getTemplateRootUri(extensionUri), 'templates', definition.templateFolderName);
+}
+
+export async function promptForLearningDocumentType(currentType?: LearningDocumentType): Promise<LearningDocumentType | undefined> {
+	const selection = await vscode.window.showQuickPick(
+		getLearningDocumentDefinitions().map((definition) => ({
+			label: definition.label,
+			description: definition.description,
+			detail: `Template: ${definition.templateFolderName}`,
+			picked: definition.type === currentType,
+			type: definition.type
+		})),
+		{
+			title: 'Type de document',
+			placeHolder: 'Choisissez le type de document learning-kit à créer',
+			ignoreFocusOut: true
+		}
+	);
+
+	return selection?.type as LearningDocumentType | undefined;
 }
 
 async function readTextFile(fileUri: vscode.Uri): Promise<string> {
@@ -133,6 +212,13 @@ async function writeState(context: vscode.ExtensionContext, folder: vscode.Works
 	await context.workspaceState.update(getStorageKey(folder), state);
 }
 
+export async function clearLearningDocumentState(
+	context: vscode.ExtensionContext,
+	workspaceFolder: vscode.WorkspaceFolder
+): Promise<void> {
+	await context.workspaceState.update(getStorageKey(workspaceFolder), undefined);
+}
+
 async function writeDocumentManifest(workspaceFolder: vscode.WorkspaceFolder, document: LearningDocumentRecord): Promise<void> {
 	const manifestUri = vscode.Uri.joinPath(workspaceFolder.uri, document.manifestFile);
 	const manifest: LearningDocumentManifest = {
@@ -160,6 +246,19 @@ export async function getLearningDocuments(
 ): Promise<LearningDocumentRecord[]> {
 	const state = await readState(context, workspaceFolder);
 	return state.documents;
+}
+
+export async function getLearningDocumentById(
+	context: vscode.ExtensionContext,
+	workspaceFolder: vscode.WorkspaceFolder,
+	documentId: string | undefined
+): Promise<LearningDocumentRecord | undefined> {
+	if (!documentId) {
+		return undefined;
+	}
+
+	const state = await readState(context, workspaceFolder);
+	return state.documents.find((document) => document.id === documentId);
 }
 
 export async function getActiveLearningDocument(
@@ -202,7 +301,7 @@ export async function promptForLearningDocument(
 	const selection = await vscode.window.showQuickPick(
 		state.documents.map((document) => ({
 			label: document.title,
-			description: LEARNING_DOCUMENT_DEFINITIONS[document.type].label,
+			description: getLearningDocumentTypeLabel(document.type),
 			detail: document.relativeDirectory,
 			documentId: document.id,
 			picked: document.id === state.activeDocumentId
@@ -249,7 +348,8 @@ export async function createLearningDocument(
 	const promptTemplate = await readTextFile(vscode.Uri.joinPath(templateUri, 'PROMPT.md'));
 	const exampleTemplate = await readTextFile(vscode.Uri.joinPath(templateUri, 'section-EXAMPLE.html'));
 
-	const subtitle = `${LEARNING_DOCUMENT_DEFINITIONS[type].label} • ${createdAt.slice(0, 10)}`;
+	const definition = getLearningDocumentDefinition(type);
+	const subtitle = `${definition.label} • ${createdAt.slice(0, 10)}`;
 	const nextIndexContent = indexTemplate
 		.replace(/\.\.\/\.\.\/layouts\//g, './layouts/')
 		.replace(/\{\{TITRE\}\}/g, title)

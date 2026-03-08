@@ -3,6 +3,7 @@
   "name": "ai-context-orchestrator",
   "displayName": "AI Context Orchestrator",
   "description": "Generate project context and launch Claude, Gemini, or Copilot with it.",
+  "icon": "media/logo.png",
   "version": "0.0.2",
   "engines": {
     "vscode": "^1.109.0"
@@ -50,6 +51,18 @@
       {
         "command": "ai-context-orchestrator.cleanActiveWorkflowFiles",
         "title": "AI Context Orchestrator: Clean Active Workflow Files"
+      },
+      {
+        "command": "ai-context-orchestrator.resetWorkspaceExtension",
+        "title": "AI Context Orchestrator: Full Reset Workspace Extension State"
+      },
+      {
+        "command": "ai-context-orchestrator.resetWorkspaceWorkflowState",
+        "title": "AI Context Orchestrator: Reset Workflow Runtime State"
+      },
+      {
+        "command": "ai-context-orchestrator.resetWorkspaceExtensionPartial",
+        "title": "AI Context Orchestrator: Reset Workspace Orchestration"
       },
       {
         "command": "ai-context-orchestrator.generateContext",

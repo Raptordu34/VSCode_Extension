@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { ProviderTarget, ProviderAccountConfiguration, ProviderStatusSnapshot } from '../providers/types.js';
-import type { WorkspaceModeState } from '../workspace/types.js';
+import type { WorkspaceMode, WorkspaceModeState } from '../workspace/types.js';
 import type { LearningDocumentRecord } from '../documents/types.js';
 
 export type { ProviderTarget, ProviderAccountConfiguration, ProviderStatusSnapshot };
@@ -38,6 +38,8 @@ export interface WorkflowExecutionPlan {
 	provider: ProviderTarget;
 	providerModel?: string;
 	providerAccountId?: string;
+	workspaceMode?: WorkspaceMode;
+	learningDocumentId?: string;
 	workflowId?: string;
 	branchId?: string;
 	startNewWorkflow?: boolean;
@@ -58,6 +60,7 @@ export interface ContextMetadata {
 	workspaceMode?: string;
 	activeLearningDocumentTitle?: string;
 	activeLearningDocumentPath?: string;
+	activeLearningDocumentType?: string;
 	preset: WorkflowPreset;
 	provider: ProviderTarget;
 	providerModel?: string;
@@ -182,6 +185,7 @@ export interface ProjectContext {
 	optimization: OptimizationResult;
 	metadata: ContextMetadata;
 	workflowPlan: WorkflowExecutionPlan;
+	activeLearningDocument?: LearningDocumentRecord;
 	artifactPlan?: ArtifactPlan;
 	reused: boolean;
 	workflowSession?: WorkflowSessionState;
@@ -272,5 +276,6 @@ export interface LastWorkflowConfig {
   provider: ProviderTarget;
   providerModel?: string;
   claudeEffort?: ClaudeEffortLevel;
+	learningDocumentId?: string;
   brief?: string;
 }

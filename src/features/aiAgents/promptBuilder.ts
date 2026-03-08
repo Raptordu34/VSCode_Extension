@@ -6,6 +6,8 @@ import { CONTEXT_FILE_NAME, WORKFLOW_SESSION_FILE, WORKFLOW_BRIEF_FILE } from ".
 import { serializeList } from "../../utils/index.js";
 import { getProviderLabel, formatProviderModel } from "../providers/providerService.js";
 import { getProviderCapabilities } from "../providers/providerCatalog.js";
+import { getLearningDocumentTypeLabel } from "../documents/service.js";
+import { getWorkflowIntentCopy } from "../workflow/presets.js";
 import { formatWorkflowRoles } from "../workflow/ui.js";
 import { buildClaudeLaunchCommand, buildGeminiLaunchCommand } from "./agentLauncher.js";
 
@@ -176,13 +178,14 @@ function buildInstructionMetadataLines(workflowPlan: WorkflowExecutionPlan, meta
 }
 
 function buildClaudeInstructionArtifactContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata): string {
+	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
 	return [
 		'## AI Context Orchestrator',
 		'',
 		...buildInstructionMetadataLines(workflowPlan, metadata),
 		'',
 		'<workflow>',
-		workflowPlan.presetDefinition.launchInstruction,
+		intentCopy.launchInstruction,
 		...getPresetExecutionProfile(workflowPlan.preset).priorities,
 		'</workflow>',
 		'',
@@ -217,6 +220,7 @@ function buildClaudeInstructionArtifactContent(workflowPlan: WorkflowExecutionPl
 }
 
 function buildGeminiInstructionArtifactContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata): string {
+	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
 	return [
 		'## AI Context Orchestrator',
 		'',
@@ -233,7 +237,7 @@ function buildGeminiInstructionArtifactContent(workflowPlan: WorkflowExecutionPl
 		'- Prefer stable project patterns and minimal edits over flexible abstractions.',
 		'',
 		'### Task',
-		workflowPlan.presetDefinition.launchInstruction,
+		intentCopy.launchInstruction,
 		'',
 		...formatPresetProfileSections(workflowPlan.preset, {
 			priorities: '### Preset Priorities',
@@ -253,6 +257,7 @@ function buildGeminiInstructionArtifactContent(workflowPlan: WorkflowExecutionPl
 }
 
 function buildCopilotInstructionArtifactContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata): string {
+	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
 	return [
 		'## AI Context Orchestrator',
 		'',
@@ -265,7 +270,7 @@ function buildCopilotInstructionArtifactContent(workflowPlan: WorkflowExecutionP
 		'- Keep edits minimal and verification explicit.',
 		'',
 		'### Current objective',
-		workflowPlan.presetDefinition.launchInstruction,
+		intentCopy.launchInstruction,
 		'',
 		...formatPresetProfileSections(workflowPlan.preset, {
 			priorities: '### Preset priorities',
@@ -306,6 +311,7 @@ export function buildAgentArtifact(workflowPlan: WorkflowExecutionPlan, metadata
 	}
 }
 export function buildClaudeAgentContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata, role: WorkflowRole): string {
+	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
 	return [
 		'---',
 		`name: orchestrator-${role}`,
@@ -316,7 +322,7 @@ export function buildClaudeAgentContent(workflowPlan: WorkflowExecutionPlan, met
 		'',
 		`You are the ${role} role for AI Context Orchestrator.`,
 		`Current workflow preset: ${workflowPlan.preset}.`,
-		`Workflow objective: ${workflowPlan.presetDefinition.launchInstruction}`,
+		`Workflow objective: ${intentCopy.launchInstruction}`,
 		`Context file: ${CONTEXT_FILE_NAME}.`,
 		'',
 		'Primary responsibilities:',
@@ -345,6 +351,7 @@ export function buildClaudeAgentContent(workflowPlan: WorkflowExecutionPlan, met
 	].join('\n');
 }
 export function buildGeminiAgentContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata, role: WorkflowRole): string {
+	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
 	return [
 		'---',
 		`name: orchestrator-${role}`,
@@ -358,7 +365,7 @@ export function buildGeminiAgentContent(workflowPlan: WorkflowExecutionPlan, met
 		'',
 		`You are the ${role} role for AI Context Orchestrator.`,
 		`Current workflow preset: ${workflowPlan.preset}.`,
-		`Workflow objective: ${workflowPlan.presetDefinition.launchInstruction}`,
+		`Workflow objective: ${intentCopy.launchInstruction}`,
 		`Context file: ${CONTEXT_FILE_NAME}.`,
 		'',
 		'Primary responsibilities:',
@@ -387,6 +394,7 @@ export function buildGeminiAgentContent(workflowPlan: WorkflowExecutionPlan, met
 	].join('\n');
 }
 export function buildCopilotAgentContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata, role: WorkflowRole): string {
+	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
 	const handoffs = getCopilotHandoffsForRole(workflowPlan, role);
 	const handoffLines = handoffs.flatMap((handoff) => [
 		`  - label: ${handoff.label}`,
@@ -408,7 +416,7 @@ export function buildCopilotAgentContent(workflowPlan: WorkflowExecutionPlan, me
 		'',
 		`You are the ${role} role for AI Context Orchestrator.`,
 		`Current workflow preset: ${workflowPlan.preset}.`,
-		`Workflow objective: ${workflowPlan.presetDefinition.launchInstruction}`,
+		`Workflow objective: ${intentCopy.launchInstruction}`,
 		`Read ${CONTEXT_FILE_NAME} before acting.`,
 		'',
 		'Primary responsibilities:',
@@ -460,6 +468,7 @@ export function buildSkillArtifact(workflowPlan: WorkflowExecutionPlan, metadata
 	}
 }
 export function buildClaudeSkillContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata): string {
+	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
 	return [
 		'---',
 		`name: ${workflowPlan.presetDefinition.artifactSkillName}`,
@@ -469,10 +478,10 @@ export function buildClaudeSkillContent(workflowPlan: WorkflowExecutionPlan, met
 		`agent: ${getClaudeSkillAgent(workflowPlan.preset)}`,
 		'---',
 		'',
-		workflowPlan.presetDefinition.launchInstruction,
+		intentCopy.launchInstruction,
 		'',
 		'When to use this skill:',
-		`- Use it when the request matches the ${workflowPlan.presetDefinition.label.toLowerCase()} workflow.`,
+		`- Use it when the request matches the ${intentCopy.label.toLowerCase()} workflow.`,
 		'- Use the prepared roles instead of improvising a new workflow structure.',
 		'',
 		'Execution loop:',
@@ -498,6 +507,7 @@ export function buildClaudeSkillContent(workflowPlan: WorkflowExecutionPlan, met
 	].join('\n');
 }
 export function buildGeminiSkillContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata): string {
+	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
 	return [
 		'---',
 		`name: ${workflowPlan.presetDefinition.artifactSkillName}`,
@@ -506,10 +516,10 @@ export function buildGeminiSkillContent(workflowPlan: WorkflowExecutionPlan, met
 		'',
 		'# Workflow Skill',
 		'',
-		workflowPlan.presetDefinition.launchInstruction,
+		intentCopy.launchInstruction,
 		'',
 		'When to use this skill:',
-		`- Use it when the request needs the ${workflowPlan.presetDefinition.label.toLowerCase()} workflow.`,
+		`- Use it when the request needs the ${intentCopy.label.toLowerCase()} workflow.`,
 		'- Keep the role chain explicit instead of blending exploration, implementation, review, and testing together.',
 		'',
 		'Execution loop:',
@@ -534,6 +544,7 @@ export function buildGeminiSkillContent(workflowPlan: WorkflowExecutionPlan, met
 	].join('\n');
 }
 export function buildCopilotSkillContent(workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata): string {
+	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
 	return [
 		'---',
 		`name: ${workflowPlan.presetDefinition.artifactSkillName}`,
@@ -542,10 +553,10 @@ export function buildCopilotSkillContent(workflowPlan: WorkflowExecutionPlan, me
 		'',
 		'# Workflow Skill',
 		'',
-		workflowPlan.presetDefinition.launchInstruction,
+		intentCopy.launchInstruction,
 		'',
 		'When to use this skill:',
-		`- Use it when the user request maps to the ${workflowPlan.presetDefinition.label.toLowerCase()} workflow.`,
+		`- Use it when the user request maps to the ${intentCopy.label.toLowerCase()} workflow.`,
 		'- Keep the work split across the prepared agents and handoffs rather than treating everything as one generic chat.',
 		'',
 		'Execution loop:',
@@ -868,8 +879,9 @@ export function replaceManagedBlock(existingContent: string, managedBlock: strin
 	return `${existingContent.trimEnd()}\n\n${managedBlock}`;
 }
 export function buildWorkflowSummary(projectContext: ProjectContext): string {
+	const intentCopy = getWorkflowIntentCopy(projectContext.workflowPlan.preset, projectContext.workflowPlan.workspaceMode);
 	const parts = [
-		`${projectContext.workflowPlan.presetDefinition.label} -> ${getProviderLabel(projectContext.workflowPlan.provider)}`,
+		`${intentCopy.label} -> ${getProviderLabel(projectContext.workflowPlan.provider)}`,
 		`Model: ${formatProviderModel(projectContext.workflowPlan.provider, projectContext.workflowPlan.providerModel)}`,
 		projectContext.workflowPlan.provider === 'claude' ? `Claude account: ${projectContext.workflowPlan.claudeAccountId ?? 'default'}` : undefined,
 		projectContext.workflowPlan.provider === 'claude' ? `Claude effort: ${projectContext.workflowPlan.claudeEffort ?? 'default'}` : undefined,
@@ -917,6 +929,7 @@ function buildWorkflowInstructionCommonParts(projectContext: ProjectContext): {
 	providerEffortInstruction: string;
 	artifactInstruction: string;
 	budgetInstruction?: string;
+	learningDocumentInstructions: string[];
 	presetPriorityInstructions: string[];
 	presetCompletionInstructions: string[];
 	presetAvoidInstructions: string[];
@@ -926,6 +939,15 @@ function buildWorkflowInstructionCommonParts(projectContext: ProjectContext): {
 		? `Read ${stageFile} and write your findings or results back into that file before stopping.`
 		: 'Write your findings into the shared workflow stage file before stopping.';
 	const presetProfile = getPresetExecutionProfile(projectContext.workflowPlan.preset);
+	const learningDocument = projectContext.activeLearningDocument;
+	const learningDocumentInstructions = learningDocument
+		? [
+			`The primary output target is the learning document "${learningDocument.title}" (${getLearningDocumentTypeLabel(learningDocument.type)}).`,
+			`Read ${learningDocument.indexFile}, ${learningDocument.promptFile}, and any imported files under ${learningDocument.sourceDirectory} before proposing or generating content.`,
+			'Keep the result aligned with the learning-kit template structure, tone, and sectioning already present in the target document.',
+			'When the brief is ambiguous, improve or extend the targeted learning document instead of defaulting to generic code-oriented output.'
+		]
+		: [];
 
 	return {
 		stageFile,
@@ -945,6 +967,7 @@ function buildWorkflowInstructionCommonParts(projectContext: ProjectContext): {
 		budgetInstruction: projectContext.metadata.contextBudgetSummary
 			? `This run was generated with a bounded context budget: ${projectContext.metadata.contextBudgetSummary}.`
 			: undefined,
+		learningDocumentInstructions,
 		presetPriorityInstructions: presetProfile.priorities,
 		presetCompletionInstructions: presetProfile.completion,
 		presetAvoidInstructions: presetProfile.avoid
@@ -953,10 +976,11 @@ function buildWorkflowInstructionCommonParts(projectContext: ProjectContext): {
 
 function buildClaudeWorkflowInstruction(projectContext: ProjectContext): string {
 	const common = buildWorkflowInstructionCommonParts(projectContext);
+	const intentCopy = getWorkflowIntentCopy(projectContext.workflowPlan.preset, projectContext.workflowPlan.workspaceMode);
 	return [
 		'<workflow>',
-		`Use the ${projectContext.workflowPlan.presetDefinition.label} workflow for this project.`,
-		projectContext.workflowPlan.presetDefinition.launchInstruction,
+		`Use the ${intentCopy.label} workflow for this project.`,
+		intentCopy.launchInstruction,
 		'</workflow>',
 		'',
 		'<context>',
@@ -964,6 +988,7 @@ function buildClaudeWorkflowInstruction(projectContext: ProjectContext): string 
 		`Read ${WORKFLOW_SESSION_FILE} if it exists.`,
 		`Read ${WORKFLOW_BRIEF_FILE} if it exists.`,
 		common.stageFile ? `Read upstream handoffs referenced by ${common.stageFile} before acting.` : 'Read any upstream stage handoffs before acting.',
+		...common.learningDocumentInstructions,
 		common.budgetInstruction,
 		'</context>',
 		'',
@@ -987,12 +1012,14 @@ function buildClaudeWorkflowInstruction(projectContext: ProjectContext): string 
 
 function buildGeminiWorkflowInstruction(projectContext: ProjectContext): string {
 	const common = buildWorkflowInstructionCommonParts(projectContext);
+	const intentCopy = getWorkflowIntentCopy(projectContext.workflowPlan.preset, projectContext.workflowPlan.workspaceMode);
 	return [
 		'## Context',
 		`Start by reading ${CONTEXT_FILE_NAME}.`,
 		`Read ${WORKFLOW_SESSION_FILE} if it exists.`,
 		`Read ${WORKFLOW_BRIEF_FILE} if it exists.`,
 		common.stageFile ? `Read upstream handoffs referenced by ${common.stageFile} before acting.` : 'Read any upstream stage handoffs before acting.',
+		...common.learningDocumentInstructions,
 		common.budgetInstruction,
 		'',
 		'## Provider',
@@ -1011,8 +1038,8 @@ function buildGeminiWorkflowInstruction(projectContext: ProjectContext): string 
 		...common.presetPriorityInstructions.map((entry) => `- ${entry}`),
 		'',
 		'## Task',
-		`Use the ${projectContext.workflowPlan.presetDefinition.label} workflow for this project.`,
-		projectContext.workflowPlan.presetDefinition.launchInstruction,
+		`Use the ${intentCopy.label} workflow for this project.`,
+		intentCopy.launchInstruction,
 		common.stageWriteInstruction,
 		'',
 		'## Done When',
@@ -1022,14 +1049,16 @@ function buildGeminiWorkflowInstruction(projectContext: ProjectContext): string 
 
 function buildCopilotWorkflowInstruction(projectContext: ProjectContext): string {
 	const common = buildWorkflowInstructionCommonParts(projectContext);
+	const intentCopy = getWorkflowIntentCopy(projectContext.workflowPlan.preset, projectContext.workflowPlan.workspaceMode);
 	return [
-		`Use the ${projectContext.workflowPlan.presetDefinition.label} workflow for this project.`,
+		`Use the ${intentCopy.label} workflow for this project.`,
 		`Start by reading ${CONTEXT_FILE_NAME}.`,
 		common.providerAccountInstruction,
 		common.providerModelInstruction,
 		`Read ${WORKFLOW_SESSION_FILE} if it exists.`,
 		`Read ${WORKFLOW_BRIEF_FILE} if it exists.`,
 		common.stageFile ? `Read upstream handoffs referenced by ${common.stageFile} before acting.` : 'Read any upstream stage handoffs before acting.',
+		...common.learningDocumentInstructions,
 		common.budgetInstruction,
 		common.artifactInstruction,
 		`Preset priorities: ${serializeList(common.presetPriorityInstructions)}.`,
@@ -1037,7 +1066,7 @@ function buildCopilotWorkflowInstruction(projectContext: ProjectContext): string
 		`Avoid: ${serializeList(common.presetAvoidInstructions)}.`,
 		'Keep repository-wide instructions concise here; rely on prepared skills and agents for detailed procedures.',
 		'Prefer handoffs when another prepared role can complete the next step more precisely.',
-		projectContext.workflowPlan.presetDefinition.launchInstruction,
+		intentCopy.launchInstruction,
 		common.stageWriteInstruction
 	].filter((value): value is string => value !== undefined).join(' ');
 }

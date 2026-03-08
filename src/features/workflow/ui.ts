@@ -28,6 +28,8 @@ import type {
 import { capitalize } from "../../utils/index.js";
 import { readLastWorkflowConfig, setWorkflowHistoryCollapsed } from './workflowService.js';
 import { getWorkspaceModeDefinition } from '../workspace/service.js';
+import { getLearningDocumentTypeLabel } from '../documents/service.js';
+import { getWorkflowIntentCopy } from './presets.js';
 
 export interface WorkflowUiHelpers {
 	createNonce(): string;
@@ -68,7 +70,7 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 			localResourceRoots: [this.extensionUri]
 		};
 
-		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; providerModel?: string; claudeEffort?: string; brief?: string; stageIndex?: number; target?: string; collapsed?: boolean }) => {
+		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; providerModel?: string; claudeEffort?: string; learningDocumentId?: string; brief?: string; stageIndex?: number; target?: string; collapsed?: boolean }) => {
 			switch (message.command) {
 				case 'selectWorkspaceMode':
 					await vscode.commands.executeCommand('ai-context-orchestrator.selectWorkspaceMode');
@@ -96,6 +98,7 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 							provider: message.provider,
 							providerModel: message.providerModel,
 							claudeEffort: message.claudeEffort,
+							learningDocumentId: message.learningDocumentId,
 							brief: message.brief
 						}
 					);
@@ -110,6 +113,7 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 							provider: message.provider,
 							providerModel: message.providerModel,
 							claudeEffort: message.claudeEffort,
+							learningDocumentId: message.learningDocumentId,
 							brief: message.brief
 						}
 					);
@@ -121,6 +125,15 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 					return;
 				case 'refresh':
 					this.refresh();
+					return;
+				case 'resetWorkspaceWorkflowState':
+					await vscode.commands.executeCommand('ai-context-orchestrator.resetWorkspaceWorkflowState');
+					return;
+				case 'resetWorkspaceExtensionPartial':
+					await vscode.commands.executeCommand('ai-context-orchestrator.resetWorkspaceExtensionPartial');
+					return;
+				case 'resetWorkspaceExtension':
+					await vscode.commands.executeCommand('ai-context-orchestrator.resetWorkspaceExtension');
 					return;
 				case 'refreshProviders':
 					await vscode.commands.executeCommand('ai-context-orchestrator.refreshProviderStatus');
@@ -274,9 +287,10 @@ export function buildWorkflowPromptFromDashboardState(
 	}
 
 	const presetDefinition = WORKFLOW_PRESETS[state.session.currentPreset];
+	const intentCopy = getWorkflowIntentCopy(state.session.currentPreset, state.workspaceModeState?.mode);
 	const stageWriteInstruction = `Read ${state.latestStage.stageFile} and write your findings or results back into that file before stopping.`;
 	return [
-		`Use the ${presetDefinition.label} workflow for this project.`,
+		`Use the ${intentCopy.label} workflow for this project.`,
 		`Start by reading ${CONTEXT_FILE_NAME}.`,
 		`Read ${WORKFLOW_SESSION_FILE} if it exists.`,
 		`Read ${WORKFLOW_BRIEF_FILE} if it exists.`,
@@ -288,7 +302,7 @@ export function buildWorkflowPromptFromDashboardState(
 		state.artifactCount > 0
 			? `Use the generated ${helpers.getProviderLabel(state.session.currentProvider)} artifacts when they help.`
 			: 'Work directly from the context pack and shared workflow files.',
-		presetDefinition.launchInstruction,
+		intentCopy.launchInstruction,
 		stageWriteInstruction
 	].join(' ');
 }
@@ -300,7 +314,7 @@ export function buildWorkflowPromptPreviewDocument(
 ): string {
 	const session = state.session;
 	const latestStage = state.latestStage;
-	const stageLabel = session ? WORKFLOW_PRESETS[session.currentPreset].label : 'Unknown';
+	const stageLabel = session ? getWorkflowIntentCopy(session.currentPreset, state.workspaceModeState?.mode).label : 'Unknown';
 	const providerLabel = session ? helpers.getProviderLabel(session.currentProvider) : 'Unknown';
 	return [
 		'# Workflow Prompt Preview',
@@ -379,7 +393,7 @@ export function getWorkflowControlHtml(
 		${state.session.stages.map((stage) => `
 		<div class="stage-pill ${stage.status}">
 			<div class="stage-meta-row">
-				<span class="pill-label">${String(stage.index).padStart(2, '0')} ${helpers.escapeHtml(WORKFLOW_PRESETS[stage.preset].label)}</span>
+				<span class="pill-label">${String(stage.index).padStart(2, '0')} ${helpers.escapeHtml(getWorkflowIntentCopy(stage.preset, state.workspaceModeState?.mode).label)}</span>
 				<span class="history-badge stage-badge">${stage.index === state.session?.currentStageIndex ? 'Current' : getWorkflowStageStatusLabel(stage.status)}</span>
 			</div>
 			<span class="pill-status">${helpers.escapeHtml(stage.stageFile)}</span>
@@ -444,12 +458,12 @@ export function getWorkflowControlHtml(
 <div class="mc-section-body">
 	<p class="section-footnote">Le mode ${helpers.escapeHtml(learningMode.label)} active la création de documents et l’import de sources locales.</p>
 	<div class="shortcuts">
-		<button type="button" class="linkButton" data-command="openActiveLearningDocument" ${state.activeLearningDocument ? '' : 'disabled'}>Document actif<span>${helpers.escapeHtml(state.activeLearningDocument?.title ?? 'Aucun')}</span></button>
+		<button type="button" class="linkButton" data-command="openActiveLearningDocument" ${state.activeLearningDocument ? '' : 'disabled'}>Document actif<span>${helpers.escapeHtml(state.activeLearningDocument ? `${state.activeLearningDocument.title} · ${getLearningDocumentTypeLabel(state.activeLearningDocument.type)}` : 'Aucun')}</span></button>
 		<button type="button" class="linkButton" data-command="switchLearningDocument" ${(state.learningDocuments?.length ?? 0) > 0 ? '' : 'disabled'}>Changer<span>${helpers.escapeHtml(state.activeLearningDocument?.relativeDirectory ?? 'Aucun document')}</span></button>
 		<button type="button" class="linkButton" data-command="addLearningDocumentSources" ${state.activeLearningDocument ? '' : 'disabled'}>Sources<span>${helpers.escapeHtml(state.activeLearningDocument ? `${state.activeLearningDocument.sources.length} importée(s)` : 'Aucune')}</span></button>
 	</div>
 	<div class="actions" style="margin-top:8px;">
-		<button type="button" class="secondary" data-command="createLearningDocument">Créer un compte rendu</button>
+		<button type="button" class="secondary" data-command="createLearningDocument">Créer un document</button>
 	</div>
 </div>
 </details>` : '';
@@ -472,6 +486,9 @@ export function getWorkflowControlHtml(
 		<button type="button" class="linkButton" data-command="copyPrompt" ${state.session ? '' : 'disabled'}>Copy<span>Copy launch prompt</span></button>
 	</div>
 	<div class="actions" style="margin-top:8px;">
+		<button type="button" class="secondary" data-command="resetWorkspaceWorkflowState">Reset Workflow</button>
+		<button type="button" class="secondary" data-command="resetWorkspaceExtensionPartial">Reset Orchestration</button>
+		<button type="button" class="secondary" data-command="resetWorkspaceExtension">Reset Complete</button>
 		<button type="button" class="secondary" data-command="cleanActiveWorkflowFiles" ${state.activeWorkflowId ? '' : 'disabled'}>Clean Active Generated Files</button>
 	</div>
 </div>
@@ -491,8 +508,16 @@ export function getWorkflowControlHtml(
 	} : undefined;
 
 	const drawerHtml = drawerOpen
-		? buildConfigDrawerHtml(helpers, lastConfig, configuration, drawerMode, continuePrefill)
+		? buildConfigDrawerHtml(state, helpers, lastConfig, configuration, drawerMode, continuePrefill)
 		: '';
+
+	const primarySectionsHtml = learningMode?.supportsLearningDocuments
+		? `${learningDocumentsHtml}
+${providersHtml}
+${filesHtml}`
+		: `${providersHtml}
+${filesHtml}
+${learningDocumentsHtml}`;
 
 	const contentHtml = `
 ${copilotBannerHtml}
@@ -500,9 +525,7 @@ ${drawerHtml}
 ${heroHtml}
 ${historyHtml}
 ${stagesHtml}
-${providersHtml}
-${learningDocumentsHtml}
-${filesHtml}
+${primarySectionsHtml}
 ${governanceHtml}
 	${state.session ? `<div style="margin-top:4px;">
 	<button type="button" data-command="init" class="secondary">+ New Workflow</button>
@@ -553,8 +576,18 @@ var drawerPreset = '${continuePrefill?.preset ?? lastConfig?.preset ?? defaultPr
 var drawerProvider = '${continuePrefill?.provider ?? lastConfig?.provider ?? defaultProvider}';
 var drawerEffort = '${continuePrefill?.claudeEffort ?? lastConfig?.claudeEffort ?? 'medium'}';
 var drawerMode = '${drawerMode}';
+var drawerLearningDocumentEnabled = ${learningMode?.supportsLearningDocuments ? 'true' : 'false'};
+var drawerLearningDocumentId = '${lastConfig?.learningDocumentId ?? state.activeLearningDocument?.id ?? ''}';
+var DRAWER_INTENT_COPY = ${JSON.stringify(Object.fromEntries(Object.values(WORKFLOW_PRESETS).map((presetDefinition) => [presetDefinition.preset, getWorkflowIntentCopy(presetDefinition.preset, state.workspaceModeState?.mode)])))};
 var CLAUDE_MODELS = ${JSON.stringify(claudeModels)};
 var GEMINI_MODELS = ${JSON.stringify(geminiModels)};
+
+function getIntentCopy(preset) {
+	return DRAWER_INTENT_COPY[preset] || {
+		briefPrompt: 'Describe the objective for this stage.',
+		briefPlaceholder: 'Describe the objective for this stage...'
+	};
+}
 
 function getModels(provider) {
 	if (provider === 'gemini') { return GEMINI_MODELS; }
@@ -592,23 +625,24 @@ function updateBriefVisibility(preset) {
 		row.setAttribute('aria-hidden', visible ? 'false' : 'true');
 	}
 	if (help) {
+		var intent = getIntentCopy(preset);
 		help.textContent = visible
-			? (drawerMode === 'continue'
-				? 'Describe the goal for this next stage. Keep it concrete.'
-				: 'One sentence on the expected outcome. Keep it concrete.')
+			? intent.briefPrompt
 			: 'Optional for Explore. Leave it empty to start with the current workspace context.';
 	}
 	if (hint) {
 		hint.textContent = visible
-			? (drawerMode === 'continue'
-				? 'This brief will guide the continuation prompt for the next stage.'
-				: 'You can refine scope or constraints here.')
+			? (drawerLearningDocumentEnabled
+				? 'Le brief sert de cible concrète pour le document, ses sections et ses sources.'
+				: (drawerMode === 'continue'
+					? 'This brief will guide the continuation prompt for the next stage.'
+					: 'You can refine scope or constraints here.'))
 			: 'Explore starts faster without a brief.';
 	}
 	var ta = document.getElementById('drawer-brief');
 	if (ta) {
-		var ph = { explore: 'What area to explore?', plan: 'What to plan?', build: 'What to build?', debug: 'What bug to fix?', review: 'What to review?', test: 'What to test?' };
-		ta.placeholder = ph[preset] || 'Describe the objective...';
+		var intent = getIntentCopy(preset);
+		ta.placeholder = intent.briefPlaceholder || 'Describe the objective...';
 	}
 	updateLaunchState();
 	updateSelectionSummary();
@@ -651,6 +685,13 @@ function updateSelectionSummary() {
 	if (drawerProvider === 'claude') {
 		detail += ' · ' + drawerEffort + ' effort';
 	}
+	if (drawerLearningDocumentEnabled) {
+		var docEl = document.getElementById('drawer-learning-document');
+		if (docEl && docEl.value) {
+			var option = docEl.options[docEl.selectedIndex];
+			detail += ' · ' + option.text;
+		}
+	}
 	summary.textContent = detail;
 	updateAdvancedSummary();
 }
@@ -662,11 +703,13 @@ function updateLaunchState() {
 	if (!launchBtn || !message) { return; }
 	var requiresBrief = drawerPreset !== 'explore';
 	var briefValue = briefEl ? briefEl.value.trim() : '';
-	var isValid = !requiresBrief || briefValue.length > 0;
+	var docEl = document.getElementById('drawer-learning-document');
+	var hasDocument = !drawerLearningDocumentEnabled || (docEl && docEl.value);
+	var isValid = (!requiresBrief || briefValue.length > 0) && !!hasDocument;
 	launchBtn.disabled = !isValid;
 	message.textContent = isValid
-		? 'Launch uses the current provider and remembers this setup for next time.'
-		: 'Add a brief before launching this workflow.';
+		? (drawerLearningDocumentEnabled ? 'Launch uses the selected learning document and current provider settings.' : 'Launch uses the current provider and remembers this setup for next time.')
+		: (!hasDocument ? 'Select a learning document before launching.' : 'Add a brief before launching this workflow.');
 	}
 
 function focusComposer() {
@@ -713,6 +756,14 @@ var briefInput = document.getElementById('drawer-brief');
 if (briefInput) {
 	briefInput.addEventListener('input', updateLaunchState);
 }
+var learningDocumentSelect = document.getElementById('drawer-learning-document');
+if (learningDocumentSelect) {
+	learningDocumentSelect.addEventListener('change', function() {
+		drawerLearningDocumentId = learningDocumentSelect.value;
+		updateSelectionSummary();
+		updateLaunchState();
+	});
+}
 
 function triggerLaunch() {
 	if (!drawerLaunchBtn || drawerLaunchBtn.disabled) {
@@ -727,6 +778,7 @@ function triggerLaunch() {
 		provider: drawerProvider,
 		providerModel: modelEl ? modelEl.value : undefined,
 		claudeEffort: drawerProvider === 'claude' ? drawerEffort : undefined,
+		learningDocumentId: drawerLearningDocumentEnabled ? drawerLearningDocumentId || undefined : undefined,
 		brief: (briefEl && briefEl.value.trim()) ? briefEl.value.trim() : undefined
 	});
 }
@@ -777,26 +829,27 @@ if (document.getElementById('mc-drawer')) {
 
 function buildInitHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpers, defaultPreset: string, defaultProvider: string, defaultModel: string, drawerOpen: boolean): string {
 	const workspaceMode = state.workspaceModeState ? getWorkspaceModeDefinition(state.workspaceModeState.mode) : undefined;
+	const defaultIntentLabel = getWorkflowIntentCopy(defaultPreset as WorkflowPreset, state.workspaceModeState?.mode).label;
 	const modeLine = workspaceMode
 		? `<div class="stat"><strong>Workspace mode</strong><span>${helpers.escapeHtml(workspaceMode.label)}</span></div>`
 		: `<div class="stat"><strong>Workspace mode</strong><span>Non défini</span></div>`;
 	const secondLine = workspaceMode?.supportsLearningDocuments
-		? `<div class="stat"><strong>Document actif</strong><span>${helpers.escapeHtml(state.activeLearningDocument?.title ?? 'Aucun document')}</span></div>`
+		? `<div class="stat"><strong>Document actif</strong><span>${helpers.escapeHtml(state.activeLearningDocument ? `${state.activeLearningDocument.title} · ${getLearningDocumentTypeLabel(state.activeLearningDocument.type)}` : 'Aucun document')}</span></div>`
 		: `<div class="stat"><strong>Fast path</strong><span>Goal, provider, optional brief, then launch.</span></div>`;
 	const extraActions = workspaceMode?.supportsLearningDocuments
-		? `<button type="button" class="secondary" data-command="createLearningDocument">Créer un compte rendu</button>
+		? `<button type="button" class="secondary" data-command="createLearningDocument">Créer un document</button>
 		<button type="button" class="secondary" data-command="addLearningDocumentSources" ${state.activeLearningDocument ? '' : 'disabled'}>Importer des sources</button>`
 		: `<button type="button" class="secondary" data-command="init">Open full setup</button>`;
 	return `
 <section class="card hero">
 	<div class="kicker">No active workflow</div>
-	<h3>Start a workflow from the sidebar</h3>
-	<p class="lead">Use the quick launcher for the common path, then open advanced settings only when you need to change model or provider-specific tuning.</p>
+	<h3>${workspaceMode?.supportsLearningDocuments ? 'Piloter un document depuis la sidebar' : 'Start a workflow from the sidebar'}</h3>
+	<p class="lead">${workspaceMode?.supportsLearningDocuments ? 'Choisissez un document cible, importez vos sources, puis lancez le provider avec un prompt adapté au template actif.' : 'Use the quick launcher for the common path, then open advanced settings only when you need to change model or provider-specific tuning.'}</p>
 	<div class="stat-grid" style="margin-top:12px;">
 		${modeLine}
 		<div class="stat">
 			<strong>Default route</strong>
-			<span>${helpers.escapeHtml(defaultPreset)} · ${helpers.escapeHtml(defaultProvider)} · ${helpers.escapeHtml(defaultModel)}</span>
+			<span>${helpers.escapeHtml(defaultIntentLabel)} · ${helpers.escapeHtml(defaultProvider)} · ${helpers.escapeHtml(defaultModel)}</span>
 		</div>
 		${secondLine}
 	</div>
@@ -955,7 +1008,7 @@ function buildHistoryEntryHtml(
 ): string {
 	const isActive = entry.workflowId === activeWorkflowId;
 	const providerLabel = helpers.getProviderLabel(entry.currentProvider);
-	const presetLabel = WORKFLOW_PRESETS[entry.currentPreset].label;
+	const presetLabel = getWorkflowIntentCopy(entry.currentPreset, undefined).label;
 	const parentEntry = entry.parentWorkflowId ? entryById.get(entry.parentWorkflowId) : undefined;
 	const lineage = parentEntry
 		? `Branch of ${parentEntry.label}${entry.parentStageIndex ? ` @ stage ${entry.parentStageIndex}` : ''}`
@@ -997,10 +1050,10 @@ function buildHistoryEntryHtml(
 
 function buildActiveHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpers, recommendedPreset: string | undefined): string {
 	const session = state.session!;
-	const presetLabel = WORKFLOW_PRESETS[session.currentPreset].label;
+	const presetLabel = getWorkflowIntentCopy(session.currentPreset, state.workspaceModeState?.mode).label;
 	const providerLabel = helpers.getProviderLabel(session.currentProvider);
 	const stageLabel = `Stage ${session.currentStageIndex}`;
-	const nextLabel = recommendedPreset && recommendedPreset in WORKFLOW_PRESETS ? WORKFLOW_PRESETS[recommendedPreset as keyof typeof WORKFLOW_PRESETS].label : 'Next stage';
+	const nextLabel = recommendedPreset && recommendedPreset in WORKFLOW_PRESETS ? getWorkflowIntentCopy(recommendedPreset as keyof typeof WORKFLOW_PRESETS, state.workspaceModeState?.mode).label : 'Next stage';
 	const completedCount = session.stages.filter((s) => s.status === 'completed').length;
 	return `
 <section class="card hero">
@@ -1086,16 +1139,23 @@ function buildProviderLaunchFormPreview(
 }
 
 function buildConfigDrawerHtml(
+	state: WorkflowDashboardState,
 	helpers: WorkflowUiHelpers,
 	lastConfig: LastWorkflowConfig | undefined,
 	configuration: ExtensionConfiguration,
 	mode: 'new' | 'continue' = 'new',
 	sessionPrefill?: { preset?: WorkflowPreset; provider?: ProviderTarget; providerModel?: string; claudeEffort?: ClaudeEffortLevel; brief?: string }
 ): string {
+	const workspaceMode = state.workspaceModeState ? getWorkspaceModeDefinition(state.workspaceModeState.mode) : undefined;
+	const supportsLearningDocuments = Boolean(workspaceMode?.supportsLearningDocuments);
+	const availableLearningDocuments = state.learningDocuments ?? [];
 	const preset = sessionPrefill?.preset ?? lastConfig?.preset ?? configuration.defaultPreset;
 	const provider = sessionPrefill?.provider ?? lastConfig?.provider ?? configuration.defaultProvider;
 	const model = sessionPrefill?.providerModel ?? lastConfig?.providerModel ?? '';
 	const effort = sessionPrefill?.claudeEffort ?? lastConfig?.claudeEffort ?? configuration.defaultClaudeEffort;
+	const learningDocumentId = supportsLearningDocuments
+		? (lastConfig?.learningDocumentId ?? state.activeLearningDocument?.id ?? '')
+		: '';
 	const brief = sessionPrefill?.brief ?? lastConfig?.brief ?? '';
 
 	const claudeModels = ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
@@ -1103,7 +1163,7 @@ function buildConfigDrawerHtml(
 
 	const presets = Object.values(WORKFLOW_PRESETS);
 	const presetPills = presets.map((p) =>
-		`<button type="button" class="drawer-pill ${p.preset === preset ? 'active' : ''}" data-field="preset" data-value="${p.preset}">${helpers.escapeHtml(p.label)}</button>`
+		`<button type="button" class="drawer-pill ${p.preset === preset ? 'active' : ''}" data-field="preset" data-value="${p.preset}">${helpers.escapeHtml(getWorkflowIntentCopy(p.preset, workspaceMode?.mode).label)}</button>`
 	).join('');
 
 	const providers: ProviderTarget[] = ['claude', 'gemini', 'copilot'];
@@ -1121,18 +1181,23 @@ function buildConfigDrawerHtml(
 	).join('');
 
 	const isNewMode = mode === 'new';
-	const briefPlaceholder = preset === 'explore' ? 'What area to explore?' : 'Describe the objective for this stage...';
+	const selectedIntent = getWorkflowIntentCopy(preset, workspaceMode?.mode);
+	const briefPlaceholder = selectedIntent.briefPlaceholder;
 	const providerHelp = provider === 'claude'
 		? 'Best when you want deeper reasoning. Effort controls quality, speed, and cost.'
 		: provider === 'gemini'
 			? 'Good default for broad analysis and faster iteration.'
 			: 'Uses the active Copilot setup. Model selection stays minimal.';
+	const documentOptions = availableLearningDocuments.map((document) =>
+		`<option value="${helpers.escapeHtml(document.id)}" ${document.id === learningDocumentId ? 'selected' : ''}>${helpers.escapeHtml(`${document.title} · ${getLearningDocumentTypeLabel(document.type)}`)}</option>`
+	).join('');
 	const briefVisible = preset !== 'explore';
-	const selectionSummary = `${WORKFLOW_PRESETS[preset].label} with ${helpers.getProviderLabel(provider)} · ${model || activeModels[0]}${provider === 'claude' ? ` · ${effort} effort` : ''}`;
+	const selectedLearningDocument = availableLearningDocuments.find((document) => document.id === learningDocumentId);
+	const selectionSummary = `${getWorkflowIntentCopy(preset, workspaceMode?.mode).label} with ${helpers.getProviderLabel(provider)} · ${model || activeModels[0]}${provider === 'claude' ? ` · ${effort} effort` : ''}${selectedLearningDocument ? ` · ${selectedLearningDocument.title}` : ''}`;
 	const drawerTitle = isNewMode ? 'New workflow' : 'Resume workflow';
 	const drawerSubtitle = isNewMode
-		? 'Keep the common path short. Advanced settings are available below when needed.'
-		: 'Override the preset, provider, model, and brief for this continuation step.';
+		? (supportsLearningDocuments ? 'Choose the target document first, then tune provider settings only when needed.' : 'Keep the common path short. Advanced settings are available below when needed.')
+		: (supportsLearningDocuments ? 'Continue on the selected learning document with an updated preset, provider, or brief.' : 'Override the preset, provider, model, and brief for this continuation step.');
 	const launchBtnLabel = isNewMode ? 'Launch ▶' : 'Continue →';
 
 	return `
@@ -1148,19 +1213,27 @@ function buildConfigDrawerHtml(
 	<div class="drawer-body">
 		<div class="drawer-intro">
 			<strong id="launch-summary" aria-live="polite">${helpers.escapeHtml(selectionSummary)}</strong>
-			<span>Launch remembers this setup and reuses it the next time you open the sidebar launcher.</span>
+			<span>${supportsLearningDocuments ? 'Launch targets the selected learning document and remembers that choice next time.' : 'Launch remembers this setup and reuses it the next time you open the sidebar launcher.'}</span>
 		</div>
+		${supportsLearningDocuments ? `<div class="drawer-group">
+			<div class="drawer-field">
+				<label class="drawer-label" for="drawer-learning-document">Document cible</label>
+				<p class="drawer-help">Choisissez le document learning-kit sur lequel le provider doit travailler.</p>
+				<select class="drawer-select" id="drawer-learning-document" ${availableLearningDocuments.length > 0 ? '' : 'disabled'}>${documentOptions || '<option value="">Aucun document disponible</option>'}</select>
+				<span class="drawer-hint">${availableLearningDocuments.length > 0 ? 'Le prompt et le contexte utiliseront ce document, son template et ses sources importées.' : 'Créez d’abord un document depuis la section Learning Documents.'}</span>
+			</div>
+		</div>` : ''}
 		<div class="drawer-group">
 			<div class="drawer-field">
-				<label class="drawer-label">Goal</label>
-				<p class="drawer-help">Pick the workflow outcome first. This controls whether a brief is required.</p>
+				<label class="drawer-label">${supportsLearningDocuments ? 'Intent' : 'Goal'}</label>
+				<p class="drawer-help">${supportsLearningDocuments ? 'Choisissez l’intention de travail pour ce document. Cela détermine si un brief est requis.' : 'Pick the workflow outcome first. This controls whether a brief is required.'}</p>
 			<div class="drawer-pills" id="preset-pills">${presetPills}</div>
 			</div>
 			<div class="drawer-field" id="brief-field"${briefVisible ? '' : ' hidden aria-hidden="true"'}>
 				<label class="drawer-label" for="drawer-brief">Brief</label>
-				<p class="drawer-help" id="brief-help">${briefVisible ? (isNewMode ? 'One sentence on the expected outcome. Keep it concrete.' : 'Describe the goal for this next stage. Keep it concrete.') : 'Optional for Explore. Leave it empty to start with the current workspace context.'}</p>
+				<p class="drawer-help" id="brief-help">${briefVisible ? selectedIntent.briefPrompt : 'Optional for Explore. Leave it empty to start with the current workspace context.'}</p>
 				<textarea class="drawer-textarea" id="drawer-brief" placeholder="${helpers.escapeHtml(briefPlaceholder)}" aria-describedby="brief-help brief-hint">${helpers.escapeHtml(brief)}</textarea>
-				<span class="drawer-hint" id="brief-hint">${briefVisible ? (isNewMode ? 'You can refine scope or constraints here.' : 'This brief will guide the continuation prompt for the next stage.') : 'Explore starts faster without a brief.'}</span>
+				<span class="drawer-hint" id="brief-hint">${briefVisible ? (supportsLearningDocuments ? 'Le brief sert de cible concrète pour le document, ses sections et ses sources.' : (isNewMode ? 'You can refine scope or constraints here.' : 'This brief will guide the continuation prompt for the next stage.')) : 'Explore starts faster without a brief.'}</span>
 			</div>
 		</div>
 		<div class="drawer-group">
@@ -1194,7 +1267,7 @@ function buildConfigDrawerHtml(
 		</details>
 	</div>
 	<div class="drawer-footer">
-		<span class="drawer-validation" id="launch-validation" aria-live="polite">Launch uses the current provider and remembers this setup for next time.</span>
+		<span class="drawer-validation" id="launch-validation" aria-live="polite">${supportsLearningDocuments ? 'Launch uses the selected document and current provider settings.' : 'Launch uses the current provider and remembers this setup for next time.'}</span>
 		<button type="button" class="secondary" id="drawer-cancel-btn">Cancel</button>
 		<button type="button" id="drawer-launch-btn">${helpers.escapeHtml(launchBtnLabel)}</button>
 	</div>

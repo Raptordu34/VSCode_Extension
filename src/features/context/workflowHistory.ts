@@ -6,6 +6,7 @@ import {
 	WORKFLOW_BRIEF_FILE,
 	WORKFLOW_HISTORY_DIRECTORY,
 	WORKFLOW_HISTORY_INDEX_FILE,
+	WORKFLOW_STATE_DIRECTORY,
 	WORKFLOW_SESSION_FILE
 } from '../workflow/constants.js';
 import type {
@@ -20,6 +21,7 @@ import type {
 import { buildWorkspaceUri, fileExists, normalizeWorkspaceRelativePath, readUtf8 } from '../../core/workspace.js';
 import { createNonce } from '../../utils/index.js';
 import { replaceManagedBlock } from '../aiAgents/promptBuilder.js';
+import { WORKFLOW_PRESETS } from '../workflow/presets.js';
 
 interface MutationWriteOperation {
 	kind: 'write';
@@ -907,5 +909,105 @@ export function applyWorkflowIdentityToPlan(workflowPlan: WorkflowExecutionPlan,
 		workflowId: workflowIdentity.workflowId ?? workflowPlan.workflowId,
 		branchId: workflowIdentity.branchId ?? workflowPlan.branchId,
 		startNewWorkflow: workflowIdentity.startNewWorkflow ?? workflowPlan.startNewWorkflow
+	};
+}
+
+function collectGeneratedAgentPaths(): string[] {
+	const roles = new Set(Object.values(WORKFLOW_PRESETS).flatMap((preset) => preset.roles));
+	return [...roles].flatMap((role) => [
+		`.claude/agents/orchestrator-${role}.md`,
+		`.gemini/agents/orchestrator-${role}.md`,
+		`.github/agents/orchestrator-${role}.agent.md`
+	]);
+}
+
+function collectGeneratedSkillDirectories(): string[] {
+	const skillNames = new Set(Object.values(WORKFLOW_PRESETS).map((preset) => preset.artifactSkillName));
+	return [...skillNames].flatMap((skillName) => [
+		`.claude/skills/${skillName}`,
+		`.gemini/skills/${skillName}`,
+		`.github/skills/${skillName}`
+	]);
+}
+
+export interface ResetWorkspaceFilesResult {
+	deletedPaths: number;
+	cleanedManagedFiles: number;
+}
+
+export async function resetWorkflowRuntimeFiles(workspaceFolder: vscode.WorkspaceFolder): Promise<ResetWorkspaceFilesResult> {
+	let deletedPaths = 0;
+
+	const deletePath = async (relativePath: string, recursive: boolean): Promise<void> => {
+		const uri = buildWorkspaceUri(workspaceFolder.uri, relativePath);
+		if (!uri || !(await fileExists(uri))) {
+			return;
+		}
+
+		await vscode.workspace.fs.delete(uri, { recursive, useTrash: false });
+		deletedPaths += 1;
+	};
+
+	await deletePath(CONTEXT_FILE_NAME, false);
+	await deletePath(WORKFLOW_STATE_DIRECTORY, true);
+
+	return {
+		deletedPaths,
+		cleanedManagedFiles: 0
+	};
+}
+
+export async function resetOrchestratorWorkspaceFiles(workspaceFolder: vscode.WorkspaceFolder): Promise<ResetWorkspaceFilesResult> {
+	let deletedPaths = 0;
+	let cleanedManagedFiles = 0;
+
+	const deletePath = async (relativePath: string, recursive: boolean): Promise<void> => {
+		const uri = buildWorkspaceUri(workspaceFolder.uri, relativePath);
+		if (!uri || !(await fileExists(uri))) {
+			return;
+		}
+
+		await vscode.workspace.fs.delete(uri, { recursive, useTrash: false });
+		deletedPaths += 1;
+	};
+
+	const cleanupManagedMarkdownPath = async (relativePath: string): Promise<void> => {
+		const uri = buildWorkspaceUri(workspaceFolder.uri, relativePath);
+		if (!uri || !(await fileExists(uri))) {
+			return;
+		}
+
+		const existingContent = await readUtf8(uri);
+		const nextContent = removeManagedMarkdownBlock(existingContent);
+		if (!nextContent) {
+			await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: false });
+			deletedPaths += 1;
+			return;
+		}
+
+		if (nextContent !== existingContent) {
+			await vscode.workspace.fs.writeFile(uri, toUtf8Bytes(nextContent));
+			cleanedManagedFiles += 1;
+		}
+	};
+
+	await deletePath(CONTEXT_FILE_NAME, false);
+	await deletePath(WORKFLOW_STATE_DIRECTORY, true);
+
+	for (const managedPath of ['CLAUDE.md', 'GEMINI.md', '.github/copilot-instructions.md']) {
+		await cleanupManagedMarkdownPath(managedPath);
+	}
+
+	for (const agentPath of collectGeneratedAgentPaths()) {
+		await deletePath(agentPath, false);
+	}
+
+	for (const skillDirectory of collectGeneratedSkillDirectories()) {
+		await deletePath(skillDirectory, true);
+	}
+
+	return {
+		deletedPaths,
+		cleanedManagedFiles
 	};
 }

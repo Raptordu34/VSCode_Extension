@@ -74,6 +74,13 @@ export async function setWorkspaceModeState(
 	return nextState;
 }
 
+export async function clearWorkspaceModeState(
+	context: vscode.ExtensionContext,
+	workspaceFolder: vscode.WorkspaceFolder
+): Promise<void> {
+	await context.workspaceState.update(getWorkspaceModeStorageKey(workspaceFolder), undefined);
+}
+
 export async function promptForWorkspaceMode(currentMode?: WorkspaceMode): Promise<WorkspaceMode | undefined> {
 	const selection = await vscode.window.showQuickPick(
 		(Object.values(WORKSPACE_MODE_DEFINITIONS) as WorkspaceModeDefinition[]).map((definition) => ({

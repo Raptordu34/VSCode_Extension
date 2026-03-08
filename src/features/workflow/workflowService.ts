@@ -10,7 +10,7 @@ import { getWorkflowStageStatusLabel, formatWorkflowRoles } from "./ui.js";
 import { getExtensionConfiguration } from "../../core/configuration.js";
 import { mergeProviderStatusCache } from "../providers/providerService.js";
 import { buildProviderLaunchPrompt, buildWorkflowSummary } from "../aiAgents/promptBuilder.js";
-import { WORKFLOW_PRESETS } from "./presets.js";
+import { WORKFLOW_PRESETS, getWorkflowIntentCopy } from "./presets.js";
 import { readWorkflowHistoryIndex, repairWorkflowHistoryIndex } from "../context/workflowHistory.js";
 import { detectGovernancePolicy } from "./artifactGovernance.js";
 import { getWorkspaceModeState } from '../workspace/service.js';
@@ -184,6 +184,7 @@ export function buildSmartDefaultWorkflowPlan(preset: WorkflowPreset, configurat
 	const defaultClaudeAccount = findProviderAccount(configuration, 'claude', configuration.activeClaudeAccountId)?.id ?? configuration.claudeAccounts[0]?.id;
 	return {
 		preset: presetDefinition.preset,
+		workspaceMode: undefined,
 		provider: configuration.defaultProvider,
 		providerModel: getDefaultProviderModel(configuration.defaultProvider, configuration, defaultProviderAccount),
 		providerAccountId: defaultProviderAccount,
@@ -242,6 +243,7 @@ export function buildSmartContinuationWorkflowPlan(
 }
 
 export function buildWorkflowSummaryDocument(projectContext: ProjectContext): string {
+	const intentCopy = getWorkflowIntentCopy(projectContext.workflowPlan.preset, projectContext.workflowPlan.workspaceMode);
 	const artifactLines = projectContext.artifactPlan?.files.map((artifact) => `- ${artifact.relativePath}`) ?? ['- none'];
 	const optimizationLine = projectContext.optimization.applied
 		? `Optimized by Copilot using ${projectContext.optimization.modelName ?? 'an available model'}`
@@ -249,7 +251,7 @@ export function buildWorkflowSummaryDocument(projectContext: ProjectContext): st
 	const launchPrompt = buildProviderLaunchPrompt(projectContext);
 
 	return [
-		`# ${projectContext.workflowPlan.presetDefinition.label} Workflow Summary`,
+		`# ${intentCopy.label} Workflow Summary`,
 		'',
 		`- Workspace: ${projectContext.workspaceFolder.name}`,
 		`- Preset id: ${projectContext.workflowPlan.preset}`,
@@ -261,7 +263,7 @@ export function buildWorkflowSummaryDocument(projectContext: ProjectContext): st
 		`- Optimization: ${optimizationLine}`,
 		'',
 		'## Objective',
-		projectContext.workflowPlan.presetDefinition.launchInstruction,
+		intentCopy.launchInstruction,
 		'',
 		'## Context Signals',
 		projectContext.metadata.keyFiles.length > 0 ? `Key files: ${projectContext.metadata.keyFiles.join(', ')}` : 'Key files: none detected',
@@ -287,16 +289,25 @@ export function buildWorkflowSummaryDocument(projectContext: ProjectContext): st
 	].join('\n');
 }
 export async function promptForWorkflowPlan(configuration: ExtensionConfiguration): Promise<WorkflowExecutionPlan | undefined> {
+	return promptForWorkflowPlanWithMode(configuration);
+}
+
+export async function promptForWorkflowPlanWithMode(
+	configuration: ExtensionConfiguration,
+	workspaceMode?: WorkflowExecutionPlan['workspaceMode']
+): Promise<WorkflowExecutionPlan | undefined> {
 	const presetSelection = await vscode.window.showQuickPick<WorkflowQuickPickItem>(
 		Object.values(WORKFLOW_PRESETS).map((presetDefinition) => ({
-			label: presetDefinition.label,
-			description: presetDefinition.description,
-			detail: `${presetDefinition.detail} Roles: ${formatWorkflowRoles(presetDefinition.roles)}. Recommended provider: ${getProviderLabel(presetDefinition.recommendedProvider)}.`,
+			label: getWorkflowIntentCopy(presetDefinition.preset, workspaceMode).label,
+			description: getWorkflowIntentCopy(presetDefinition.preset, workspaceMode).description,
+			detail: `${getWorkflowIntentCopy(presetDefinition.preset, workspaceMode).detail} Roles: ${formatWorkflowRoles(presetDefinition.roles)}. Recommended provider: ${getProviderLabel(presetDefinition.recommendedProvider)}.`,
 			presetDefinition
 		})),
 		{
 			title: '1/7 Workflow Preset',
-			placeHolder: 'Choose the workflow goal you want to prepare',
+			placeHolder: workspaceMode === 'research' || workspaceMode === 'study' || workspaceMode === 'blank'
+				? 'Choisissez l’intention documentaire à préparer'
+				: 'Choose the workflow goal you want to prepare',
 			ignoreFocusOut: true
 		}
 	);
@@ -454,6 +465,7 @@ export async function promptForWorkflowPlan(configuration: ExtensionConfiguratio
 
 	const workflowPlan: WorkflowExecutionPlan = {
 		preset: presetSelection.presetDefinition.preset,
+		workspaceMode,
 		provider: providerSelection.provider,
 		providerModel,
 		providerAccountId,
@@ -468,7 +480,7 @@ export async function promptForWorkflowPlan(configuration: ExtensionConfiguratio
 	};
 
 	if (workflowPlan.preset !== 'explore') {
-		const brief = await promptForWorkflowBrief(workflowPlan.preset);
+		const brief = await promptForWorkflowBrief(workflowPlan.preset, undefined, workspaceMode);
 		if (!brief) {
 			return undefined;
 		}
@@ -478,7 +490,7 @@ export async function promptForWorkflowPlan(configuration: ExtensionConfiguratio
 	const reviewSelection = await vscode.window.showQuickPick<WorkflowQuickPickItem>([
 		{
 			label: 'Generate workflow pack',
-			description: `${getProviderLabel(workflowPlan.provider)} · ${workflowPlan.presetDefinition.label}`,
+			description: `${getProviderLabel(workflowPlan.provider)} · ${getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode).label}`,
 			detail: buildWorkflowPlanSetupSummary(workflowPlan)
 		},
 		{
@@ -500,19 +512,20 @@ export async function promptForWorkflowPlan(configuration: ExtensionConfiguratio
 }
 export async function promptForWorkflowContinuation(
 	configuration: ExtensionConfiguration,
-	session: WorkflowSessionState
+	session: WorkflowSessionState,
+	workspaceMode?: WorkflowExecutionPlan['workspaceMode']
 ): Promise<WorkflowExecutionPlan | undefined> {
 	const suggestedPresets = buildSuggestedNextPresets(session.currentPreset);
 	const presetSelection = await vscode.window.showQuickPick<WorkflowQuickPickItem>(
 		suggestedPresets.map((preset) => ({
-			label: WORKFLOW_PRESETS[preset].label,
+			label: getWorkflowIntentCopy(preset, workspaceMode).label,
 			description: preset === suggestedPresets[0] ? 'Suggested next step' : undefined,
-			detail: `${WORKFLOW_PRESETS[preset].description} Roles: ${formatWorkflowRoles(WORKFLOW_PRESETS[preset].roles)}.`,
+			detail: `${getWorkflowIntentCopy(preset, workspaceMode).description} Roles: ${formatWorkflowRoles(WORKFLOW_PRESETS[preset].roles)}.`,
 			presetDefinition: WORKFLOW_PRESETS[preset]
 		})),
 		{
 			title: 'Continue Workflow: Next Stage',
-			placeHolder: `Current stage: ${WORKFLOW_PRESETS[session.currentPreset].label} with ${getProviderLabel(session.currentProvider)}`,
+			placeHolder: `Current stage: ${getWorkflowIntentCopy(session.currentPreset, workspaceMode).label} with ${getProviderLabel(session.currentProvider)}`,
 			ignoreFocusOut: true
 		}
 	);
@@ -569,12 +582,16 @@ export async function promptForWorkflowContinuation(
 	}
 
 	const brief = await promptForWorkflowBrief(selectedPreset.preset, session);
+	if (brief && workspaceMode) {
+		brief.taskType = inferTaskType(selectedPreset.preset, brief.rawText);
+	}
 	if (!brief) {
 		return undefined;
 	}
 
 	return {
 		preset: selectedPreset.preset,
+		workspaceMode,
 		provider: providerSelection.provider,
 		providerModel,
 		providerAccountId,
@@ -606,15 +623,21 @@ export async function promptForClaudeEffort(defaultEffort: ClaudeEffortLevel): P
 
 	return selection.label.toLowerCase() as ClaudeEffortLevel;
 }
-export async function promptForWorkflowBrief(preset: WorkflowPreset, existingSession?: WorkflowSessionState): Promise<WorkflowBrief | undefined> {
+
+export async function promptForWorkflowBrief(
+	preset: WorkflowPreset,
+	existingSession?: WorkflowSessionState,
+	workspaceMode?: WorkflowExecutionPlan['workspaceMode']
+): Promise<WorkflowBrief | undefined> {
+	const intentCopy = getWorkflowIntentCopy(preset, workspaceMode);
 	const prompt = await vscode.window.showInputBox({
 		title: existingSession ? 'Workflow Brief For Next Stage' : 'Workflow Brief',
-		prompt: buildBriefPrompt(preset),
+		prompt: intentCopy.briefPrompt,
 		placeHolder: existingSession
-			? 'Example: Add a save/load system for custom obstacles without changing the rendering pipeline'
-			: 'Example: Fix the fluid preset selector so it updates all active controls consistently',
+			? intentCopy.briefPlaceholder
+			: intentCopy.briefPlaceholder,
 		ignoreFocusOut: true,
-		value: existingSession ? `Continue from ${WORKFLOW_PRESETS[existingSession.currentPreset].label}: ` : ''
+		value: existingSession ? `Continue from ${getWorkflowIntentCopy(existingSession.currentPreset, workspaceMode).label}: ` : ''
 	});
 
 	if (!prompt || !prompt.trim()) {
@@ -630,21 +653,7 @@ export async function promptForWorkflowBrief(preset: WorkflowPreset, existingSes
 	};
 }
 export function buildBriefPrompt(preset: WorkflowPreset): string {
-	switch (preset) {
-		case 'plan':
-			return 'What should be planned next? Describe the feature, fix, or change to prepare.';
-		case 'build':
-			return 'What should be implemented next?';
-		case 'debug':
-			return 'What bug or failing behavior should be investigated next?';
-		case 'review':
-			return 'What code or change set should be reviewed next?';
-		case 'test':
-			return 'What test surface or regression should be covered next?';
-		case 'explore':
-		default:
-			return 'What area of the codebase should be explored?';
-	}
+	return getWorkflowIntentCopy(preset).briefPrompt;
 }
 export function inferTaskType(preset: WorkflowPreset, text: string): string {
 	const normalized = text.toLowerCase();
@@ -664,7 +673,7 @@ export function inferTaskType(preset: WorkflowPreset, text: string): string {
 }
 export function buildWorkflowPlanSetupSummary(workflowPlan: WorkflowExecutionPlan): string {
 	return [
-		`Preset: ${workflowPlan.presetDefinition.label}`,
+		`Preset: ${getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode).label}`,
 		`Provider: ${getProviderLabel(workflowPlan.provider)}`,
 		`Model: ${formatProviderModel(workflowPlan.provider, workflowPlan.providerModel)}`,
 		`Account: ${workflowPlan.providerAccountId ?? 'default'}`,

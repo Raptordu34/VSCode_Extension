@@ -6,6 +6,7 @@ import {
 	createLearningDocument,
 	getActiveLearningDocument,
 	importSourcesIntoLearningDocument,
+	promptForLearningDocumentType,
 	promptForLearningDocument,
 	setActiveLearningDocument
 } from './service.js';
@@ -39,10 +40,13 @@ export function registerDocumentCommands(context: vscode.ExtensionContext): void
 				return;
 			}
 
-			const documentType: LearningDocumentType = 'compte-rendu';
+			const documentType: LearningDocumentType | undefined = await promptForLearningDocumentType();
+			if (!documentType) {
+				return;
+			}
 			const title = await vscode.window.showInputBox({
 				title: 'Créer un document learning-kit',
-				prompt: 'Nom du document à créer',
+				prompt: `Nom du document à créer pour le type ${documentType}`,
 				placeHolder: 'Exemple: Réseaux bayésiens - séance 03',
 				ignoreFocusOut: true,
 				validateInput: (value) => value.trim().length === 0 ? 'Le titre du document est requis.' : undefined

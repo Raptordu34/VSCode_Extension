@@ -1,4 +1,13 @@
-export type LearningDocumentType = 'compte-rendu';
+export type LearningDocumentType =
+	| 'compte-rendu'
+	| 'presentation'
+	| 'fiche-revision'
+	| 'td-exercice'
+	| 'synthese-article'
+	| 'rapport-projet'
+	| 'comparatif'
+	| 'one-pager'
+	| 'cheat-sheet';
 
 export interface LearningDocumentDefinition {
 	type: LearningDocumentType;

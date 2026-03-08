@@ -3,7 +3,7 @@ import { EventBus } from '../../core/eventBus.js';
 import { Logger } from '../../core/logger.js';
 import { resolveWorkspaceFolder } from '../../core/workspaceContext.js';
 import { getExtensionConfiguration } from '../../core/configuration.js';
-import { buildSmartDefaultWorkflowPlan, openWorkspaceRelativeFile, promptForWorkflowPlan, promptForWorkflowContinuation, updateSelectedWorkflowStageStatus, buildWorkflowSummaryDocument, saveLastWorkflowConfig, inferTaskType, buildSmartContinuationWorkflowPlan } from './workflowService.js';
+import { buildSmartDefaultWorkflowPlan, openWorkspaceRelativeFile, promptForWorkflowPlanWithMode, promptForWorkflowContinuation, updateSelectedWorkflowStageStatus, buildWorkflowSummaryDocument, saveLastWorkflowConfig, inferTaskType, buildSmartContinuationWorkflowPlan } from './workflowService.js';
 import { WORKFLOW_PRESETS } from './presets.js';
 import { gatherProjectContext, buildContextGenerationMessage } from '../context/contextBuilder.js';
 import { readWorkflowBrief, readWorkflowSessionState } from '../context/workflowPersistence.js';
@@ -11,9 +11,13 @@ import { launchProvider } from '../aiAgents/agentLauncher.js';
 import { CONTEXT_FILE_NAME } from './constants.js';
 import { WorkflowDashboardState, ProjectContext, WorkflowQuickPickItem, ProviderTarget, WorkflowPreset, ClaudeEffortLevel, WorkflowTreeNode } from './types.js';
 import { buildWorkspaceUri } from '../../core/workspace.js';
-import { archiveActiveWorkflowState, buildWorkflowHistoryQuickPickLabel, cleanActiveWorkflowFiles, deleteWorkflowFromHistory, forkWorkflowFromHistory, forkWorkflowFromHistoryAtStage, readWorkflowArchiveManifest, readWorkflowHistoryIndex, restoreWorkflowFromHistory } from '../context/workflowHistory.js';
+import { archiveActiveWorkflowState, buildWorkflowHistoryQuickPickLabel, cleanActiveWorkflowFiles, deleteWorkflowFromHistory, forkWorkflowFromHistory, forkWorkflowFromHistoryAtStage, readWorkflowArchiveManifest, readWorkflowHistoryIndex, resetOrchestratorWorkspaceFiles, resetWorkflowRuntimeFiles, restoreWorkflowFromHistory } from '../context/workflowHistory.js';
 import { appendGitignoreRules } from './artifactGovernance.js';
-import { ensureWorkspaceMode, getWorkspaceModeDefinition, supportsLearningDocuments } from '../workspace/service.js';
+import { clearWorkspaceModeState, ensureWorkspaceMode, getWorkspaceModeDefinition, getWorkspaceModeState, supportsLearningDocuments } from '../workspace/service.js';
+import { clearLearningDocumentState, LEARNING_DOCUMENTS_ROOT } from '../documents/service.js';
+import { LAST_WORKFLOW_CONFIG_KEY, PENDING_COPILOT_PROMPT_KEY } from './constants.js';
+import { saveWorkflowHistoryCollapsedIds } from './workflowService.js';
+import { getWorkflowIntentCopy } from './presets.js';
 
 export function registerWorkflowCommands(
 	context: vscode.ExtensionContext,
@@ -73,7 +77,28 @@ export function registerWorkflowCommands(
 			EventBus.fire('refresh');
 		}),
 
-		vscode.commands.registerCommand('ai-context-orchestrator.smartInitAI', async (preset?: string, overrides?: { provider?: string; providerModel?: string; claudeEffort?: string; brief?: string }) => {
+		vscode.commands.registerCommand('ai-context-orchestrator.resetWorkspaceExtension', async () => {
+			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder to reset');
+			if (!workspaceFolder) {return;}
+			await runResetWorkspaceExtensionFlow(context, workspaceFolder, 'full');
+			EventBus.fire('refresh');
+		}),
+
+		vscode.commands.registerCommand('ai-context-orchestrator.resetWorkspaceWorkflowState', async () => {
+			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose workflow runtime should be reset');
+			if (!workspaceFolder) {return;}
+			await runResetWorkspaceExtensionFlow(context, workspaceFolder, 'workflow');
+			EventBus.fire('refresh');
+		}),
+
+		vscode.commands.registerCommand('ai-context-orchestrator.resetWorkspaceExtensionPartial', async () => {
+			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder to partially reset');
+			if (!workspaceFolder) {return;}
+			await runResetWorkspaceExtensionFlow(context, workspaceFolder, 'orchestration');
+			EventBus.fire('refresh');
+		}),
+
+		vscode.commands.registerCommand('ai-context-orchestrator.smartInitAI', async (preset?: string, overrides?: { provider?: string; providerModel?: string; claudeEffort?: string; learningDocumentId?: string; brief?: string }) => {
 			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder to initialize');
 			if (!workspaceFolder) {return;}
 			const configuration = getExtensionConfiguration();
@@ -82,6 +107,7 @@ export function registerWorkflowCommands(
 				provider: overrides.provider as ProviderTarget | undefined,
 				providerModel: overrides.providerModel,
 				claudeEffort: overrides.claudeEffort as ClaudeEffortLevel | undefined,
+				learningDocumentId: overrides.learningDocumentId,
 				brief: overrides.brief
 			} : undefined;
 			await runSmartInitAiFlow(context, resolvedPreset, workspaceFolder, resolvedOverrides);
@@ -91,6 +117,7 @@ export function registerWorkflowCommands(
 					provider: resolvedOverrides.provider ?? configuration.defaultProvider,
 					providerModel: resolvedOverrides.providerModel,
 					claudeEffort: resolvedOverrides.claudeEffort,
+					learningDocumentId: resolvedOverrides.learningDocumentId,
 					brief: resolvedOverrides.brief
 				});
 			}
@@ -117,7 +144,7 @@ export function registerWorkflowCommands(
 			EventBus.fire('refresh');
 		}),
 
-		vscode.commands.registerCommand('ai-context-orchestrator.smartContinueAI', async (overrides?: { preset?: string; provider?: string; providerModel?: string; claudeEffort?: string; brief?: string }) => {
+		vscode.commands.registerCommand('ai-context-orchestrator.smartContinueAI', async (overrides?: { preset?: string; provider?: string; providerModel?: string; claudeEffort?: string; learningDocumentId?: string; brief?: string }) => {
 			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder to continue');
 			if (!workspaceFolder) {return;}
 			await runSmartContinueAiFlow(context, workspaceFolder, overrides ? {
@@ -125,6 +152,7 @@ export function registerWorkflowCommands(
 				provider: overrides.provider as ProviderTarget | undefined,
 				providerModel: overrides.providerModel,
 				claudeEffort: overrides.claudeEffort as ClaudeEffortLevel | undefined,
+				learningDocumentId: overrides.learningDocumentId,
 				brief: overrides.brief
 			} : undefined);
 			if (overrides) {
@@ -134,6 +162,7 @@ export function registerWorkflowCommands(
 					provider: (overrides.provider as ProviderTarget | undefined) ?? configuration.defaultProvider,
 					providerModel: overrides.providerModel,
 					claudeEffort: overrides.claudeEffort as ClaudeEffortLevel | undefined,
+					learningDocumentId: overrides.learningDocumentId,
 					brief: overrides.brief
 				});
 			}
@@ -177,6 +206,7 @@ async function runSmartInitAiFlow(
 		provider?: ProviderTarget;
 		providerModel?: string;
 		claudeEffort?: ClaudeEffortLevel;
+		learningDocumentId?: string;
 		brief?: string;
 	}
 ): Promise<void> {
@@ -187,10 +217,12 @@ async function runSmartInitAiFlow(
 
 	const configuration = getExtensionConfiguration();
 	const workflowPlan = buildSmartDefaultWorkflowPlan(preset, configuration);
+	workflowPlan.workspaceMode = workspaceModeState.mode;
 	workflowPlan.startNewWorkflow = true;
 	if (overrides?.provider) { workflowPlan.provider = overrides.provider; }
 	if (overrides?.providerModel !== undefined) { workflowPlan.providerModel = overrides.providerModel; }
 	if (overrides?.claudeEffort) { workflowPlan.claudeEffort = overrides.claudeEffort; }
+	if (overrides?.learningDocumentId !== undefined) { workflowPlan.learningDocumentId = overrides.learningDocumentId; }
 	if (overrides?.brief) {
 		workflowPlan.brief = {
 			taskType: inferTaskType(preset, overrides.brief),
@@ -216,10 +248,12 @@ async function runSmartContinueAiFlow(
 		provider?: ProviderTarget;
 		providerModel?: string;
 		claudeEffort?: ClaudeEffortLevel;
+		learningDocumentId?: string;
 		brief?: string;
 	}
 ): Promise<void> {
 	const configuration = getExtensionConfiguration();
+	const workspaceModeState = getWorkspaceModeState(context, workspaceFolder);
 	const existingSession = await readWorkflowSessionState(workspaceFolder.uri);
 	if (!existingSession) {
 		vscode.window.showWarningMessage('No workflow session found yet. Start with Init Workflow first.');
@@ -227,6 +261,7 @@ async function runSmartContinueAiFlow(
 	}
 
 	const workflowPlan = buildSmartContinuationWorkflowPlan(existingSession, configuration, overrides);
+	workflowPlan.workspaceMode = workspaceModeState?.mode;
 	if (overrides?.brief) {
 		workflowPlan.brief = {
 			taskType: inferTaskType(workflowPlan.preset, overrides.brief),
@@ -234,6 +269,9 @@ async function runSmartContinueAiFlow(
 			constraints: [],
 			rawText: overrides.brief
 		};
+	}
+	if (overrides?.learningDocumentId !== undefined) {
+		workflowPlan.learningDocumentId = overrides.learningDocumentId;
 	}
 	const projectContext = await gatherProjectContext(context, false, workflowPlan, workspaceFolder);
 	if (!projectContext) {return;}
@@ -252,13 +290,13 @@ async function runInitAiFlow(context: vscode.ExtensionContext, workspaceFolder: 
 	if (supportsLearningDocuments(workspaceModeState.mode)) {
 		const action = await vscode.window.showQuickPick([
 			{
-				label: 'Créer un compte rendu learning-kit',
+				label: 'Créer un document learning-kit',
 				description: 'Initialiser un document documentaire structuré',
 				action: 'create-document'
 			},
 			{
-				label: 'Lancer l’assistant IA',
-				description: 'Conserver le workflow IA tout en injectant le contexte documentaire',
+				label: `Démarrer ${getWorkflowIntentCopy('build', workspaceModeState.mode).label.toLowerCase()}`,
+				description: 'Ouvrir la configuration de workflow avec des intents adaptés au mode documentaire',
 				action: 'launch-assistant'
 			},
 			{
@@ -268,7 +306,9 @@ async function runInitAiFlow(context: vscode.ExtensionContext, workspaceFolder: 
 			}
 		], {
 			title: 'Initialisation du workspace',
-			placeHolder: 'Choisissez l’action principale pour ce workspace documentaire',
+			placeHolder: workspaceModeState.mode === 'research'
+				? 'Choisissez comment démarrer votre workflow documentaire de recherche'
+				: 'Choisissez comment démarrer votre workflow documentaire',
 			ignoreFocusOut: true
 		});
 
@@ -288,7 +328,7 @@ async function runInitAiFlow(context: vscode.ExtensionContext, workspaceFolder: 
 	}
 
 	const configuration = getExtensionConfiguration();
-	const workflowPlan = await promptForWorkflowPlan(configuration);
+	const workflowPlan = await promptForWorkflowPlanWithMode(configuration, workspaceModeState.mode);
 	if (!workflowPlan) {return;}
 	workflowPlan.startNewWorkflow = true;
 
@@ -316,15 +356,70 @@ async function runInitAiFlow(context: vscode.ExtensionContext, workspaceFolder: 
 	Logger.info(`[launch] Started workflow ${workflowPlan.preset} with provider ${workflowPlan.provider}`);
 }
 
+async function runResetWorkspaceExtensionFlow(
+	context: vscode.ExtensionContext,
+	workspaceFolder: vscode.WorkspaceFolder,
+	requestedScope: 'workflow' | 'orchestration' | 'full'
+): Promise<void> {
+	const scope = requestedScope;
+	const isWorkflowReset = scope === 'workflow';
+	const isFullReset = scope === 'full';
+	const isOrchestrationReset = scope === 'orchestration';
+	const confirm = await vscode.window.showWarningMessage(
+		isFullReset
+			? 'Reset complet AI Context Orchestrator dans ce workspace ? Cela supprime les fichiers de workflow générés, l’historique, les learning documents et le mode du workspace pour repartir depuis zéro.'
+			: isOrchestrationReset
+				? 'Reset orchestration AI Context Orchestrator dans ce workspace ? Cela supprime les fichiers de workflow générés, les artefacts provider et l’état d’orchestration, tout en conservant les learning documents et le mode du workspace.'
+				: 'Reset workflow AI Context Orchestrator dans ce workspace ? Cela supprime seulement le contexte courant, la session active et l’historique de workflow, sans toucher aux learning documents, au mode du workspace ni aux artefacts provider.',
+		{ modal: true },
+		isFullReset ? 'Reset complet' : isOrchestrationReset ? 'Reset orchestration' : 'Reset workflow'
+	);
+	if (confirm !== (isFullReset ? 'Reset complet' : isOrchestrationReset ? 'Reset orchestration' : 'Reset workflow')) {
+		return;
+	}
+
+	const learningDocumentsUri = vscode.Uri.joinPath(workspaceFolder.uri, ...LEARNING_DOCUMENTS_ROOT.split('/'));
+	const learningDocumentsExists = isFullReset
+		? await vscode.workspace.fs.stat(learningDocumentsUri).then(() => true, () => false)
+		: false;
+	const resetResult = isWorkflowReset
+		? await resetWorkflowRuntimeFiles(workspaceFolder)
+		: await resetOrchestratorWorkspaceFiles(workspaceFolder);
+	if (isFullReset && learningDocumentsExists) {
+		await vscode.workspace.fs.delete(learningDocumentsUri, { recursive: true, useTrash: false });
+	}
+
+	const cleanupTasks: Array<Thenable<void> | Promise<void>> = [
+		saveWorkflowHistoryCollapsedIds(context, workspaceFolder, []),
+		context.globalState.update(LAST_WORKFLOW_CONFIG_KEY, undefined),
+		context.globalState.update(PENDING_COPILOT_PROMPT_KEY, undefined)
+	];
+	if (isFullReset) {
+		cleanupTasks.push(clearLearningDocumentState(context, workspaceFolder));
+		cleanupTasks.push(clearWorkspaceModeState(context, workspaceFolder));
+	}
+	await Promise.all(cleanupTasks);
+
+	const removedLearningDocuments = learningDocumentsExists ? 1 : 0;
+	void vscode.window.showInformationMessage(
+		isFullReset
+			? `Reset complet terminé. ${resetResult.deletedPaths + removedLearningDocuments} chemin(s) généré(s) supprimé(s) et ${resetResult.cleanedManagedFiles} fichier(s) managé(s) nettoyé(s).`
+			: isOrchestrationReset
+				? `Reset orchestration terminé. ${resetResult.deletedPaths} chemin(s) d’orchestration supprimé(s) et ${resetResult.cleanedManagedFiles} fichier(s) managé(s) nettoyé(s). Les learning documents et le mode du workspace sont conservés.`
+				: `Reset workflow terminé. ${resetResult.deletedPaths} chemin(s) de contexte et d’historique supprimé(s). Les learning documents, le mode du workspace et les artefacts provider sont conservés.`
+	);
+}
+
 async function runContinueWorkflowFlow(context: vscode.ExtensionContext, workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
 	const configuration = getExtensionConfiguration();
+	const workspaceModeState = getWorkspaceModeState(context, workspaceFolder);
 	const existingSession = await readWorkflowSessionState(workspaceFolder.uri);
 	if (!existingSession) {
 		vscode.window.showWarningMessage('No workflow session found yet. Start with Init Workflow first.');
 		return;
 	}
 
-	const workflowPlan = await promptForWorkflowContinuation(configuration, existingSession);
+	const workflowPlan = await promptForWorkflowContinuation(configuration, existingSession, workspaceModeState?.mode);
 	if (!workflowPlan) {return;}
 	workflowPlan.startNewWorkflow = false;
 	workflowPlan.workflowId = existingSession.workflowId;

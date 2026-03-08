@@ -22,6 +22,7 @@ import { replaceManagedBlock } from '../aiAgents/promptBuilder.js';
 import { formatWorkflowRoles } from '../workflow/ui.js';
 import { archiveActiveWorkflowState } from './workflowHistory.js';
 import { createNonce } from '../../utils/index.js';
+import { getWorkflowIntentCopy } from '../workflow/presets.js';
 
 export interface WorkspaceWriteOperation {
 	uri: vscode.Uri;
@@ -296,8 +297,9 @@ export function buildWorkflowStageContent(
 	stage: WorkflowStageRecord,
 	brief?: WorkflowBrief
 ): string {
+	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
 	return [
-		`# Stage ${String(stage.index).padStart(2, '0')} ${workflowPlan.presetDefinition.label}`,
+		`# Stage ${String(stage.index).padStart(2, '0')} ${intentCopy.label}`,
 		'',
 		`- Provider: ${getProviderLabel(workflowPlan.provider)}`,
 		`- Provider model: ${formatProviderModel(workflowPlan.provider, stage.providerModel)}`,
@@ -310,7 +312,7 @@ export function buildWorkflowStageContent(
 		`- Generated at: ${stage.generatedAt}`,
 		'',
 		'## Objective',
-		workflowPlan.presetDefinition.launchInstruction,
+		intentCopy.launchInstruction,
 		'',
 		'## User Brief',
 		brief ? brief.goal : 'No explicit brief provided for this stage.',
@@ -335,8 +337,9 @@ export function buildWorkflowStageContent(
 }
 
 export function buildContextGenerationMessage(projectContext: ProjectContext): string {
+	const intentCopy = getWorkflowIntentCopy(projectContext.workflowPlan.preset, projectContext.workflowPlan.workspaceMode);
 	const parts = [
-		`${projectContext.workflowPlan.presetDefinition.label} workflow prepared for ${projectContext.workflowPlan.provider}.`,
+		`${intentCopy.label} workflow prepared for ${projectContext.workflowPlan.provider}.`,
 		projectContext.reused
 			? 'Existing context pack reused.'
 			: projectContext.optimization.applied
@@ -378,7 +381,8 @@ export async function persistWorkflowArtifacts(
 	const workflowId = workflowPlan.workflowId ?? (isNewWorkflow ? `workflow-${Date.now().toString(36)}-${createNonce().slice(0, 8)}` : existingSession?.workflowId);
 	const branchId = workflowPlan.branchId ?? existingSession?.branchId ?? 'main';
 	const createdAt = isNewWorkflow ? new Date().toISOString() : existingSession?.createdAt;
-	const label = brief?.goal ?? (workflowPlan.preset === 'explore' ? 'Explore workflow' : `${workflowPlan.presetDefinition.label} workflow`);
+	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
+	const label = brief?.goal ?? (workflowPlan.preset === 'explore' ? `${intentCopy.label}` : `${intentCopy.label} workflow`);
 	const stage: WorkflowStageRecord = {
 		index: nextIndex,
 		workflowId,
@@ -390,7 +394,7 @@ export async function persistWorkflowArtifacts(
 		status: 'prepared',
 		stageFile,
 		generatedAt: new Date().toISOString(),
-		briefSummary: brief?.goal ?? (workflowPlan.preset === 'explore' ? 'Explore the repository and identify reusable patterns.' : 'No brief provided.'),
+		briefSummary: brief?.goal ?? (workflowPlan.preset === 'explore' ? intentCopy.launchInstruction : 'No brief provided.'),
 		contextFile: relativizeToWorkspace(workspaceFolder.uri, contextFile),
 		claudeAccountId: workflowPlan.claudeAccountId,
 		claudeEffort: workflowPlan.claudeEffort,
