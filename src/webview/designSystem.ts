@@ -557,6 +557,135 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	.advanced-details summary { cursor: pointer; font-size: 0.80rem; color: var(--text-secondary); list-style: none; }
 	.advanced-details summary::-webkit-details-marker { display: none; }
 	.advanced-details summary:hover { color: var(--text-body); }
+	/* Config Drawer */
+	.mc-backdrop {
+	  position: fixed;
+	  inset: 0;
+	  background: rgba(0,0,0,0.5);
+	  backdrop-filter: blur(4px);
+	  -webkit-backdrop-filter: blur(4px);
+	  z-index: 100;
+	  animation: fade-in 150ms ease;
+	}
+	.mc-drawer {
+	  position: fixed;
+	  bottom: 0;
+	  left: 0;
+	  right: 0;
+	  z-index: 101;
+	  background: var(--panel-strong);
+	  border-top: 1px solid var(--glass-border);
+	  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+	  display: flex;
+	  flex-direction: column;
+	  max-height: 90vh;
+	  animation: slide-up 200ms ease-out;
+	}
+	@keyframes slide-up {
+	  from { transform: translateY(100%); }
+	  to   { transform: translateY(0); }
+	}
+	@keyframes fade-in {
+	  from { opacity: 0; }
+	  to   { opacity: 1; }
+	}
+	.drawer-header {
+	  display: flex;
+	  align-items: center;
+	  justify-content: space-between;
+	  padding: 14px 16px 10px;
+	  border-bottom: 1px solid rgba(255,255,255,0.07);
+	  flex-shrink: 0;
+	}
+	.drawer-title {
+	  font-size: 0.95rem;
+	  font-weight: 800;
+	  color: var(--text-primary);
+	}
+	.drawer-close {
+	  appearance: none;
+	  background: none;
+	  border: none;
+	  color: var(--text-secondary);
+	  cursor: pointer;
+	  font-size: 1rem;
+	  padding: 4px 8px;
+	  border-radius: 6px;
+	  width: auto;
+	  box-shadow: none;
+	  transition: color 120ms, background 120ms;
+	}
+	.drawer-close:hover { color: var(--text-primary); background: rgba(255,255,255,0.06); transform: none; box-shadow: none; }
+	.drawer-body {
+	  overflow-y: auto;
+	  padding: 14px 16px;
+	  display: grid;
+	  gap: 14px;
+	  flex: 1;
+	}
+	.drawer-footer {
+	  padding: 12px 16px;
+	  border-top: 1px solid rgba(255,255,255,0.07);
+	  flex-shrink: 0;
+	}
+	.drawer-field { display: grid; gap: 6px; }
+	.drawer-label {
+	  font-size: 0.78rem;
+	  font-weight: 700;
+	  color: var(--text-secondary);
+	  text-transform: uppercase;
+	  letter-spacing: 0.06em;
+	}
+	.drawer-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+	.drawer-pill {
+	  appearance: none;
+	  padding: 5px 12px;
+	  border-radius: 999px;
+	  border: 1px solid rgba(255,255,255,0.10);
+	  background: rgba(255,255,255,0.04);
+	  color: var(--text-secondary);
+	  cursor: pointer;
+	  font-size: 0.80rem;
+	  font-weight: 600;
+	  width: auto;
+	  box-shadow: none;
+	  transition: background 100ms, border-color 100ms, color 100ms;
+	}
+	.drawer-pill:hover:not(:disabled) { background: rgba(214,117,86,0.10); color: var(--text-body); transform: none; box-shadow: none; }
+	.drawer-pill.active {
+	  background: linear-gradient(160deg, rgba(214,117,86,0.22), rgba(214,117,86,0.10));
+	  border-color: rgba(214,117,86,0.40);
+	  color: var(--text-primary);
+	  transform: none;
+	  box-shadow: none;
+	}
+	.drawer-select {
+	  appearance: none;
+	  width: 100%;
+	  padding: 8px 10px;
+	  border-radius: 10px;
+	  border: 1px solid rgba(255,255,255,0.10);
+	  background: rgba(255,255,255,0.04);
+	  color: var(--text-body);
+	  font: inherit;
+	  font-size: 0.84rem;
+	  cursor: pointer;
+	}
+	.drawer-select:focus { outline: 1px solid rgba(214,117,86,0.40); }
+	.drawer-textarea {
+	  width: 100%;
+	  min-height: 64px;
+	  padding: 8px 10px;
+	  border-radius: 10px;
+	  border: 1px solid rgba(255,255,255,0.10);
+	  background: rgba(255,255,255,0.04);
+	  color: var(--text-body);
+	  font: inherit;
+	  font-size: 0.84rem;
+	  resize: vertical;
+	  box-sizing: border-box;
+	}
+	.drawer-textarea:focus { outline: 1px solid rgba(214,117,86,0.40); }
 </style>
 </head>
 <body>
