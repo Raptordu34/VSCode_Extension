@@ -8,12 +8,14 @@ import {
 import { WORKFLOW_PRESETS } from './presets.js';
 import type {
 	ExtensionConfiguration,
+	LastWorkflowConfig,
 	ProviderAccountConfiguration,
 	ProviderTarget,
 	WorkflowDashboardState,
 	WorkflowStageStatus,
 	WorkflowRole } from './types.js';
 import { capitalize } from "../../utils/index.js";
+import { readLastWorkflowConfig } from './workflowService.js';
 
 export interface WorkflowUiHelpers {
 	createNonce(): string;
@@ -29,11 +31,13 @@ export interface WorkflowUiHelpers {
 
 export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 	private view?: vscode.WebviewView;
+	private drawerOpen = false;
 
 	constructor(
 		private readonly extensionUri: vscode.Uri,
 		private readonly loadState: () => Promise<WorkflowDashboardState>,
-		private readonly helpers: WorkflowUiHelpers
+		private readonly helpers: WorkflowUiHelpers,
+		private readonly context: vscode.ExtensionContext
 	) {}
 
 	refresh(): void {
@@ -119,6 +123,14 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 				case 'markCompleted':
 					await vscode.commands.executeCommand('ai-context-orchestrator.setSelectedStageCompleted', message.stageIndex !== undefined ? { stageIndex: message.stageIndex } : undefined);
 					return;
+				case 'openConfigDrawer':
+					this.drawerOpen = true;
+					void this.render(this.view!);
+					return;
+				case 'closeConfigDrawer':
+					this.drawerOpen = false;
+					void this.render(this.view!);
+					return;
 			}
 		});
 
@@ -128,7 +140,8 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 	private async render(webviewView: vscode.WebviewView): Promise<void> {
 		const state = await this.loadState();
 		const nonce = this.helpers.createNonce();
-		webviewView.webview.html = getWorkflowControlHtml(webviewView.webview, state, nonce, this.helpers);
+		const lastConfig = this.drawerOpen ? readLastWorkflowConfig(this.context) : undefined;
+		webviewView.webview.html = getWorkflowControlHtml(webviewView.webview, state, nonce, this.helpers, this.drawerOpen, lastConfig);
 	}
 }
 
@@ -213,7 +226,9 @@ export function getWorkflowControlHtml(
 	webview: vscode.Webview,
 	state: WorkflowDashboardState,
 	nonce: string,
-	helpers: WorkflowUiHelpers
+	helpers: WorkflowUiHelpers,
+	drawerOpen: boolean = false,
+	lastConfig?: LastWorkflowConfig
 ): string {
 	const configuration = state.configuration ?? helpers.getExtensionConfiguration();
 	const defaultPreset = configuration.defaultPreset;
@@ -312,12 +327,6 @@ for (var btn of document.querySelectorAll('.preset-btn')) {
 		for (var x of document.querySelectorAll('.preset-btn')) { x.classList.toggle('active', x.dataset.preset === selectedPreset); }
 	}; })(btn));
 }
-var launchBtn = document.getElementById('mc-launch-btn');
-if (launchBtn) {
-	launchBtn.addEventListener('click', function() {
-		vscode.postMessage({ command: 'smartInit', preset: selectedPreset });
-	});
-}
 for (var markBtn of document.querySelectorAll('button[data-stage-index]')) {
 	markBtn.addEventListener('click', (function(b) { return function() {
 		vscode.postMessage({ command: b.dataset.command, stageIndex: Number(b.dataset.stageIndex) });
@@ -344,7 +353,7 @@ function buildInitHero(helpers: WorkflowUiHelpers, defaultPreset: string, defaul
 	<div class="preset-selector">${presetButtons}</div>
 	<p class="small" style="margin-top:8px;">Avec : ${helpers.escapeHtml(defaultProvider)} · ${helpers.escapeHtml(defaultModel)}</p>
 	<div class="actions" style="margin-top:10px;">
-		<button type="button" id="mc-launch-btn">Lancer ▶</button>
+		<button type="button" data-command="openConfigDrawer">Lancer ▶</button>
 	</div>
 	<details class="advanced-details" style="margin-top:8px;">
 		<summary>▸ Configuration complète</summary>

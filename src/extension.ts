@@ -36,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
 	};
 
 	const loadDashboardState = async (): Promise<WorkflowDashboardState> => getWorkflowDashboardState(context);
-	const workflowControlViewProvider = new WorkflowControlViewProvider(context.extensionUri, loadDashboardState, workflowUiHelpers);
+	const workflowControlViewProvider = new WorkflowControlViewProvider(context.extensionUri, loadDashboardState, workflowUiHelpers, context);
 
 	const refreshDebouncer = new UiRefreshDebouncer();
 
