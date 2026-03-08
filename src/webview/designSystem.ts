@@ -178,7 +178,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		gap: 8px;
 		width: fit-content;
 		padding: 4px 8px;
-		border-radius: 999px;
+		border-radius: var(--radius-interactive);
 		background: var(--badge-bg);
 		border: 1px solid transparent;
 		color: var(--badge-fg);
@@ -196,7 +196,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		width: 100%;
 		text-align: left;
 		padding: 12px 14px;
-		border-radius: 14px;
+		border-radius: var(--radius-interactive);
 		border: 1px solid transparent;
 		background: transparent;
 		color: var(--text-body);
@@ -281,7 +281,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		content: '';
 		width: 3px;
 		height: 16px;
-		border-radius: 999px;
+		border-radius: 0;
 		background: var(--accent);
 	}
 	.lead {
@@ -407,9 +407,10 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		display: flex;
 		gap: 6px;
 		padding: 4px;
-		border-radius: 16px;
+		border-radius: var(--radius-sm);
 		background: var(--panel-strong);
 		border: 1px solid var(--glass-border);
+		box-shadow: var(--shadow-elev-1);
 		overflow-x: auto;
 		scrollbar-width: none;
 	}
@@ -420,7 +421,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		appearance: none;
 		white-space: nowrap;
 		padding: 8px 14px;
-		border-radius: 12px;
+		border-radius: var(--radius-interactive);
 		border: 1px solid transparent;
 		background: transparent;
 		color: var(--text-secondary);
@@ -440,7 +441,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		background: var(--active-bg);
 		border-color: transparent;
 		color: var(--active-fg);
-		box-shadow: none;
+		box-shadow: var(--shadow-elev-1);
 	}
 	.tab-panel {
 		display: none;
@@ -539,7 +540,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	.preset-btn {
 		appearance: none;
 		padding: 5px 12px;
-		border-radius: 999px;
+		border-radius: var(--radius-interactive);
 		border: 1px solid var(--glass-border);
 		background: var(--panel-soft);
 		color: var(--text-secondary);
@@ -640,7 +641,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	}
 	.history-toggle {
 		padding: 0;
-		border-radius: 6px;
+		border-radius: var(--radius-interactive);
 		border: 1px solid rgba(255,255,255,0.1);
 		background: rgba(255,255,255,0.04);
 		color: var(--text-secondary);
@@ -692,7 +693,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	.pill-label { display: block; font-size: 0.83rem; font-weight: 700; color: var(--text-primary); }
 	.pill-status { display: block; font-size: 0.74rem; color: var(--text-secondary); margin-top: 2px; }
 	.pill-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-	.small-btn { padding: 4px 10px !important; font-size: 0.76rem !important; border-radius: 8px !important; }
+	.small-btn { padding: 4px 10px !important; font-size: 0.76rem !important; border-radius: var(--radius-interactive) !important; }
 	.provider-row { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
 	.provider-row:last-of-type { border-bottom: none; }
 	.provider-card {
@@ -728,7 +729,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	}
 	.provider-metric-grid .stat {
 		padding: 10px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 	}
 	.provider-metric-grid .stat strong {
 		font-size: 0.78rem;
@@ -816,9 +817,10 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	  display: grid;
 	  gap: 0;
 	  margin-bottom: 12px;
-	  background: var(--panel-elevated);
+	  background: var(--panel-glass);
 	  border: 1px solid var(--glass-border);
-	  box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+	  border-top-color: color-mix(in srgb, var(--glass-border) 70%, rgba(255,255,255,0.12));
+	  box-shadow: var(--shadow-elev-2);
 	  animation: fade-in 140ms ease-out;
 	}
 	@keyframes fade-in {
@@ -867,7 +869,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	  display: grid;
 	  gap: 4px;
 	  padding: 12px 14px;
-	  border-radius: 14px;
+	  border-radius: var(--radius-sm);
 	  background: var(--panel-soft);
 	  border: 1px solid var(--glass-border);
 	}
@@ -883,7 +885,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	  display: grid;
 	  gap: 12px;
 	  padding: 14px;
-	  border-radius: 16px;
+	  border-radius: var(--radius-sm);
 	  background: var(--panel-soft);
 	  border: 1px solid var(--glass-border);
 	}
@@ -917,7 +919,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	.drawer-pill {
 	  appearance: none;
 	  padding: 7px 12px;
-	  border-radius: 999px;
+	  border-radius: var(--radius-interactive);
 	  border: 1px solid var(--glass-border);
 	  background: var(--panel-bg);
 	  color: var(--text-body);
@@ -940,7 +942,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	  appearance: none;
 	  width: 100%;
 	  padding: 10px 12px;
-	  border-radius: 10px;
+	  border-radius: var(--radius-sm);
 	  border: 1px solid var(--input-border);
 	  background: var(--input-bg);
 	  color: var(--input-fg);
@@ -952,7 +954,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	  width: 100%;
 	  min-height: 84px;
 	  padding: 10px 12px;
-	  border-radius: 10px;
+	  border-radius: var(--radius-sm);
 	  border: 1px solid var(--input-border);
 	  background: var(--input-bg);
 	  color: var(--input-fg);
@@ -962,7 +964,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	  box-sizing: border-box;
 	}
 	.drawer-advanced {
-	  border-radius: 14px;
+	  border-radius: var(--radius-sm);
 	  border: 1px solid var(--glass-border);
 	  background: var(--panel-bg);
 	  padding: 0 14px;
@@ -1027,7 +1029,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	/* Stage preview */
 	.stage-preview {
 		margin-top: 8px;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		border: 1px solid var(--glass-border);
 		overflow: hidden;
 	}
@@ -1056,7 +1058,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	/* Copilot banner */
 	.copilot-banner {
 		padding: 12px 14px;
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-sm);
 		border: 1px solid color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 42%, var(--glass-border));
 		background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 10%, var(--panel-strong));
 		margin-bottom: 6px;
