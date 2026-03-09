@@ -324,6 +324,8 @@ export interface WorkflowDashboardState {
 	providerStatusUpdatedAt?: string;
 	copilotPendingPrompt?: string;
 	artifactGovernance?: ArtifactGovernancePolicy;
+	activePipeline?: ActivePipelineState;
+	availablePipelineTemplates?: PipelineTemplateDefinition[];
 }
 
 export interface WorkflowTreeNode {
@@ -348,4 +350,42 @@ export interface LastWorkflowConfig {
   claudeEffort?: ClaudeEffortLevel;
 	learningDocumentId?: string;
   brief?: string;
+}
+
+// Pipeline types
+export type PipelineTemplateId = 'add-feature' | 'bug-fix' | 'code-review' | 'refactor';
+
+export interface PipelineStepConfig {
+  preset: WorkflowPreset;
+  label: string;
+  provider?: ProviderTarget;
+  providerModel?: string;
+  providerAccountId?: string;
+  claudeAccountId?: string;
+  claudeEffort?: ClaudeEffortLevel;
+}
+
+export interface PipelineTemplateDefinition {
+  id: PipelineTemplateId;
+  label: string;
+  description: string;
+  steps: WorkflowPreset[];
+  gitBranchPrefix?: string;
+  skipGit?: boolean;
+}
+
+export interface ActivePipelineState {
+  templateId: PipelineTemplateId;
+  branchName?: string;
+  currentStepIndex: number;
+  stepConfigs: PipelineStepConfig[];
+  workflowId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GitOperationResult {
+  success: boolean;
+  branchName?: string;
+  error?: string;
 }

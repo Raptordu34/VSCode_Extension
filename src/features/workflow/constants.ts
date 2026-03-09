@@ -58,6 +58,8 @@ export const LAST_WORKFLOW_CONFIG_KEY = 'aiContextOrchestrator.lastWorkflowConfi
 export const WORKFLOW_HISTORY_COLLAPSE_STATE_KEY = 'aiContextOrchestrator.workflowHistoryCollapseState';
 export const PENDING_COPILOT_PROMPT_KEY = 'aiContextOrchestrator.pendingCopilotPrompt';
 
+export const ACTIVE_PIPELINE_STATE_KEY = 'aiContextOrchestrator.activePipeline';
+
 export const GITIGNORE_MANAGED_PATHS = [
 	'.ai-orchestrator/session.json',
 	'.ai-orchestrator/stages/',

@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import type { WorkflowDashboardState, WorkflowTreeNode, WorkflowStageStatus, ExtensionConfiguration, WorkflowExecutionPlan, ProjectContext, WorkflowQuickPickItem, ClaudeEffortLevel, WorkflowPreset, WorkflowBrief, WorkflowSessionState, ProviderTarget, LastWorkflowConfig, ArtifactGovernancePolicy } from "./types.js";
+import { readActivePipelineState } from "./pipelineService.js";
+import { PIPELINE_TEMPLATES } from "./pipelineTemplates.js";
 import type { ProviderStatusCache } from "../providers/types.js";
 import type { LearningDocumentRecord } from '../documents/types.js';
 import { PROVIDER_STATUS_CACHE_KEY, CONTEXT_FILE_NAME, LAST_WORKFLOW_CONFIG_KEY, PENDING_COPILOT_PROMPT_KEY, WORKFLOW_HISTORY_COLLAPSE_STATE_KEY } from "./constants.js";
@@ -125,6 +127,9 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 	const latestStage = session?.stages.at(-1);
 	const artifactCount = session?.stages.reduce((total, stage) => total + stage.artifactFiles.length, 0) ?? 0;
 
+	const activePipeline = readActivePipelineState(context, workspaceFolder);
+	const availablePipelineTemplates = Object.values(PIPELINE_TEMPLATES);
+
 	return {
 		workspaceFolder,
 		workspaceModeState,
@@ -147,7 +152,9 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 		providerStatuses,
 		providerStatusUpdatedAt: providerStatusCache?.updatedAt,
 		copilotPendingPrompt,
-		artifactGovernance
+		artifactGovernance,
+		activePipeline,
+		availablePipelineTemplates
 	};
 }
 export async function updateSelectedWorkflowStageStatus(

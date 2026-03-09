@@ -27,7 +27,10 @@ import type {
 	WorkflowRole,
 	WorkflowSessionState,
 	ClaudeEffortLevel,
-	WorkflowPreset } from './types.js';
+	WorkflowPreset,
+	PipelineTemplateDefinition,
+	ActivePipelineState } from './types.js';
+import { PIPELINE_TEMPLATES } from './pipelineTemplates.js';
 import { capitalize } from "../../utils/index.js";
 import { readLastWorkflowConfig, setWorkflowHistoryCollapsed } from './workflowService.js';
 import { getWorkspaceModeDefinition } from '../workspace/service.js';
@@ -302,6 +305,15 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 					return;
 				case 'configureGitignore':
 					await vscode.commands.executeCommand('ai-context-orchestrator.configureGitignore');
+					return;
+				case 'startPipeline':
+					await vscode.commands.executeCommand('ai-context-orchestrator.startPipeline', message.target);
+					return;
+				case 'abortPipeline':
+					await vscode.commands.executeCommand('ai-context-orchestrator.abortPipeline');
+					return;
+				case 'advancePipelineStep':
+					await vscode.commands.executeCommand('ai-context-orchestrator.advancePipelineStep');
 					return;
 				case 'fetchStagePreview': {
 					const stageFile = message.target;
@@ -595,12 +607,22 @@ ${filesHtml}`
 ${filesHtml}
 ${learningDocumentsHtml}`;
 
+	const isCodeMode = state.workspaceModeState?.mode === 'code';
+	const activePipelineHtml = isCodeMode && state.activePipeline
+		? buildActivePipelineHtml(state.activePipeline, helpers)
+		: '';
+	const pipelinePickerHtml = isCodeMode && !state.activePipeline && state.availablePipelineTemplates?.length
+		? buildPipelinePickerHtml(state.availablePipelineTemplates, helpers)
+		: '';
+
 	const contentHtml = `
 ${copilotBannerHtml}
+${activePipelineHtml}
 ${drawerHtml}
 ${heroHtml}
 ${historyHtml}
 ${stagesHtml}
+${pipelinePickerHtml}
 ${primarySectionsHtml}
 ${governanceHtml}
 	${state.session ? `<div style="margin-top:4px;">
@@ -1251,6 +1273,68 @@ function buildActiveHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpe
 		<button type="button" class="secondary" data-command="manageDistributedSourceAnalysis" ${distributedSourceBatch ? '' : 'disabled'}>Sources</button>
 	</div>
 	<p class="small" style="margin-top:8px;">Use the sections below to inspect handoffs, restore previous runs, or branch from the current stage.</p>
+</section>`;
+}
+
+function buildPipelinePickerHtml(templates: PipelineTemplateDefinition[], helpers: WorkflowUiHelpers): string {
+	const cards = templates.map((t) => `
+	<div class="provider-row provider-card" style="gap:8px;">
+		<div class="provider-title-row">
+			<strong>${helpers.escapeHtml(t.label)}</strong>
+		</div>
+		<div class="small provider-detail">${helpers.escapeHtml(t.description)}</div>
+		<div class="small provider-detail" style="margin-top:2px;">${helpers.escapeHtml(t.steps.join(' → '))}</div>
+		<div class="actions dense-actions" style="margin-top:6px;">
+			<button type="button" data-command="startPipeline" data-target="${helpers.escapeHtml(t.id)}">Start</button>
+		</div>
+	</div>`).join('');
+
+	return `
+<details class="mc-section">
+<summary class="mc-section-header">
+	<span class="mc-section-title">Pipelines</span>
+	<span class="mc-section-badge">${templates.length} templates</span>
+</summary>
+<div class="mc-section-body">
+	<p class="section-footnote">Run a multi-step pipeline that chains presets together and optionally manages a git branch.</p>
+	${cards}
+</div>
+</details>`;
+}
+
+function buildActivePipelineHtml(activePipeline: ActivePipelineState, helpers: WorkflowUiHelpers): string {
+	const template = PIPELINE_TEMPLATES[activePipeline.templateId];
+	if (!template) {
+		return '';
+	}
+
+	const pills = template.steps.map((step, i) => {
+		const isDone = i < activePipeline.currentStepIndex;
+		const isCurrent = i === activePipeline.currentStepIndex;
+		const statusClass = isDone ? 'completed' : isCurrent ? 'in-progress' : 'prepared';
+		const badge = isDone ? 'Done' : isCurrent ? 'Current' : 'Pending';
+		return `<span class="stage-pill ${statusClass}" style="display:inline-block; margin:2px 4px 2px 0; padding:2px 8px; font-size:12px;">${helpers.escapeHtml(step)} <span class="history-badge stage-badge">${badge}</span></span>`;
+	}).join('');
+
+	const branchInfo = activePipeline.branchName
+		? `<div class="small provider-detail" style="margin-top:4px;">Branch: <code>${helpers.escapeHtml(activePipeline.branchName)}</code></div>`
+		: '';
+
+	const stepNumber = activePipeline.currentStepIndex + 1;
+	const isComplete = activePipeline.currentStepIndex >= template.steps.length;
+
+	return `
+<section class="card" style="margin-bottom:12px; border-left:3px solid var(--vscode-focusBorder);">
+	<div class="kicker">Active Pipeline</div>
+	<h3 style="margin-top:4px;">${helpers.escapeHtml(template.label)}</h3>
+	<div style="margin-top:6px;">${pills}</div>
+	${branchInfo}
+	<div class="actions dense-actions" style="margin-top:8px;">
+		${isComplete
+			? ''
+			: `<button type="button" data-command="advancePipelineStep">Run Step ${stepNumber}</button>`}
+		<button type="button" class="secondary" data-command="abortPipeline">Abort pipeline</button>
+	</div>
 </section>`;
 }
 

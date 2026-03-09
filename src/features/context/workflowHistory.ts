@@ -944,8 +944,12 @@ export async function resetWorkflowRuntimeFiles(workspaceFolder: vscode.Workspac
 			return;
 		}
 
-		await vscode.workspace.fs.delete(uri, { recursive, useTrash: false });
-		deletedPaths += 1;
+		try {
+			await vscode.workspace.fs.delete(uri, { recursive, useTrash: false });
+			deletedPaths += 1;
+		} catch {
+			// On Windows, open files or terminals inside the directory cause EBUSY — skip gracefully
+		}
 	};
 
 	await deletePath(CONTEXT_FILE_NAME, false);
@@ -967,8 +971,12 @@ export async function resetOrchestratorWorkspaceFiles(workspaceFolder: vscode.Wo
 			return;
 		}
 
-		await vscode.workspace.fs.delete(uri, { recursive, useTrash: false });
-		deletedPaths += 1;
+		try {
+			await vscode.workspace.fs.delete(uri, { recursive, useTrash: false });
+			deletedPaths += 1;
+		} catch {
+			// On Windows, open files or terminals inside the directory cause EBUSY — skip gracefully
+		}
 	};
 
 	const cleanupManagedMarkdownPath = async (relativePath: string): Promise<void> => {
