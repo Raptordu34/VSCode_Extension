@@ -20,9 +20,10 @@ import { LAST_WORKFLOW_CONFIG_KEY, PENDING_COPILOT_PROMPT_KEY } from './constant
 import { saveWorkflowHistoryCollapsedIds } from './workflowService.js';
 import { getWorkflowIntentCopy } from './presets.js';
 import { getProviderLabel } from '../providers/providerService.js';
-import { startPipeline, advancePipeline, abortPipeline } from './pipelineService.js';
+import { startPipeline, advancePipeline, abortPipeline, completePendingPipelineStep } from './pipelineService.js';
 import { PIPELINE_TEMPLATES } from './pipelineTemplates.js';
 import type { PipelineTemplateId } from './types.js';
+import { WORKFLOW_OBJECTIVE_FILE } from './constants.js';
 
 export function registerWorkflowCommands(
 	context: vscode.ExtensionContext,
@@ -79,6 +80,13 @@ export function registerWorkflowCommands(
 			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose generated workflow files should be cleaned');
 			if (!workspaceFolder) {return;}
 			await runCleanActiveWorkflowFilesFlow(workspaceFolder);
+			EventBus.fire('refresh');
+		}),
+
+		vscode.commands.registerCommand('ai-context-orchestrator.openWorkflowObjective', async () => {
+			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose objective file should be opened');
+			if (!workspaceFolder) {return;}
+			await openWorkspaceRelativeFile(workspaceFolder.uri, WORKFLOW_OBJECTIVE_FILE);
 			EventBus.fire('refresh');
 		}),
 
@@ -278,6 +286,13 @@ export function registerWorkflowCommands(
 			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder');
 			if (!workspaceFolder) {return;}
 			await abortPipeline(context, workspaceFolder);
+			EventBus.fire('refresh');
+		}),
+
+		vscode.commands.registerCommand('ai-context-orchestrator.completePendingCopilotPipelineStep', async () => {
+			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder');
+			if (!workspaceFolder) {return;}
+			await completePendingPipelineStep(context, workspaceFolder);
 			EventBus.fire('refresh');
 		})
 	);

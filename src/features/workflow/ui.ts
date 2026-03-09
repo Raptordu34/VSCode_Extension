@@ -229,6 +229,9 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 				case 'openSession':
 					await vscode.commands.executeCommand('ai-context-orchestrator.openWorkflowSession');
 					return;
+				case 'openObjective':
+					await vscode.commands.executeCommand('ai-context-orchestrator.openWorkflowObjective');
+					return;
 				case 'restoreWorkflowFromHistory':
 					await vscode.commands.executeCommand('ai-context-orchestrator.restoreWorkflowFromHistory', message.target);
 					return;
@@ -314,6 +317,9 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 					return;
 				case 'advancePipelineStep':
 					await vscode.commands.executeCommand('ai-context-orchestrator.advancePipelineStep');
+					return;
+				case 'completePendingCopilotPipelineStep':
+					await vscode.commands.executeCommand('ai-context-orchestrator.completePendingCopilotPipelineStep');
 					return;
 				case 'fetchStagePreview': {
 					const stageFile = message.target;
@@ -447,6 +453,7 @@ export function getWorkflowControlHtml(
 		: buildInitHero(state, helpers, defaultPreset, defaultProvider, defaultModel, drawerOpen);
 
 	const copilotBannerHtml = state.copilotPendingPrompt ? buildCopilotBannerHtml(helpers) : '';
+	const objectiveHtml = state.currentObjective ? buildCurrentObjectiveHtml(state, helpers) : '';
 
 	const stagesHtml = state.session ? `
 <details class="mc-section" open>
@@ -467,7 +474,10 @@ export function getWorkflowControlHtml(
 			<div class="pill-actions">
 				<button type="button" class="secondary small-btn" data-command="openStageFile" data-target="${helpers.escapeHtml(stage.stageFile)}">Open</button>
 				<button type="button" class="secondary small-btn" title="Create a new workflow rooted at this stage checkpoint." data-command="forkWorkflowFromStage" data-stage-index="${stage.index}">Branch here</button>
-				<button type="button" class="secondary small-btn" data-command="markCompleted" data-stage-index="${stage.index}">Mark Done</button>
+						<button type="button" class="secondary small-btn" data-command="markCompleted" data-stage-index="${stage.index}">Mark Done</button>
+						${state.activePipeline?.pendingManualCompletion?.stepIndex === stage.index - 1 && state.activePipeline.pendingManualCompletion.provider === 'copilot'
+							? `<button type="button" class="secondary small-btn" data-command="completePendingCopilotPipelineStep">Marquer comme termine</button>`
+							: ''}
 			</div>
 			<details class="stage-preview" data-stage-file="${helpers.escapeHtml(stage.stageFile)}">
 				<summary>Preview findings</summary>
@@ -567,6 +577,7 @@ export function getWorkflowControlHtml(
 	<p class="section-footnote">Open the current workflow assets directly without leaving the sidebar.</p>
 	<div class="shortcuts">
 		<button type="button" class="linkButton" data-command="openContext" ${state.contextFileExists ? '' : 'disabled'}>Context Pack<span>${helpers.escapeHtml(CONTEXT_FILE_NAME)}</span></button>
+		<button type="button" class="linkButton" data-command="openObjective" ${state.currentObjective ? '' : 'disabled'}>Objectif<span>${helpers.escapeHtml(state.currentObjective?.relativePath ?? 'Aucun')}</span></button>
 		<button type="button" class="linkButton" data-command="openBrief" ${state.brief ? '' : 'disabled'}>Brief<span>${helpers.escapeHtml(state.brief ? state.brief.taskType : 'No brief')}</span></button>
 		<button type="button" class="linkButton" data-command="openLatestHandoff" ${state.latestStage ? '' : 'disabled'}>Latest Handoff<span>${helpers.escapeHtml(latestHandoff || 'None')}</span></button>
 		<button type="button" class="linkButton" data-command="openSession" ${state.session ? '' : 'disabled'}>Session<span>${helpers.escapeHtml(WORKFLOW_SESSION_FILE)}</span></button>
@@ -617,6 +628,7 @@ ${learningDocumentsHtml}`;
 
 	const contentHtml = `
 ${copilotBannerHtml}
+${objectiveHtml}
 ${activePipelineHtml}
 ${drawerHtml}
 ${heroHtml}
@@ -1276,6 +1288,23 @@ function buildActiveHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpe
 </section>`;
 }
 
+function buildCurrentObjectiveHtml(state: WorkflowDashboardState, helpers: WorkflowUiHelpers): string {
+	const objective = state.currentObjective;
+	if (!objective) {
+		return '';
+	}
+
+	return `
+<section class="card" style="position:sticky; top:8px; z-index:2; border-left:3px solid var(--vscode-focusBorder);">
+	<div class="kicker">Objectif Actuel</div>
+	<p class="small" style="margin-top:6px;">${helpers.escapeHtml(objective.relativePath)}</p>
+	<pre style="margin-top:10px; white-space:pre-wrap; max-height:240px; overflow:auto; font:inherit; color:var(--text-body); background:var(--panel-strong); border:1px solid var(--glass-border); padding:12px; border-radius:var(--radius-md);">${helpers.escapeHtml(objective.upgradedGoal || objective.content)}</pre>
+	<div class="actions dense-actions" style="margin-top:10px;">
+		<button type="button" class="secondary" data-command="openObjective">Open objective file</button>
+	</div>
+</section>`;
+}
+
 function buildPipelinePickerHtml(templates: PipelineTemplateDefinition[], helpers: WorkflowUiHelpers): string {
 	const cards = templates.map((t) => `
 	<div class="provider-row provider-card" style="gap:8px;">
@@ -1322,6 +1351,7 @@ function buildActivePipelineHtml(activePipeline: ActivePipelineState, helpers: W
 
 	const stepNumber = activePipeline.currentStepIndex + 1;
 	const isComplete = activePipeline.currentStepIndex >= template.steps.length;
+	const isWaitingForCopilot = Boolean(activePipeline.pendingManualCompletion && activePipeline.pendingManualCompletion.provider === 'copilot');
 
 	return `
 <section class="card" style="margin-bottom:12px; border-left:3px solid var(--vscode-focusBorder);">
@@ -1329,8 +1359,11 @@ function buildActivePipelineHtml(activePipeline: ActivePipelineState, helpers: W
 	<h3 style="margin-top:4px;">${helpers.escapeHtml(template.label)}</h3>
 	<div style="margin-top:6px;">${pills}</div>
 	${branchInfo}
+	${isWaitingForCopilot ? `<p class="small" style="margin-top:8px;">Copilot step in progress: validate it manually when the chat task is done.</p>` : ''}
 	<div class="actions dense-actions" style="margin-top:8px;">
-		${isComplete
+		${isWaitingForCopilot
+			? `<button type="button" data-command="completePendingCopilotPipelineStep">Marquer comme termine</button>`
+			: isComplete
 			? ''
 			: `<button type="button" data-command="advancePipelineStep">Run Step ${stepNumber}</button>`}
 		<button type="button" class="secondary" data-command="abortPipeline">Abort pipeline</button>

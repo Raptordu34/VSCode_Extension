@@ -201,6 +201,14 @@ export interface WorkflowBrief {
 	rawText: string;
 }
 
+export interface WorkflowObjectiveState {
+	relativePath: string;
+	content: string;
+	upgradedGoal: string;
+	rawInput: string;
+	generatedAt: string;
+}
+
 export interface WorkflowArchivedFile {
 	relativePath: string;
 	kind: WorkflowArchivedFileKind;
@@ -258,6 +266,8 @@ export interface ProjectContext {
 	workflowSession?: WorkflowSessionState;
 	currentStage?: WorkflowStageRecord;
 	brief?: WorkflowBrief;
+	currentObjective?: WorkflowObjectiveState;
+	projectMemory?: string;
 }
 
 export interface ExtensionConfiguration {
@@ -324,6 +334,7 @@ export interface WorkflowDashboardState {
 	providerStatusUpdatedAt?: string;
 	copilotPendingPrompt?: string;
 	artifactGovernance?: ArtifactGovernancePolicy;
+	currentObjective?: WorkflowObjectiveState;
 	activePipeline?: ActivePipelineState;
 	availablePipelineTemplates?: PipelineTemplateDefinition[];
 }
@@ -380,6 +391,11 @@ export interface ActivePipelineState {
   baseBranch?: string;
   currentStepIndex: number;
   stepConfigs: PipelineStepConfig[];
+	pendingManualCompletion?: {
+	stepIndex: number;
+	provider: ProviderTarget;
+	label: string;
+	};
   workflowId?: string;
   createdAt: string;
   updatedAt: string;

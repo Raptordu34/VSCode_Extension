@@ -1058,6 +1058,8 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 		overflow-y: auto;
 		border-top: 1px solid var(--glass-border);
 		background: var(--panel-bg);
+		font-family: inherit;
+		white-space: inherit;
 	}
 	.stage-preview-body h1, .stage-preview-body h2, .stage-preview-body h3 {
 		color: var(--text-primary);

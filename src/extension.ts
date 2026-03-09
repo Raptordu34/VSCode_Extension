@@ -21,6 +21,8 @@ import { Logger } from './core/logger.js';
 import { EventBus } from './core/eventBus.js';
 import { registerAllCommands } from './commands/index.js';
 import { getWorkspaceModeLabel, getWorkspaceModeState } from './features/workspace/service.js';
+import { ensureIgnoredArtifacts } from './features/workflow/artifactGovernance.js';
+import { WORKFLOW_OBJECTIVE_FILE } from './features/workflow/constants.js';
 
 export let extensionContextRef: vscode.ExtensionContext | undefined;
 
@@ -73,10 +75,21 @@ export function activate(context: vscode.ExtensionContext) {
 
 	registerAllCommands(context, loadDashboardState, workflowUiHelpers);
 
+	for (const workspaceFolder of vscode.workspace.workspaceFolders ?? []) {
+		void ensureIgnoredArtifacts(workspaceFolder.uri).catch((error) => {
+			Logger.warn(`Unable to update .gitignore for ${workspaceFolder.name}: ${error instanceof Error ? error.message : String(error)}`);
+		});
+	}
+
 	const sessionWatcher = vscode.workspace.createFileSystemWatcher(`**/${WORKFLOW_SESSION_FILE}`);
 	sessionWatcher.onDidCreate(() => refreshDebouncer.enqueue('session-create', refreshWorkflowUi));
 	sessionWatcher.onDidChange(() => refreshDebouncer.enqueue('session-change', refreshWorkflowUi));
 	sessionWatcher.onDidDelete(() => refreshDebouncer.enqueue('session-delete', refreshWorkflowUi));
+
+	const objectiveWatcher = vscode.workspace.createFileSystemWatcher(`**/${WORKFLOW_OBJECTIVE_FILE}`);
+	objectiveWatcher.onDidCreate(() => refreshDebouncer.enqueue('objective-create', refreshWorkflowUi));
+	objectiveWatcher.onDidChange(() => refreshDebouncer.enqueue('objective-change', refreshWorkflowUi));
+	objectiveWatcher.onDidDelete(() => refreshDebouncer.enqueue('objective-delete', refreshWorkflowUi));
 
 	const historyIndexWatcher = vscode.workspace.createFileSystemWatcher(`**/${WORKFLOW_HISTORY_INDEX_FILE}`);
 	historyIndexWatcher.onDidCreate(() => refreshDebouncer.enqueue('history-index-create', refreshWorkflowUi));
@@ -113,6 +126,7 @@ export function activate(context: vscode.ExtensionContext) {
 		continueStatusBarItem,
 		refreshDebouncer,
 		sessionWatcher,
+		objectiveWatcher,
 		historyIndexWatcher,
 		workflowRelayWatcher,
 		contextFileWatcher,

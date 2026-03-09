@@ -10,6 +10,7 @@ import { getLearningDocumentTypeLabel } from "../documents/service.js";
 import { getEffectiveWorkflowIntentCopy } from "../workflow/presets.js";
 import { formatWorkflowRoles } from "../workflow/ui.js";
 import { buildClaudeLaunchCommand, buildGeminiLaunchCommand } from "./agentLauncher.js";
+import { PROJECT_MEMORY_FILE, WORKFLOW_OBJECTIVE_FILE } from '../workflow/constants.js';
 
 export function buildArtifactPlan(workspaceUri: vscode.Uri, workflowPlan: WorkflowExecutionPlan, metadata: ContextMetadata): ArtifactPlan {
 	const files: GeneratedArtifact[] = [];
@@ -924,11 +925,13 @@ export function buildSharedWorkflowInstruction(projectContext: ProjectContext): 
 function buildWorkflowInstructionCommonParts(projectContext: ProjectContext): {
 	stageFile?: string;
 	stageWriteInstruction: string;
+	objectiveInstruction: string[];
 	providerAccountInstruction: string;
 	providerModelInstruction: string;
 	providerEffortInstruction: string;
 	artifactInstruction: string;
 	budgetInstruction?: string;
+	projectMemoryInstruction?: string;
 	learningDocumentInstructions: string[];
 	presetPriorityInstructions: string[];
 	presetCompletionInstructions: string[];
@@ -975,6 +978,12 @@ function buildWorkflowInstructionCommonParts(projectContext: ProjectContext): {
 	return {
 		stageFile,
 		stageWriteInstruction,
+		objectiveInstruction: projectContext.currentObjective
+			? [
+				`Read ${projectContext.currentObjective.relativePath} before acting.`,
+				`Use the upgraded objective in ${projectContext.currentObjective.relativePath} as the authoritative execution plan for this run.`
+			]
+			: [`Read ${WORKFLOW_OBJECTIVE_FILE} if it exists.`],
 		providerAccountInstruction: projectContext.workflowPlan.providerAccountId
 			? `Use the configured ${getProviderLabel(projectContext.workflowPlan.provider)} account ${projectContext.workflowPlan.providerAccountId}.`
 			: `Use the active ${getProviderLabel(projectContext.workflowPlan.provider)} account for this workflow.`,
@@ -989,6 +998,9 @@ function buildWorkflowInstructionCommonParts(projectContext: ProjectContext): {
 			: 'Work directly from the context pack and shared workflow files.',
 		budgetInstruction: projectContext.metadata.contextBudgetSummary
 			? `This run was generated with a bounded context budget: ${projectContext.metadata.contextBudgetSummary}.`
+			: undefined,
+		projectMemoryInstruction: projectContext.projectMemory
+			? `Read ${PROJECT_MEMORY_FILE} before broad exploration. Use it to target the latest project changes without re-scanning unrelated areas.`
 			: undefined,
 		learningDocumentInstructions,
 		presetPriorityInstructions: presetProfile.priorities,
@@ -1010,6 +1022,8 @@ function buildClaudeWorkflowInstruction(projectContext: ProjectContext): string 
 		`Start by reading ${CONTEXT_FILE_NAME}.`,
 		`Read ${WORKFLOW_SESSION_FILE} if it exists.`,
 		`Read ${WORKFLOW_BRIEF_FILE} if it exists.`,
+		...common.objectiveInstruction,
+		common.projectMemoryInstruction,
 		common.stageFile ? `Read upstream handoffs referenced by ${common.stageFile} before acting.` : 'Read any upstream stage handoffs before acting.',
 		...common.learningDocumentInstructions,
 		common.budgetInstruction,
@@ -1041,6 +1055,8 @@ function buildGeminiWorkflowInstruction(projectContext: ProjectContext): string 
 		`Start by reading ${CONTEXT_FILE_NAME}.`,
 		`Read ${WORKFLOW_SESSION_FILE} if it exists.`,
 		`Read ${WORKFLOW_BRIEF_FILE} if it exists.`,
+		...common.objectiveInstruction,
+		common.projectMemoryInstruction,
 		common.stageFile ? `Read upstream handoffs referenced by ${common.stageFile} before acting.` : 'Read any upstream stage handoffs before acting.',
 		...common.learningDocumentInstructions,
 		common.budgetInstruction,
@@ -1080,6 +1096,8 @@ function buildCopilotWorkflowInstruction(projectContext: ProjectContext): string
 		common.providerModelInstruction,
 		`Read ${WORKFLOW_SESSION_FILE} if it exists.`,
 		`Read ${WORKFLOW_BRIEF_FILE} if it exists.`,
+		...common.objectiveInstruction,
+		common.projectMemoryInstruction,
 		common.stageFile ? `Read upstream handoffs referenced by ${common.stageFile} before acting.` : 'Read any upstream stage handoffs before acting.',
 		...common.learningDocumentInstructions,
 		common.budgetInstruction,

@@ -9,12 +9,13 @@ import { WORKFLOW_PRESETS } from './presets.js';
 import { buildSmartDefaultWorkflowPlan, promptForClaudeEffort } from './workflowService.js';
 import { gatherProjectContext } from '../context/contextBuilder.js';
 import { launchProvider } from '../aiAgents/agentLauncher.js';
-import { readWorkflowSessionState } from '../context/workflowPersistence.js';
+import { readWorkflowBrief, readWorkflowSessionState } from '../context/workflowPersistence.js';
 import { getWorkspaceModeState } from '../workspace/service.js';
 import { createBranch, isGitRepository, getCurrentBranch } from '../git/gitService.js';
 import { generateBranchName } from '../git/branchNameGenerator.js';
 import { getProviderLabel, promptForProviderTarget, promptForProviderModel, promptForProviderAccount, getProviderAccounts, findProviderAccount, getActiveProviderAccountId, getDefaultProviderModel, getDefaultClaudeEffort } from '../providers/providerService.js';
 import { formatProviderModel } from '../providers/providerService.js';
+import { appendProjectMemoryEntry } from '../context/projectMemory.js';
 
 function getPipelineStateKey(workspaceFolder: vscode.WorkspaceFolder): string {
 	return `${ACTIVE_PIPELINE_STATE_KEY}.${workspaceFolder.uri.toString()}`;
@@ -122,6 +123,10 @@ export async function advancePipeline(
 		void vscode.window.showWarningMessage('No active pipeline found.');
 		return;
 	}
+	if (pipelineState.pendingManualCompletion) {
+		void vscode.window.showInformationMessage(`Complete the current ${getProviderLabel(pipelineState.pendingManualCompletion.provider)} step from the workflow panel before advancing.`);
+		return;
+	}
 
 	const template = PIPELINE_TEMPLATES[pipelineState.templateId];
 	if (pipelineState.currentStepIndex >= template.steps.length) {
@@ -210,14 +215,53 @@ export async function advancePipeline(
 
 	const updatedState: ActivePipelineState = {
 		...pipelineState,
-		currentStepIndex: pipelineState.currentStepIndex + 1,
+		currentStepIndex: stepConfig.provider === 'copilot' ? pipelineState.currentStepIndex : pipelineState.currentStepIndex + 1,
 		stepConfigs: updatedStepConfigs,
+		pendingManualCompletion: stepConfig.provider === 'copilot'
+			? {
+				stepIndex: pipelineState.currentStepIndex,
+				provider: stepConfig.provider,
+				label: stepLabel
+			}
+			: undefined,
 		workflowId: session?.workflowId ?? pipelineState.workflowId,
 		updatedAt: new Date().toISOString()
 	};
 
 	await saveActivePipelineState(context, workspaceFolder, updatedState);
-	Logger.info(`[pipeline] Completed step ${stepNumber} (${stepPreset}), advancing to step ${updatedState.currentStepIndex + 1}`);
+	Logger.info(stepConfig.provider === 'copilot'
+		? `[pipeline] Waiting for manual completion of step ${stepNumber} (${stepPreset})`
+		: `[pipeline] Completed step ${stepNumber} (${stepPreset}), advancing to step ${updatedState.currentStepIndex + 1}`);
+
+	EventBus.fire('refresh');
+}
+
+export async function completePendingPipelineStep(
+	context: vscode.ExtensionContext,
+	workspaceFolder: vscode.WorkspaceFolder
+): Promise<void> {
+	const pipelineState = readActivePipelineState(context, workspaceFolder);
+	if (!pipelineState?.pendingManualCompletion) {
+		void vscode.window.showInformationMessage('No Copilot pipeline step is waiting for manual completion.');
+		return;
+	}
+
+	const nextStepIndex = pipelineState.pendingManualCompletion.stepIndex + 1;
+	const updatedState: ActivePipelineState = {
+		...pipelineState,
+		currentStepIndex: nextStepIndex,
+		pendingManualCompletion: undefined,
+		updatedAt: new Date().toISOString()
+	};
+
+	await saveActivePipelineState(context, workspaceFolder, updatedState);
+	Logger.info(`[pipeline] Manually completed Copilot step ${pipelineState.pendingManualCompletion.stepIndex + 1}`);
+
+	const template = PIPELINE_TEMPLATES[pipelineState.templateId];
+	if (nextStepIndex >= template.steps.length) {
+		await finalizePipeline(context, workspaceFolder);
+		return;
+	}
 
 	EventBus.fire('refresh');
 }
@@ -312,6 +356,14 @@ export async function finalizePipeline(
 		}
 	} else {
 		void vscode.window.showInformationMessage(`Pipeline "${template.label}" complete.`);
+	}
+
+	const [session, brief] = await Promise.all([
+		readWorkflowSessionState(workspaceFolder.uri),
+		readWorkflowBrief(workspaceFolder.uri)
+	]);
+	if (session?.workflowId && session.workflowId === pipelineState.workflowId) {
+		await appendProjectMemoryEntry(workspaceFolder, session, brief);
 	}
 
 	await clearActivePipelineState(context, workspaceFolder);

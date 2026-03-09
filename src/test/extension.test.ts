@@ -277,12 +277,12 @@ suite('provider-specific prompt builder output', () => {
 				providerModel: workflowPlan.providerModel,
 				providerAccountId: workflowPlan.providerAccountId,
 				status: 'prepared',
-				stageFile: '.ai-orchestrator/stages/02-implement.md',
+				stageFile: 'stage/02-implement.md',
 				generatedAt: '2026-03-08T12:00:00.000Z',
 				briefSummary: 'Implement provider-specific prompt shaping',
 				contextFile: '.ai-context.md',
 				artifactFiles: [],
-				upstreamStageFiles: ['.ai-orchestrator/stages/01-plan.md'],
+				upstreamStageFiles: ['stage/01-plan.md'],
 				claudeEffort: workflowPlan.claudeEffort
 			}
 		};
@@ -615,7 +615,7 @@ suite('workflow persistence', () => {
 					providerModel: 'claude-sonnet-4-6',
 					providerAccountId: 'claude-main',
 					status: 'prepared',
-					stageFile: '.ai-orchestrator/stages/01-build.md',
+					stageFile: 'stage/01-build.md',
 					generatedAt: '2026-03-09T00:00:00.000Z',
 					briefSummary: 'Analyser les sources une par une',
 					contextFile: '.ai-context.md',
@@ -634,7 +634,7 @@ suite('workflow persistence', () => {
 				providerModel: 'claude-sonnet-4-6',
 				providerAccountId: 'claude-main',
 				status: 'prepared',
-				stageFile: '.ai-orchestrator/stages/01-build.md',
+				stageFile: 'stage/01-build.md',
 				generatedAt: '2026-03-09T00:00:00.000Z',
 				briefSummary: 'Analyser les sources une par une',
 				contextFile: '.ai-context.md',
@@ -759,7 +759,7 @@ suite('workflow persistence', () => {
 					providerModel: 'claude-sonnet-4-6',
 					providerAccountId: 'claude-main',
 					status: 'prepared',
-					stageFile: '.ai-orchestrator/stages/01-build.md',
+					stageFile: 'stage/01-build.md',
 					generatedAt: '2026-03-09T00:00:00.000Z',
 					briefSummary: 'Analyser les sources une par une',
 					contextFile: '.ai-context.md',
@@ -778,7 +778,7 @@ suite('workflow persistence', () => {
 				providerModel: 'claude-sonnet-4-6',
 				providerAccountId: 'claude-main',
 				status: 'prepared',
-				stageFile: '.ai-orchestrator/stages/01-build.md',
+				stageFile: 'stage/01-build.md',
 				generatedAt: '2026-03-09T00:00:00.000Z',
 				briefSummary: 'Analyser les sources une par une',
 				contextFile: '.ai-context.md',
@@ -881,15 +881,17 @@ suite('workflow persistence', () => {
 		assert.ok(session);
 		assert.strictEqual(session.workspaceFolderId, tempRoot.toString());
 		assert.strictEqual(session.stages.length, 1);
-		assert.strictEqual(session.stages[0].stageFile, '.ai-orchestrator/stages/01-build.md');
+		assert.strictEqual(session.stages[0].stageFile, 'stage/01-build.md');
 		assert.deepStrictEqual(session.stages[0].artifactFiles, ['.github/agents/orchestrator-implementer.agent.md']);
 		assert.strictEqual(result.stage.contextFile, '.ai-context.md');
 
-		const stageContent = Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(tempRoot, '.ai-orchestrator', 'stages', '01-build.md'))).toString('utf8');
+		const stageContent = Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(tempRoot, 'stage', '01-build.md'))).toString('utf8');
+		const objectiveContent = Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(tempRoot, 'stage', '00_OBJECTIVE.md'))).toString('utf8');
 		const artifactContent = Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(tempRoot, '.github', 'agents', 'orchestrator-implementer.agent.md'))).toString('utf8');
 		const contextContent = Buffer.from(await vscode.workspace.fs.readFile(contextFile)).toString('utf8');
 
 		assert.ok(stageContent.includes('Implement persistence test fixture'));
+		assert.ok(objectiveContent.includes('## Plan technique reformule'));
 		assert.ok(artifactContent.includes('# test artifact'));
 		assert.ok(contextContent.includes('# Context Generation Metadata'));
 		assert.strictEqual(normalizeWorkspaceRelativePath(result.stage.artifactFiles[0]), '.github/agents/orchestrator-implementer.agent.md');
@@ -1804,7 +1806,7 @@ suite('workflow control html', () => {
 							status: 'completed',
 							generatedAt: '2026-03-08T12:00:00.000Z',
 							briefSummary: 'Workflow A stage 1',
-							stageFile: '.ai-orchestrator/stages/01-build.md',
+							stageFile: 'stage/01-build.md',
 							contextFile: '.ai-context.md',
 							artifactFiles: [],
 							upstreamStageFiles: [],
@@ -1819,10 +1821,10 @@ suite('workflow control html', () => {
 							status: 'in-progress',
 							generatedAt: '2026-03-08T12:30:00.000Z',
 							briefSummary: 'Workflow A stage 2',
-							stageFile: '.ai-orchestrator/stages/02-review.md',
+							stageFile: 'stage/02-review.md',
 							contextFile: '.ai-context.md',
 							artifactFiles: [],
-							upstreamStageFiles: ['.ai-orchestrator/stages/01-build.md'],
+							upstreamStageFiles: ['stage/01-build.md'],
 							workflowId: 'workflow-a',
 							branchId: 'master'
 						}
@@ -1850,7 +1852,7 @@ suite('workflow control html', () => {
 						currentProvider: 'copilot',
 						briefSummary: 'Workflow A summary',
 						manifestPath: '.ai-orchestrator/history/workflow-a/manifest.json',
-						latestStageFile: '.ai-orchestrator/stages/02-build.md'
+						latestStageFile: 'stage/02-build.md'
 						},
 						{
 							workflowId: 'workflow-b',
@@ -1866,7 +1868,7 @@ suite('workflow control html', () => {
 							currentProvider: 'claude',
 							briefSummary: 'Workflow B summary',
 							manifestPath: '.ai-orchestrator/history/workflow-b/manifest.json',
-							latestStageFile: '.ai-orchestrator/stages/02-review.md'
+							latestStageFile: 'stage/02-review.md'
 					}
 				],
 				activeWorkflowId: 'workflow-a'

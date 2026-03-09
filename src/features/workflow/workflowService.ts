@@ -19,6 +19,7 @@ import { readWorkflowHistoryIndex, repairWorkflowHistoryIndex } from "../context
 import { detectGovernancePolicy } from "./artifactGovernance.js";
 import { getWorkspaceModeState } from '../workspace/service.js';
 import { getActiveLearningDocument, getLearningDocuments } from '../documents/service.js';
+import { readWorkflowObjective } from '../aiAgents/aiEnhancer.js';
 
 type WorkflowHistoryCollapseState = Record<string, string[]>;
 
@@ -110,6 +111,7 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 		readWorkflowHistoryIndex(workspaceFolder.uri),
 		detectGovernancePolicy(workspaceFolder)
 	]);
+	const currentObjective = await readWorkflowObjective(workspaceFolder.uri);
 	const sourceAnalysisBatch = await readReconciledSourceAnalysisBatch(workspaceFolder.uri) ?? session?.sourceAnalysisBatch;
 	const [learningDocuments, activeLearningDocument] = await Promise.all([
 		getLearningDocuments(context, workspaceFolder),
@@ -153,6 +155,7 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 		providerStatusUpdatedAt: providerStatusCache?.updatedAt,
 		copilotPendingPrompt,
 		artifactGovernance,
+		currentObjective,
 		activePipeline,
 		availablePipelineTemplates
 	};

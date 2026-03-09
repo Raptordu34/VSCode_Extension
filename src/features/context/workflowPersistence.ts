@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import {
 	GENERATED_SECTION_END,
 	GENERATED_SECTION_START,
+	WORKFLOW_OBJECTIVE_FILE,
 	WORKFLOW_BRIEF_FILE,
 	WORKFLOW_SESSION_FILE,
 	WORKFLOW_STAGE_DIRECTORY
@@ -12,6 +13,7 @@ import type {
 	ProjectContext,
 	WorkflowBrief,
 	WorkflowExecutionPlan,
+	WorkflowObjectiveState,
 	WorkflowPreset,
 	WorkflowSessionState,
 	WorkflowStageRecord
@@ -24,6 +26,7 @@ import { formatWorkflowRoles } from '../workflow/ui.js';
 import { archiveActiveWorkflowState } from './workflowHistory.js';
 import { createNonce } from '../../utils/index.js';
 import { getEffectiveWorkflowIntentCopy } from '../workflow/presets.js';
+import { buildWorkflowObjectiveState } from '../aiAgents/aiEnhancer.js';
 
 export interface WorkspaceWriteOperation {
 	uri: vscode.Uri;
@@ -275,6 +278,21 @@ export async function writeWorkflowStageFile(workspaceUri: vscode.Uri, relativeP
 	await commitWorkspaceWriteTransaction([{ uri: fileUri, content: toUtf8Bytes(content.trimEnd() + '\n') }]);
 }
 
+export async function purgeStageDirectory(workspaceUri: vscode.Uri): Promise<void> {
+	const stageUri = buildWorkspaceUri(workspaceUri, WORKFLOW_STAGE_DIRECTORY);
+	if (!stageUri) {
+		return;
+	}
+
+	try {
+		await vscode.workspace.fs.delete(stageUri, { recursive: true, useTrash: false });
+	} catch {
+		// Ignore missing stage directory.
+	}
+
+	await vscode.workspace.fs.createDirectory(stageUri);
+}
+
 export function buildSuggestedNextPresets(currentPreset: WorkflowPreset): WorkflowPreset[] {
 	switch (currentPreset) {
 		case 'explore':
@@ -366,7 +384,7 @@ export async function persistWorkflowArtifacts(
 	contextFile: vscode.Uri,
 	artifactPlan?: ArtifactPlan,
 	contextContent?: string
-): Promise<{ session: WorkflowSessionState; stage: WorkflowStageRecord; brief?: WorkflowBrief }> {
+): Promise<{ session: WorkflowSessionState; stage: WorkflowStageRecord; brief?: WorkflowBrief; objective?: WorkflowObjectiveState }> {
 	const existingSession = await readWorkflowSessionState(workspaceFolder.uri);
 	const existingBrief = await readWorkflowBrief(workspaceFolder.uri);
 	const brief = workflowPlan.brief ?? existingBrief;
@@ -375,6 +393,11 @@ export async function persistWorkflowArtifacts(
 	if (isNewWorkflow && existingSession) {
 		await archiveActiveWorkflowState(workspaceFolder, existingSession, existingBrief);
 	}
+	if (isNewWorkflow) {
+		await purgeStageDirectory(workspaceFolder.uri);
+	}
+
+	const objective = brief ? await buildWorkflowObjectiveState(workflowPlan, brief) : undefined;
 
 	const nextIndex = isNewWorkflow ? 1 : (existingSession?.currentStageIndex ?? 0) + 1;
 	const stageFile = normalizeWorkspaceRelativePath(`${WORKFLOW_STAGE_DIRECTORY}/${String(nextIndex).padStart(2, '0')}-${workflowPlan.preset}.md`);
@@ -444,6 +467,12 @@ export async function persistWorkflowArtifacts(
 			operations.push({ uri: briefUri, content: toUtf8Bytes(buildWorkflowBriefContent(brief)) });
 		}
 	}
+	if (objective) {
+		const objectiveUri = buildWorkspaceUri(workspaceFolder.uri, WORKFLOW_OBJECTIVE_FILE);
+		if (objectiveUri) {
+			operations.push({ uri: objectiveUri, content: toUtf8Bytes(objective.content.trimEnd() + '\n') });
+		}
+	}
 	const stageUri = buildWorkspaceUri(workspaceFolder.uri, stageFile);
 	if (stageUri) {
 		operations.push({
@@ -458,5 +487,5 @@ export async function persistWorkflowArtifacts(
 
 	await commitWorkspaceWriteTransaction(operations);
 	await archiveActiveWorkflowState(workspaceFolder, session, brief);
-	return { session, stage, brief };
+	return { session, stage, brief, objective };
 }
