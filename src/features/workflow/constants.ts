@@ -28,6 +28,8 @@ export const DEFAULT_CONTEXT_FILES = [
 
 export const WORKFLOW_STATE_DIRECTORY = '.ai-orchestrator';
 export const WORKFLOW_STAGE_DIRECTORY = '.ai-orchestrator/stages';
+export const WORKFLOW_SOURCE_ANALYSIS_DIRECTORY = '.ai-orchestrator/analysis';
+export const WORKFLOW_SOURCE_ANALYSIS_BATCH_FILE = '.ai-orchestrator/analysis/source-batch.json';
 export const WORKFLOW_SESSION_FILE = '.ai-orchestrator/session.json';
 export const WORKFLOW_BRIEF_FILE = '.ai-orchestrator/brief.md';
 export const WORKFLOW_HISTORY_DIRECTORY = '.ai-orchestrator/history';

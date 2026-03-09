@@ -88,6 +88,15 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 				case 'addLearningDocumentSources':
 					await vscode.commands.executeCommand('ai-context-orchestrator.addLearningDocumentSources');
 					return;
+				case 'startDistributedSourceAnalysis':
+					await vscode.commands.executeCommand('ai-context-orchestrator.startDistributedSourceAnalysis');
+					return;
+				case 'manageDistributedSourceAnalysis':
+					await vscode.commands.executeCommand('ai-context-orchestrator.manageDistributedSourceAnalysis');
+					return;
+				case 'runDistributedSourceSynthesis':
+					await vscode.commands.executeCommand('ai-context-orchestrator.runDistributedSourceSynthesis');
+					return;
 				case 'init':
 					await vscode.commands.executeCommand('ai-context-orchestrator.initAI');
 					return;
@@ -453,6 +462,20 @@ export function getWorkflowControlHtml(
 
 	const learningMode = state.workspaceModeState ? getWorkspaceModeDefinition(state.workspaceModeState.mode) : undefined;
 	const hasLearningDocuments = (state.learningDocuments?.length ?? 0) > 0;
+	const distributedSourceBatch = state.sourceAnalysisBatch && state.sourceAnalysisBatch.learningDocumentId === state.activeLearningDocument?.id
+		? state.sourceAnalysisBatch
+		: undefined;
+	const canRunDistributedSourceAnalysis = state.activeLearningDocument?.type === 'compte-rendu' && (state.activeLearningDocument.sources.length ?? 0) > 0;
+	const completedDistributedJobs = distributedSourceBatch?.jobs.filter((job) => job.status === 'completed').length ?? 0;
+	const distributedSourceHtml = canRunDistributedSourceAnalysis ? `
+	<div class="actions" style="margin-top:8px; flex-wrap:wrap;">
+		<button type="button" class="secondary" data-command="startDistributedSourceAnalysis">Analyser les sources en parallèle</button>
+		<button type="button" class="secondary" data-command="manageDistributedSourceAnalysis" ${distributedSourceBatch ? '' : 'disabled'}>Gérer le batch</button>
+		<button type="button" class="secondary" data-command="runDistributedSourceSynthesis" ${distributedSourceBatch ? '' : 'disabled'}>Lancer la synthèse</button>
+	</div>
+	<p class="section-footnote" style="margin-top:8px;">${distributedSourceBatch
+		? helpers.escapeHtml(`Batch ${distributedSourceBatch.batchId} · ${completedDistributedJobs}/${distributedSourceBatch.jobs.length} job(s) completed`)
+		: 'Le mode distribué crée un fichier d’analyse par source dans .ai-orchestrator/analysis puis lance une synthèse finale.'}</p>` : '';
 	const learningDocumentsHtml = learningMode?.supportsLearningDocuments ? `
 <details class="mc-section" open>
 <summary class="mc-section-header">
@@ -470,6 +493,7 @@ export function getWorkflowControlHtml(
 	<div class="actions" style="margin-top:8px;">
 		<button type="button" class="secondary" data-command="createLearningDocument">Créer un document</button>
 	</div>
+	${distributedSourceHtml}
 </div>
 </details>` : '';
 
@@ -1162,16 +1186,22 @@ function buildActiveHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpe
 	const stageLabel = `Stage ${session.currentStageIndex}`;
 	const nextLabel = recommendedPreset && recommendedPreset in WORKFLOW_PRESETS ? getWorkflowIntentCopy(recommendedPreset as keyof typeof WORKFLOW_PRESETS, state.workspaceModeState?.mode).label : 'Next stage';
 	const completedCount = session.stages.filter((s) => s.status === 'completed').length;
+	const distributedSourceBatch = state.sourceAnalysisBatch;
+	const distributedSourceSummary = distributedSourceBatch
+		? `${distributedSourceBatch.jobs.filter((job) => job.status === 'completed').length}/${distributedSourceBatch.jobs.length} distributed source job(s) completed`
+		: undefined;
 	return `
 <section class="card hero">
 	<div class="kicker">Active Workflow</div>
 	<p class="lead" style="margin-top:6px;"><strong>${helpers.escapeHtml(presetLabel)}</strong> · ${helpers.escapeHtml(providerLabel)} · ${helpers.escapeHtml(stageLabel)}</p>
 	<p class="small">${completedCount}/${session.stages.length} stages · Next: ${helpers.escapeHtml(nextLabel)}</p>
 	${state.brief ? `<p class="small" style="margin-top:4px;">${helpers.escapeHtml(state.brief.goal)}</p>` : ''}
+	${distributedSourceSummary ? `<p class="small" style="margin-top:4px;">${helpers.escapeHtml(distributedSourceSummary)}</p>` : ''}
 	<div class="actions" style="margin-top:10px;">
 		<button type="button" data-command="openContinueDrawer">Continue ▶</button>
 		<button type="button" class="secondary" data-command="openContinueDrawer">Change settings</button>
 		<button type="button" class="secondary" data-command="previewPrompt" ${state.session ? '' : 'disabled'}>Prompt</button>
+		<button type="button" class="secondary" data-command="manageDistributedSourceAnalysis" ${distributedSourceBatch ? '' : 'disabled'}>Sources</button>
 	</div>
 	<p class="small" style="margin-top:8px;">Use the sections below to inspect handoffs, restore previous runs, or branch from the current stage.</p>
 </section>`;

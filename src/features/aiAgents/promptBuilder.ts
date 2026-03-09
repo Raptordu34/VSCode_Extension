@@ -935,20 +935,40 @@ function buildWorkflowInstructionCommonParts(projectContext: ProjectContext): {
 	presetAvoidInstructions: string[];
 } {
 	const stageFile = projectContext.currentStage?.stageFile;
-	const stageWriteInstruction = stageFile
-		? `Read ${stageFile} and write your findings or results back into that file before stopping.`
-		: 'Write your findings into the shared workflow stage file before stopping.';
+	const stageWriteInstruction = projectContext.workflowPlan.targetSourceOutputFile
+		? `Read ${projectContext.workflowPlan.targetSourceOutputFile} and write your findings back into that file before stopping.`
+		: stageFile
+			? `Read ${stageFile} and write your findings or results back into that file before stopping.`
+			: 'Write your findings into the shared workflow stage file before stopping.';
 	const presetProfile = getPresetExecutionProfile(projectContext.workflowPlan.preset);
 	const learningDocument = projectContext.activeLearningDocument;
 	const intentCopy = getEffectiveWorkflowIntentCopy(projectContext.workflowPlan.preset, projectContext.workflowPlan.workspaceMode, projectContext.workflowPlan.documentIntentId);
+	const sourceAnalysisJob = projectContext.sourceAnalysisJob;
+	const sourceAnalysisBatch = projectContext.sourceAnalysisBatch;
 	const learningDocumentInstructions = learningDocument
 		? [
 			`The primary output target is the learning document "${learningDocument.title}" (${getLearningDocumentTypeLabel(learningDocument.type)}).`,
-			`Read ${learningDocument.indexFile}, ${learningDocument.promptFile}, and any imported files under ${learningDocument.sourceDirectory} before proposing or generating content.`,
-			'Keep the result aligned with the learning-kit template structure, tone, and sectioning already present in the target document.',
+			...(sourceAnalysisJob
+				? [
+					`Read ${learningDocument.indexFile}, ${learningDocument.promptFile}, and only the assigned source file ${sourceAnalysisJob.sourceRelativePath} before acting.`,
+					`This is distributed source-analysis job ${sourceAnalysisJob.id}; write only to ${sourceAnalysisJob.outputFile}.`,
+					'Do not edit the learning document directly during this job; produce a synthesis-ready source analysis instead.'
+				]
+				: sourceAnalysisBatch && projectContext.workflowPlan.sourceAnalysisBatchId
+					? [
+						`Read ${learningDocument.indexFile}, ${learningDocument.promptFile}, and the distributed source analysis reports under .ai-orchestrator/analysis before acting.`,
+						`Use the batch ${sourceAnalysisBatch.batchId} reports as your primary source evidence for synthesis.`,
+						'Integrate, reconcile, and prioritize the intermediate reports before proposing any final structure or edits.'
+					]
+					: [`Read ${learningDocument.indexFile}, ${learningDocument.promptFile}, and any imported files under ${learningDocument.sourceDirectory} before proposing or generating content.`]),
+			...(sourceAnalysisJob
+				? ['Keep the output tightly scoped to the assigned source and the active learning document intent.']
+				: ['Keep the result aligned with the learning-kit template structure, tone, and sectioning already present in the target document.']),
 			`Document intent: ${intentCopy.label}.`,
 			intentCopy.launchInstruction,
-			'When the brief is ambiguous, improve or extend the targeted learning document instead of defaulting to generic code-oriented output.'
+			...(sourceAnalysisJob
+				? ['When the brief is ambiguous, prefer extraction, clarification, and section mapping for the assigned source rather than editing the target document.']
+				: ['When the brief is ambiguous, improve or extend the targeted learning document instead of defaulting to generic code-oriented output.'])
 		]
 		: [];
 

@@ -19,12 +19,14 @@ import { readWorkflowSessionState, readWorkflowBrief, buildSuggestedNextPresets,
 import { getWorkspaceModeLabel, getWorkspaceModeState } from '../workspace/service.js';
 import { getActiveLearningDocument, getLearningDocumentById } from '../documents/service.js';
 import { getEffectiveWorkflowIntentCopy } from '../workflow/presets.js';
+import { buildSourceAnalysisSynthesisSection, readSourceAnalysisBatch } from './sourceAnalysisBatch.js';
 
 export function buildRawContextContent(
 	workflowPlan: WorkflowExecutionPlan,
 	workspaceFolder: vscode.WorkspaceFolder,
 	workspaceModeLabel: string | undefined,
 	activeLearningDocumentSummary: string | undefined,
+	sourceAnalysisSummary: string | undefined,
 	detectedTech: string[],
 	readmeLines: string[],
 	packageDetails: PackageDetails,
@@ -56,8 +58,14 @@ export function buildRawContextContent(
 		`Brief file: ${WORKFLOW_BRIEF_FILE}`,
 		`Stage directory: ${WORKFLOW_STAGE_DIRECTORY}`,
 		workflowPlan.brief ? `Current brief: ${workflowPlan.brief.goal}` : 'Current brief: none provided for this stage',
+		workflowPlan.targetSourceRelativePath ? `Assigned source: ${workflowPlan.targetSourceRelativePath}` : undefined,
+		workflowPlan.targetSourceOutputFile ? `Assigned analysis output: ${workflowPlan.targetSourceOutputFile}` : undefined,
 		activeLearningDocumentSummary ? 'Document instruction: Respect the active learning-kit structure and imported sources when generating output.' : undefined,
 		'',
+		sourceAnalysisSummary ? '## Distributed Source Analysis' : undefined,
+		sourceAnalysisSummary,
+		sourceAnalysisSummary ? '' : undefined,
+		
 		'## Project Summary',
 		detectedTech.length > 0 ? `Detected stack: ${detectedTech.join(', ')}` : 'Detected stack: Unknown',
 		keyFiles.length > 0 ? `Key files: ${keyFiles.join(', ')}` : 'Key files: none detected',
@@ -417,6 +425,21 @@ export async function gatherProjectContext(
 		const activeLearningDocument = workflowPlan.learningDocumentId
 			? await getLearningDocumentById(context, workspaceFolder, workflowPlan.learningDocumentId)
 			: await getActiveLearningDocument(context, workspaceFolder);
+		const sourceAnalysisBatch = workflowPlan.sourceAnalysisBatchId
+			? await readSourceAnalysisBatch(workspaceFolder.uri)
+			: undefined;
+		const sourceAnalysisJob = sourceAnalysisBatch?.jobs.find((job) => job.id === workflowPlan.sourceAnalysisJobId);
+		const sourceAnalysisSummary = sourceAnalysisBatch && !sourceAnalysisJob
+			? await buildSourceAnalysisSynthesisSection(workspaceFolder.uri, sourceAnalysisBatch)
+			: sourceAnalysisJob
+				? [
+					'# Distributed Source Analysis Job',
+					'',
+					`Batch: ${sourceAnalysisBatch?.batchId ?? 'unknown'}`,
+					`Assigned source: ${sourceAnalysisJob.sourceRelativePath}`,
+					`Assigned analysis output: ${sourceAnalysisJob.outputFile}`
+				].join('\n')
+				: undefined;
 		const contextBudget = buildContextBudget(workflowPlan.provider, workflowPlan.costProfile, configuration);
 		const budgetedConfiguration = applyContextBudgetConfiguration(configuration, contextBudget);
 		const [treeLines, readmeLines, packageDetails, additionalContext, keyFiles] = await Promise.all([
@@ -465,6 +488,7 @@ export async function gatherProjectContext(
 			workspaceFolder,
 			workspaceModeLabel,
 			activeLearningDocumentSummary,
+			sourceAnalysisSummary,
 			detectedTech,
 			readmeLines,
 			packageDetails,
@@ -550,6 +574,8 @@ export async function gatherProjectContext(
 			metadata,
 			workflowPlan,
 			activeLearningDocument,
+			sourceAnalysisBatch,
+			sourceAnalysisJob,
 			artifactPlan,
 			reused: false,
 			workflowSession: workflowArtifacts.session,
@@ -732,6 +758,7 @@ export async function tryReuseExistingContext(
 			},
 			metadata,
 			workflowPlan,
+			sourceAnalysisBatch: workflowArtifacts.session.sourceAnalysisBatch,
 			artifactPlan,
 			reused: true,
 			workflowSession: workflowArtifacts.session,

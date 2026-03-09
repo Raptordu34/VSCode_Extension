@@ -387,6 +387,8 @@ export async function persistWorkflowArtifacts(
 		index: nextIndex,
 		workflowId,
 		branchId,
+		sourceAnalysisBatchId: workflowPlan.sourceAnalysisBatchId,
+		sourceAnalysisJobId: workflowPlan.sourceAnalysisJobId,
 		preset: workflowPlan.preset,
 		provider: workflowPlan.provider,
 		providerModel: workflowPlan.providerModel,
@@ -419,6 +421,7 @@ export async function persistWorkflowArtifacts(
 		currentProviderAccountId: workflowPlan.providerAccountId,
 		currentClaudeAccountId: workflowPlan.claudeAccountId,
 		currentClaudeEffort: workflowPlan.claudeEffort,
+		sourceAnalysisBatch: isNewWorkflow ? undefined : existingSession?.sourceAnalysisBatch,
 		briefFile: WORKFLOW_BRIEF_FILE,
 		stages: isNewWorkflow ? [stage] : [...(existingSession?.stages ?? []), stage]
 	};

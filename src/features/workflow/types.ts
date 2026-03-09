@@ -19,6 +19,45 @@ export type ArtifactKind = 'instruction' | 'agent' | 'skill';
 export type WorkflowStageStatus = 'prepared' | 'in-progress' | 'completed';
 export type ClaudeEffortLevel = 'low' | 'medium' | 'high';
 export type WorkflowArchivedFileKind = 'full' | 'managed-markdown' | 'session-json' | 'brief-markdown';
+export type SourceAnalysisMode = 'distributed';
+export type SourceAnalysisJobStatus = 'queued' | 'running' | 'completed' | 'failed';
+
+export interface SourceAnalysisJob {
+	id: string;
+	sourceRelativePath: string;
+	sourceLabel: string;
+	outputFile: string;
+	status: SourceAnalysisJobStatus;
+	provider: ProviderTarget;
+	providerModel?: string;
+	providerAccountId?: string;
+	claudeAccountId?: string;
+	claudeEffort?: ClaudeEffortLevel;
+	launchedAt?: string;
+	completedAt?: string;
+	notes?: string;
+}
+
+export interface SourceAnalysisBatch {
+	batchId: string;
+	workflowId: string;
+	branchId?: string;
+	stageIndex: number;
+	mode: SourceAnalysisMode;
+	learningDocumentId: string;
+	learningDocumentTitle: string;
+	documentIntentId?: DocumentWorkflowIntentId;
+	provider: ProviderTarget;
+	providerModel?: string;
+	providerAccountId?: string;
+	claudeAccountId?: string;
+	claudeEffort?: ClaudeEffortLevel;
+	briefGoal: string;
+	jobs: SourceAnalysisJob[];
+	createdAt: string;
+	updatedAt: string;
+	synthesisStageFile?: string;
+}
 
 export interface OptimizationResult {
 	content: string;
@@ -52,6 +91,11 @@ export interface DocumentWorkflowIntentDefinition {
 export interface WorkflowExecutionPlan {
 	preset: WorkflowPreset;
 	documentIntentId?: DocumentWorkflowIntentId;
+	sourceAnalysisMode?: SourceAnalysisMode;
+	sourceAnalysisBatchId?: string;
+	sourceAnalysisJobId?: string;
+	targetSourceRelativePath?: string;
+	targetSourceOutputFile?: string;
 	provider: ProviderTarget;
 	providerModel?: string;
 	providerAccountId?: string;
@@ -111,6 +155,8 @@ export interface WorkflowStageRecord {
 	index: number;
 	workflowId?: string;
 	branchId?: string;
+	sourceAnalysisBatchId?: string;
+	sourceAnalysisJobId?: string;
 	preset: WorkflowPreset;
 	provider: ProviderTarget;
 	providerModel?: string;
@@ -143,6 +189,7 @@ export interface WorkflowSessionState {
 	currentProviderAccountId?: string;
 	currentClaudeAccountId?: string;
 	currentClaudeEffort?: ClaudeEffortLevel;
+	sourceAnalysisBatch?: SourceAnalysisBatch;
 	briefFile: string;
 	stages: WorkflowStageRecord[];
 }
@@ -204,6 +251,8 @@ export interface ProjectContext {
 	metadata: ContextMetadata;
 	workflowPlan: WorkflowExecutionPlan;
 	activeLearningDocument?: LearningDocumentRecord;
+	sourceAnalysisBatch?: SourceAnalysisBatch;
+	sourceAnalysisJob?: SourceAnalysisJob;
 	artifactPlan?: ArtifactPlan;
 	reused: boolean;
 	workflowSession?: WorkflowSessionState;
@@ -260,6 +309,7 @@ export interface WorkflowDashboardState {
 	workspaceModeState?: WorkspaceModeState;
 	learningDocuments?: LearningDocumentRecord[];
 	activeLearningDocument?: LearningDocumentRecord;
+	sourceAnalysisBatch?: SourceAnalysisBatch;
 	session?: WorkflowSessionState;
 	brief?: WorkflowBrief;
 	historyEntries?: WorkflowHistoryEntry[];

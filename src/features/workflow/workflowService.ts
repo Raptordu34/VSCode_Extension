@@ -7,6 +7,7 @@ import { getProviderAccounts, getActiveProviderAccountId, findProviderAccount, g
 import { buildWorkspaceUri, fileExists, readUtf8 } from "../../core/workspace.js";
 import { getImplicitWorkspaceFolder } from '../../core/workspaceContext.js';
 import { readWorkflowSessionState, readWorkflowBrief, writeWorkflowSessionState, buildSuggestedNextPresets } from "../context/workflowPersistence.js";
+import { readSourceAnalysisBatch } from '../context/sourceAnalysisBatch.js';
 import { getWorkflowStageStatusLabel, formatWorkflowRoles } from "./ui.js";
 import { getExtensionConfiguration } from "../../core/configuration.js";
 import { mergeProviderStatusCache } from "../providers/providerService.js";
@@ -107,6 +108,7 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 		readWorkflowHistoryIndex(workspaceFolder.uri),
 		detectGovernancePolicy(workspaceFolder)
 	]);
+	const sourceAnalysisBatch = session?.sourceAnalysisBatch ?? await readSourceAnalysisBatch(workspaceFolder.uri);
 	const [learningDocuments, activeLearningDocument] = await Promise.all([
 		getLearningDocuments(context, workspaceFolder),
 		getActiveLearningDocument(context, workspaceFolder)
@@ -128,6 +130,7 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 		workspaceModeState,
 		learningDocuments,
 		activeLearningDocument,
+		sourceAnalysisBatch,
 		session,
 		brief,
 		historyEntries: historyIndex.entries.map((entry) => ({
