@@ -377,6 +377,7 @@ export interface PipelineTemplateDefinition {
 export interface ActivePipelineState {
   templateId: PipelineTemplateId;
   branchName?: string;
+  baseBranch?: string;
   currentStepIndex: number;
   stepConfigs: PipelineStepConfig[];
   workflowId?: string;

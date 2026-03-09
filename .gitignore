@@ -3,3 +3,10 @@ dist
 node_modules
 .vscode-test/
 *.vsix
+
+# ai-context-orchestrator
+.ai-orchestrator/session.json
+.ai-orchestrator/stages/
+.ai-orchestrator/history/
+.ai-context.md
+

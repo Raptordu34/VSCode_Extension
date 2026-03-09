@@ -19,6 +19,7 @@ import type {
 	WorkflowSessionState
 } from '../workflow/types.js';
 import { buildWorkspaceUri, fileExists, normalizeWorkspaceRelativePath, readUtf8 } from '../../core/workspace.js';
+import { getCurrentBranch } from '../git/gitService.js';
 import { createNonce } from '../../utils/index.js';
 import { replaceManagedBlock } from '../aiAgents/promptBuilder.js';
 import { WORKFLOW_PRESETS } from '../workflow/presets.js';
@@ -590,7 +591,8 @@ export async function forkWorkflowFromHistory(
 	}
 
 	const forkedWorkflowId = createWorkflowId();
-	const forkedBranchId = 'main';
+	const currentBranch = await getCurrentBranch(workspaceFolder.uri.fsPath);
+	const forkedBranchId = sourceManifest.branchId ?? currentBranch ?? 'main';
 	const now = new Date().toISOString();
 	const forkedLabel = labelOverride?.trim() || `Branch of ${sourceManifest.label}`;
 	const operations: MutationWriteOperation[] = [];
@@ -713,7 +715,8 @@ export async function forkWorkflowFromHistoryAtStage(
 		...sourceStages.map((stage) => normalizeWorkspaceRelativePath(stage.stageFile))
 	]);
 	const forkedWorkflowId = createWorkflowId();
-	const forkedBranchId = 'main';
+	const currentBranch = await getCurrentBranch(workspaceFolder.uri.fsPath);
+	const forkedBranchId = sourceManifest.branchId ?? currentBranch ?? 'main';
 	const now = new Date().toISOString();
 	const forkedLabel = labelOverride?.trim() || `Branch of ${sourceManifest.label} @ stage ${String(stageIndex).padStart(2, '0')}`;
 	const operations: MutationWriteOperation[] = [];
