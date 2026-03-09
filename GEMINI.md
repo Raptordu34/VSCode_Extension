@@ -1,8 +1,8 @@
 <!-- ai-context-orchestrator:generated:start -->
 ## AI Context Orchestrator
 
-- Workflow preset: test
-- Roles prepared: tester, implementer
+- Workflow preset: plan
+- Roles prepared: explorer, architect
 - Refresh mode: smart-refresh
 - Cost profile: balanced
 - Context file: .ai-context.md
@@ -20,29 +20,29 @@ Prefer direct, well-structured reasoning with grounded file evidence over specul
 - Prefer stable project patterns and minimal edits over flexible abstractions.
 
 ### Task
-Focus on testing: add or repair tests, run focused checks, and only change implementation when required by failing tests.
+Investigate the codebase, produce an implementation plan, and highlight reuse opportunities before any code changes.
 
 ### Preset Priorities
-- Select the smallest test surface that proves or disproves the change.
-- Only adjust implementation when a failing test or testability issue requires it.
+- Turn the gathered context into a constrained implementation plan with explicit checkpoints.
+- Prefer reuse and low-complexity changes over fresh abstractions.
 
 ### Completion Criteria
-- Stop once the focused checks have passed or failed with clear evidence.
-- Call out coverage gaps that still matter for regression confidence.
+- Stop once the plan is concrete enough to implement without design guesswork.
+- Keep code changes out of scope unless the user explicitly requests implementation.
 
 ### Avoid
-- Do not default to broad suite runs when a focused check is sufficient.
-- Do not add coverage that does not reduce a real regression risk.
+- Do not present multiple equivalent plans when one clear recommendation is defensible.
+- Do not hide tradeoffs or prerequisites.
 
 ### Key files
 - .vscode-test.mjs
 - CHANGELOG.md
+- CLAUDE.md
 - esbuild.js
 - eslint.config.mjs
+- GEMINI.md
 - package-lock.json
 - package.json
-- README.md
-- tsconfig.json
 
 ### Useful commands
 - check-types
@@ -55,5 +55,7 @@ Focus on testing: add or repair tests, run focused checks, and only change imple
 - vscode:prepublish
 
 ### Instruction files already present
-No provider-specific instruction files were detected during generation.
+- CLAUDE.md
+- Claude.md
+- claude.md
 <!-- ai-context-orchestrator:generated:end -->

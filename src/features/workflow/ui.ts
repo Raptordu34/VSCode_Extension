@@ -324,8 +324,8 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 						const fileUri = vscode.Uri.joinPath(state.workspaceFolder.uri, stageFile);
 						const bytes = await vscode.workspace.fs.readFile(fileUri);
 						const text = Buffer.from(bytes).toString('utf8');
-						const lines = text.split('\n').slice(0, 60).join('\n');
-						void this.view.webview.postMessage({ command: 'stagePreviewLoaded', stageFile, content: lines });
+						const html = await vscode.commands.executeCommand<string>('markdown.api.render', text) ?? text;
+						void this.view.webview.postMessage({ command: 'stagePreviewLoaded', stageFile, content: html, isHtml: true });
 					} catch {
 						void this.view.webview.postMessage({ command: 'stagePreviewLoaded', stageFile, content: 'File not available.' });
 					}
@@ -469,10 +469,10 @@ export function getWorkflowControlHtml(
 				<button type="button" class="secondary small-btn" title="Create a new workflow rooted at this stage checkpoint." data-command="forkWorkflowFromStage" data-stage-index="${stage.index}">Branch here</button>
 				<button type="button" class="secondary small-btn" data-command="markCompleted" data-stage-index="${stage.index}">Mark Done</button>
 			</div>
-			${stage.status === 'completed' ? `<details class="stage-preview" data-stage-file="${helpers.escapeHtml(stage.stageFile)}">
+			<details class="stage-preview" data-stage-file="${helpers.escapeHtml(stage.stageFile)}">
 				<summary>Preview findings</summary>
 				<div class="stage-preview-body"></div>
-			</details>` : ''}
+			</details>
 		</div>`).join('')}
 	</div>
 </div>
@@ -664,7 +664,7 @@ window.addEventListener('message', function(event) {
 		if (previewEl) {
 			previewEl.dataset.loaded = '1';
 			var body = previewEl.querySelector('.stage-preview-body');
-			if (body) { body.textContent = msg.content; }
+			if (body) { if (msg.isHtml) { body.innerHTML = msg.content; } else { body.textContent = msg.content; } }
 		}
 	}
 });
