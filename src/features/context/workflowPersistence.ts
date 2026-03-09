@@ -17,6 +17,7 @@ import type {
 	WorkflowStageRecord
 } from '../workflow/types.js';
 import { buildWorkspaceUri, normalizeWorkspaceRelativePath, readUtf8, relativizeToWorkspace } from '../../core/workspace.js';
+import { getCurrentBranch } from '../git/gitService.js';
 import { formatProviderModel, getProviderLabel } from '../providers/providerService.js';
 import { replaceManagedBlock } from '../aiAgents/promptBuilder.js';
 import { formatWorkflowRoles } from '../workflow/ui.js';
@@ -379,7 +380,8 @@ export async function persistWorkflowArtifacts(
 	const stageFile = normalizeWorkspaceRelativePath(`${WORKFLOW_STAGE_DIRECTORY}/${String(nextIndex).padStart(2, '0')}-${workflowPlan.preset}.md`);
 	const upstreamStageFiles = isNewWorkflow ? [] : existingSession?.stages.map((stage) => normalizeWorkspaceRelativePath(stage.stageFile)) ?? [];
 	const workflowId = workflowPlan.workflowId ?? (isNewWorkflow ? `workflow-${Date.now().toString(36)}-${createNonce().slice(0, 8)}` : existingSession?.workflowId);
-	const branchId = workflowPlan.branchId ?? existingSession?.branchId ?? 'main';
+	const currentBranch = await getCurrentBranch(workspaceFolder.uri.fsPath);
+	const branchId = workflowPlan.branchId ?? existingSession?.branchId ?? currentBranch ?? 'main';
 	const createdAt = isNewWorkflow ? new Date().toISOString() : existingSession?.createdAt;
 	const intentCopy = getEffectiveWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode, workflowPlan.documentIntentId);
 	const label = brief?.goal ?? (workflowPlan.preset === 'explore' ? `${intentCopy.label}` : `${intentCopy.label} workflow`);

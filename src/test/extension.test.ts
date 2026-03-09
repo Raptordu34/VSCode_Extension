@@ -596,7 +596,7 @@ suite('workflow persistence', () => {
 				workspaceName: 'source-batch-workspace',
 				workspaceFolderId: tempRoot.toString(),
 				workflowId: 'workflow-1',
-				branchId: 'main',
+				branchId: 'master',
 				updatedAt: '2026-03-09T00:00:00.000Z',
 				currentStageIndex: 1,
 				currentPreset: 'build',
@@ -609,7 +609,7 @@ suite('workflow persistence', () => {
 				stages: [{
 					index: 1,
 					workflowId: 'workflow-1',
-					branchId: 'main',
+					branchId: 'master',
 					preset: 'build',
 					provider: 'claude',
 					providerModel: 'claude-sonnet-4-6',
@@ -628,7 +628,7 @@ suite('workflow persistence', () => {
 			currentStage: {
 				index: 1,
 				workflowId: 'workflow-1',
-				branchId: 'main',
+				branchId: 'master',
 				preset: 'build',
 				provider: 'claude',
 				providerModel: 'claude-sonnet-4-6',
@@ -739,7 +739,7 @@ suite('workflow persistence', () => {
 				workspaceName: 'temp-workspace',
 				workspaceFolderId: tempRoot.toString(),
 				workflowId: 'workflow-1',
-				branchId: 'main',
+				branchId: 'master',
 				createdAt: '2026-03-09T00:00:00.000Z',
 				updatedAt: '2026-03-09T00:00:00.000Z',
 				currentStageIndex: 1,
@@ -753,7 +753,7 @@ suite('workflow persistence', () => {
 				stages: [{
 					index: 1,
 					workflowId: 'workflow-1',
-					branchId: 'main',
+					branchId: 'master',
 					preset: 'build',
 					provider: 'claude',
 					providerModel: 'claude-sonnet-4-6',
@@ -772,7 +772,7 @@ suite('workflow persistence', () => {
 			currentStage: {
 				index: 1,
 				workflowId: 'workflow-1',
-				branchId: 'main',
+				branchId: 'master',
 				preset: 'build',
 				provider: 'claude',
 				providerModel: 'claude-sonnet-4-6',
@@ -1579,7 +1579,7 @@ suite('workflow control html', () => {
 			name: 'learning-doc-workspace',
 			index: 0
 		} as vscode.WorkspaceFolder;
-		const context = createTestExtensionContext(vscode.workspace.workspaceFolders?.[0]?.uri);
+		const context = createTestExtensionContext(vscode.Uri.file(path.join(__dirname, '..', '..')));
 
 		const document = await createLearningDocument(context, workspaceFolder, 'compte-rendu', 'Réseaux bayésiens - séance 03');
 		const expectedPaths = [
@@ -1614,7 +1614,7 @@ suite('workflow control html', () => {
 			name: 'learning-reconcile-workspace',
 			index: 0
 		} as vscode.WorkspaceFolder;
-		const context = createTestExtensionContext(vscode.workspace.workspaceFolders?.[0]?.uri);
+		const context = createTestExtensionContext(vscode.Uri.file(path.join(__dirname, '..', '..')));
 
 		const createdDocument = await createLearningDocument(context, workspaceFolder, 'compte-rendu', 'Compte rendu test');
 		await clearLearningDocumentState(context, workspaceFolder);
@@ -1809,7 +1809,7 @@ suite('workflow control html', () => {
 							artifactFiles: [],
 							upstreamStageFiles: [],
 							workflowId: 'workflow-a',
-							branchId: 'main'
+							branchId: 'master'
 						},
 						{
 							index: 2,
@@ -1824,11 +1824,11 @@ suite('workflow control html', () => {
 							artifactFiles: [],
 							upstreamStageFiles: ['.ai-orchestrator/stages/01-build.md'],
 							workflowId: 'workflow-a',
-							branchId: 'main'
+							branchId: 'master'
 						}
 					],
 					workflowId: 'workflow-a',
-					branchId: 'main',
+					branchId: 'master',
 					createdAt: '2026-03-08T12:00:00.000Z',
 					updatedAt: '2026-03-08T12:30:00.000Z',
 					label: 'Workflow A'
@@ -1840,7 +1840,7 @@ suite('workflow control html', () => {
 				historyEntries: [
 					{
 						workflowId: 'workflow-a',
-						branchId: 'main',
+						branchId: 'master',
 						label: 'Workflow A',
 						createdAt: '2026-03-08T12:00:00.000Z',
 						updatedAt: '2026-03-08T12:30:00.000Z',
@@ -1854,7 +1854,7 @@ suite('workflow control html', () => {
 						},
 						{
 							workflowId: 'workflow-b',
-							branchId: 'main',
+							branchId: 'master',
 							parentWorkflowId: 'workflow-a',
 							parentStageIndex: 2,
 							label: 'Workflow B',

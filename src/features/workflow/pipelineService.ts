@@ -11,7 +11,7 @@ import { gatherProjectContext } from '../context/contextBuilder.js';
 import { launchProvider } from '../aiAgents/agentLauncher.js';
 import { readWorkflowSessionState } from '../context/workflowPersistence.js';
 import { getWorkspaceModeState } from '../workspace/service.js';
-import { createBranch, isGitRepository } from '../git/gitService.js';
+import { createBranch, isGitRepository, getCurrentBranch } from '../git/gitService.js';
 import { generateBranchName } from '../git/branchNameGenerator.js';
 import { getProviderLabel, promptForProviderTarget, promptForProviderModel, promptForProviderAccount, getProviderAccounts, findProviderAccount, getActiveProviderAccountId, getDefaultProviderModel, getDefaultClaudeEffort } from '../providers/providerService.js';
 import { formatProviderModel } from '../providers/providerService.js';
@@ -69,9 +69,11 @@ export async function startPipeline(
 	const briefText = briefInput.trim();
 
 	let branchName: string | undefined;
+	let baseBranch: string | undefined;
 	if (!template.skipGit && template.gitBranchPrefix) {
 		const isGitRepo = await isGitRepository(workspaceFolder.uri.fsPath);
 		if (isGitRepo) {
+			baseBranch = await getCurrentBranch(workspaceFolder.uri.fsPath);
 			const generatedName = await generateBranchName(template.gitBranchPrefix, briefText);
 			const confirmedName = await vscode.window.showInputBox({
 				title: 'Confirm Branch Name',
@@ -97,6 +99,7 @@ export async function startPipeline(
 	const pipelineState: ActivePipelineState = {
 		templateId,
 		branchName,
+		baseBranch,
 		currentStepIndex: 0,
 		stepConfigs: [],
 		createdAt: now,
@@ -287,8 +290,9 @@ export async function finalizePipeline(
 	const template = PIPELINE_TEMPLATES[pipelineState.templateId];
 
 	if (!template.skipGit && pipelineState.branchName) {
+		const targetBranch = pipelineState.baseBranch ?? 'main';
 		const mergeChoice = await vscode.window.showInformationMessage(
-			`Pipeline "${template.label}" complete. Merge ${pipelineState.branchName} into main?`,
+			`Pipeline "${template.label}" complete. Merge ${pipelineState.branchName} into ${targetBranch}?`,
 			{ modal: false },
 			'Merge',
 			'Keep Branch'
@@ -296,9 +300,10 @@ export async function finalizePipeline(
 
 		if (mergeChoice === 'Merge') {
 			const { mergeInto } = await import('../git/gitService.js');
-			const result = await mergeInto(workspaceFolder.uri.fsPath, pipelineState.branchName, 'main');
+			const result = await mergeInto(workspaceFolder.uri.fsPath, pipelineState.branchName, targetBranch);
 			if (result.success) {
-				void vscode.window.showInformationMessage(`Merged ${pipelineState.branchName} into main successfully.`);
+				void vscode.window.showInformationMessage(`Merged ${pipelineState.branchName} into ${targetBranch} successfully.`);
+
 			} else {
 				void vscode.window.showErrorMessage(`Merge failed: ${result.error}`);
 			}
