@@ -14,6 +14,7 @@ import type {
 } from '../providers/types.js';
 import { WORKFLOW_PRESETS } from './presets.js';
 import type {
+	DocumentWorkflowIntentDefinition,
 	ExtensionConfiguration,
 	LastWorkflowConfig,
 	ProviderAccountConfiguration,
@@ -29,7 +30,7 @@ import { capitalize } from "../../utils/index.js";
 import { readLastWorkflowConfig, setWorkflowHistoryCollapsed } from './workflowService.js';
 import { getWorkspaceModeDefinition } from '../workspace/service.js';
 import { getLearningDocumentTypeLabel } from '../documents/service.js';
-import { getWorkflowIntentCopy } from './presets.js';
+import { getDocumentWorkflowIntents, getEffectiveWorkflowIntentCopy, getWorkflowIntentCopy } from './presets.js';
 
 export interface WorkflowUiHelpers {
 	createNonce(): string;
@@ -70,7 +71,7 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 			localResourceRoots: [this.extensionUri]
 		};
 
-		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; providerModel?: string; claudeEffort?: string; learningDocumentId?: string; brief?: string; stageIndex?: number; target?: string; collapsed?: boolean }) => {
+		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; providerModel?: string; claudeEffort?: string; learningDocumentId?: string; documentIntentId?: string; brief?: string; stageIndex?: number; target?: string; collapsed?: boolean }) => {
 			switch (message.command) {
 				case 'selectWorkspaceMode':
 					await vscode.commands.executeCommand('ai-context-orchestrator.selectWorkspaceMode');
@@ -99,6 +100,7 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 							providerModel: message.providerModel,
 							claudeEffort: message.claudeEffort,
 							learningDocumentId: message.learningDocumentId,
+							documentIntentId: message.documentIntentId,
 							brief: message.brief
 						}
 					);
@@ -114,6 +116,7 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 							providerModel: message.providerModel,
 							claudeEffort: message.claudeEffort,
 							learningDocumentId: message.learningDocumentId,
+							documentIntentId: message.documentIntentId,
 							brief: message.brief
 						}
 					);
@@ -449,6 +452,7 @@ export function getWorkflowControlHtml(
 </details>`;
 
 	const learningMode = state.workspaceModeState ? getWorkspaceModeDefinition(state.workspaceModeState.mode) : undefined;
+	const hasLearningDocuments = (state.learningDocuments?.length ?? 0) > 0;
 	const learningDocumentsHtml = learningMode?.supportsLearningDocuments ? `
 <details class="mc-section" open>
 <summary class="mc-section-header">
@@ -456,12 +460,13 @@ export function getWorkflowControlHtml(
 	<span class="mc-section-badge">${state.learningDocuments?.length ?? 0} document(s)</span>
 </summary>
 <div class="mc-section-body">
-	<p class="section-footnote">Le mode ${helpers.escapeHtml(learningMode.label)} active la création de documents et l’import de sources locales.</p>
+	<p class="section-footnote">${hasLearningDocuments ? `Le mode ${helpers.escapeHtml(learningMode.label)} active la création de documents et l’import de sources locales.` : `Le mode ${helpers.escapeHtml(learningMode.label)} attend d’abord un document de travail. Commencez par créer un compte-rendu ou un autre document learning-kit.`}</p>
 	<div class="shortcuts">
 		<button type="button" class="linkButton" data-command="openActiveLearningDocument" ${state.activeLearningDocument ? '' : 'disabled'}>Document actif<span>${helpers.escapeHtml(state.activeLearningDocument ? `${state.activeLearningDocument.title} · ${getLearningDocumentTypeLabel(state.activeLearningDocument.type)}` : 'Aucun')}</span></button>
 		<button type="button" class="linkButton" data-command="switchLearningDocument" ${(state.learningDocuments?.length ?? 0) > 0 ? '' : 'disabled'}>Changer<span>${helpers.escapeHtml(state.activeLearningDocument?.relativeDirectory ?? 'Aucun document')}</span></button>
 		<button type="button" class="linkButton" data-command="addLearningDocumentSources" ${state.activeLearningDocument ? '' : 'disabled'}>Sources<span>${helpers.escapeHtml(state.activeLearningDocument ? `${state.activeLearningDocument.sources.length} importée(s)` : 'Aucune')}</span></button>
 	</div>
+	${hasLearningDocuments ? '' : `<div class="actions" style="margin-top:8px;"><button type="button" data-command="createLearningDocument">Créer votre premier document</button></div>`}
 	<div class="actions" style="margin-top:8px;">
 		<button type="button" class="secondary" data-command="createLearningDocument">Créer un document</button>
 	</div>
@@ -578,7 +583,11 @@ var drawerEffort = '${continuePrefill?.claudeEffort ?? lastConfig?.claudeEffort 
 var drawerMode = '${drawerMode}';
 var drawerLearningDocumentEnabled = ${learningMode?.supportsLearningDocuments ? 'true' : 'false'};
 var drawerLearningDocumentId = '${lastConfig?.learningDocumentId ?? state.activeLearningDocument?.id ?? ''}';
+var drawerDocumentIntentId = '${lastConfig?.documentIntentId ?? ''}';
 var DRAWER_INTENT_COPY = ${JSON.stringify(Object.fromEntries(Object.values(WORKFLOW_PRESETS).map((presetDefinition) => [presetDefinition.preset, getWorkflowIntentCopy(presetDefinition.preset, state.workspaceModeState?.mode)])))};
+var DRAWER_PRESET_ORDER = ${JSON.stringify(Object.values(WORKFLOW_PRESETS).map((presetDefinition) => presetDefinition.preset))};
+var DRAWER_DOCUMENTS = ${JSON.stringify(Object.fromEntries((state.learningDocuments ?? []).map((document) => [document.id, { id: document.id, type: document.type, title: document.title }]))) };
+var DRAWER_DOCUMENT_INTENTS = ${JSON.stringify(Object.fromEntries([...new Set((state.learningDocuments ?? []).map((document) => document.type))].map((documentType) => [documentType, getDocumentWorkflowIntents(documentType).map((intent) => ({ id: intent.id, preset: intent.preset, label: intent.label, briefPrompt: intent.briefPrompt, briefPlaceholder: intent.briefPlaceholder }))])))};
 var CLAUDE_MODELS = ${JSON.stringify(claudeModels)};
 var GEMINI_MODELS = ${JSON.stringify(geminiModels)};
 
@@ -587,6 +596,83 @@ function getIntentCopy(preset) {
 		briefPrompt: 'Describe the objective for this stage.',
 		briefPlaceholder: 'Describe the objective for this stage...'
 	};
+}
+
+function getSelectedDocumentType() {
+	if (!drawerLearningDocumentEnabled || !drawerLearningDocumentId) { return undefined; }
+	var documentInfo = DRAWER_DOCUMENTS[drawerLearningDocumentId];
+	return documentInfo ? documentInfo.type : undefined;
+}
+
+function getDocumentIntentOptions(documentType) {
+	return documentType ? (DRAWER_DOCUMENT_INTENTS[documentType] || []) : [];
+}
+
+function getCurrentIntentOptions() {
+	var documentIntentOptions = getDocumentIntentOptions(getSelectedDocumentType());
+	if (documentIntentOptions.length > 0) {
+		return documentIntentOptions.map(function(intent) {
+			return {
+				field: 'intent',
+				id: intent.id,
+				preset: intent.preset,
+				label: intent.label,
+				briefPrompt: intent.briefPrompt,
+				briefPlaceholder: intent.briefPlaceholder
+			};
+		});
+	}
+
+	return DRAWER_PRESET_ORDER.map(function(preset) {
+		var intentCopy = getIntentCopy(preset);
+		return {
+			field: 'preset',
+			id: preset,
+			preset: preset,
+			label: intentCopy.label || preset,
+			briefPrompt: intentCopy.briefPrompt,
+			briefPlaceholder: intentCopy.briefPlaceholder
+		};
+	});
+}
+
+function syncIntentSelection() {
+	var intentOptions = getCurrentIntentOptions();
+	if (!intentOptions.length) {
+		drawerDocumentIntentId = '';
+		return;
+	}
+	var documentIntentOption = intentOptions.find(function(option) { return option.field === 'intent' && option.id === drawerDocumentIntentId; });
+	if (documentIntentOption) {
+		drawerPreset = documentIntentOption.preset;
+		return;
+	}
+	var presetOption = intentOptions.find(function(option) { return option.field === 'preset' && option.id === drawerPreset; }) || intentOptions[0];
+		drawerPreset = presetOption.preset;
+		drawerDocumentIntentId = presetOption.field === 'intent' ? presetOption.id : '';
+	}
+
+function renderIntentPills() {
+	var container = document.getElementById('intent-pills');
+	if (!container) { return; }
+	var intentOptions = getCurrentIntentOptions();
+	container.innerHTML = intentOptions.map(function(option) {
+		var isActive = option.field === 'intent' ? option.id === drawerDocumentIntentId : option.id === drawerPreset;
+		var presetAttr = option.preset ? ' data-preset="' + option.preset + '"' : '';
+		return '<button type="button" class="drawer-pill ' + (isActive ? 'active' : '') + '" data-field="' + option.field + '" data-value="' + option.id + '"' + presetAttr + '>' + option.label + '</button>';
+	}).join('');
+	updateSelectionSummary();
+	updateLaunchState();
+}
+
+function getCurrentIntentSelection() {
+	var intentOptions = getCurrentIntentOptions();
+	var selected = intentOptions.find(function(option) { return option.field === 'intent' ? option.id === drawerDocumentIntentId : option.id === drawerPreset; });
+	return selected || intentOptions[0] || { preset: drawerPreset, label: drawerPreset, briefPrompt: 'Describe the objective for this stage.', briefPlaceholder: 'Describe the objective for this stage...' };
+}
+
+function requiresBrief() {
+	return drawerDocumentIntentId ? true : drawerPreset !== 'explore';
 }
 
 function getModels(provider) {
@@ -619,13 +705,13 @@ function updateBriefVisibility(preset) {
 	var row = document.getElementById('brief-field');
 	var help = document.getElementById('brief-help');
 	var hint = document.getElementById('brief-hint');
-	var visible = preset !== 'explore';
+	var visible = requiresBrief();
 	if (row) {
 		row.hidden = !visible;
 		row.setAttribute('aria-hidden', visible ? 'false' : 'true');
 	}
 	if (help) {
-		var intent = getIntentCopy(preset);
+		var intent = getCurrentIntentSelection();
 		help.textContent = visible
 			? intent.briefPrompt
 			: 'Optional for Explore. Leave it empty to start with the current workspace context.';
@@ -641,7 +727,7 @@ function updateBriefVisibility(preset) {
 	}
 	var ta = document.getElementById('drawer-brief');
 	if (ta) {
-		var intent = getIntentCopy(preset);
+		var intent = getCurrentIntentSelection();
 		ta.placeholder = intent.briefPlaceholder || 'Describe the objective...';
 	}
 	updateLaunchState();
@@ -677,9 +763,9 @@ function updateSelectionSummary() {
 	var summary = document.getElementById('launch-summary');
 	var modelEl = document.getElementById('drawer-model');
 	if (!summary || !modelEl) { return; }
-	var presetLabelEl = document.querySelector('.drawer-pill[data-field="preset"].active');
+	var presetLabelEl = document.querySelector('#intent-pills .drawer-pill.active');
 	var providerLabelEl = document.querySelector('.drawer-pill[data-field="provider"].active');
-	var presetLabel = presetLabelEl ? presetLabelEl.textContent : drawerPreset;
+	var presetLabel = presetLabelEl ? presetLabelEl.textContent : getCurrentIntentSelection().label;
 	var providerLabel = providerLabelEl ? providerLabelEl.textContent : drawerProvider;
 	var detail = presetLabel + ' with ' + providerLabel + ' · ' + modelEl.value;
 	if (drawerProvider === 'claude') {
@@ -701,20 +787,20 @@ function updateLaunchState() {
 	var message = document.getElementById('launch-validation');
 	var briefEl = document.getElementById('drawer-brief');
 	if (!launchBtn || !message) { return; }
-	var requiresBrief = drawerPreset !== 'explore';
+	var needsBrief = requiresBrief();
 	var briefValue = briefEl ? briefEl.value.trim() : '';
 	var docEl = document.getElementById('drawer-learning-document');
 	var hasDocument = !drawerLearningDocumentEnabled || (docEl && docEl.value);
-	var isValid = (!requiresBrief || briefValue.length > 0) && !!hasDocument;
+	var isValid = (!needsBrief || briefValue.length > 0) && !!hasDocument;
 	launchBtn.disabled = !isValid;
 	message.textContent = isValid
 		? (drawerLearningDocumentEnabled ? 'Launch uses the selected learning document and current provider settings.' : 'Launch uses the current provider and remembers this setup for next time.')
-		: (!hasDocument ? 'Select a learning document before launching.' : 'Add a brief before launching this workflow.');
+		: (!hasDocument ? 'Create or select a learning document before launching.' : 'Add a brief before launching this workflow.');
 	}
 
 function focusComposer() {
 	var briefField = document.getElementById('brief-field');
-	var focusTarget = drawerPreset === 'explore' || (briefField && briefField.hidden)
+	var focusTarget = !requiresBrief() || (briefField && briefField.hidden)
 		? document.querySelector('.drawer-pill[data-field="provider"].active')
 		: document.getElementById('drawer-brief');
 	if (focusTarget && typeof focusTarget.focus === 'function') {
@@ -722,31 +808,43 @@ function focusComposer() {
 	}
 }
 
-// Pill clicks (preset / provider / effort)
-for (var pill of document.querySelectorAll('.drawer-pill')) {
-	pill.addEventListener('click', (function(p) { return function() {
-		var field = p.dataset.field;
-		var value = p.dataset.value;
-		var container = p.closest('.drawer-pills');
-		if (container) {
-			for (var s of container.querySelectorAll('.drawer-pill')) { s.classList.remove('active'); }
-		}
-		p.classList.add('active');
-		if (field === 'preset') {
-			drawerPreset = value;
-			updateBriefVisibility(value);
-		} else if (field === 'provider') {
-			drawerProvider = value;
-			var sel = document.getElementById('drawer-model');
-			updateModelSelect(value, sel ? sel.value : '');
-			updateEffortVisibility(value);
-			updateProviderHelp(value);
-		} else if (field === 'effort') {
-			drawerEffort = value;
-			updateSelectionSummary();
-		}
-	}; })(pill));
-}
+document.addEventListener('click', function(event) {
+	var target = event.target;
+	if (!(target instanceof Element)) { return; }
+	var pill = target.closest('.drawer-pill');
+	if (!pill) { return; }
+	var field = pill.getAttribute('data-field');
+	var value = pill.getAttribute('data-value') || '';
+	var container = pill.closest('.drawer-pills');
+	if (container) {
+		for (var activePill of container.querySelectorAll('.drawer-pill')) { activePill.classList.remove('active'); }
+	}
+	pill.classList.add('active');
+	if (field === 'intent') {
+		drawerDocumentIntentId = value;
+		drawerPreset = pill.getAttribute('data-preset') || drawerPreset;
+		updateBriefVisibility(drawerPreset);
+		return;
+	}
+	if (field === 'preset') {
+		drawerDocumentIntentId = '';
+		drawerPreset = value;
+		updateBriefVisibility(value);
+		return;
+	}
+	if (field === 'provider') {
+		drawerProvider = value;
+		var sel = document.getElementById('drawer-model');
+		updateModelSelect(value, sel ? sel.value : '');
+		updateEffortVisibility(value);
+		updateProviderHelp(value);
+		return;
+	}
+	if (field === 'effort') {
+		drawerEffort = value;
+		updateSelectionSummary();
+	}
+});
 
 var modelSelect = document.getElementById('drawer-model');
 if (modelSelect) {
@@ -760,6 +858,9 @@ var learningDocumentSelect = document.getElementById('drawer-learning-document')
 if (learningDocumentSelect) {
 	learningDocumentSelect.addEventListener('change', function() {
 		drawerLearningDocumentId = learningDocumentSelect.value;
+		syncIntentSelection();
+		renderIntentPills();
+		updateBriefVisibility(drawerPreset);
 		updateSelectionSummary();
 		updateLaunchState();
 	});
@@ -779,6 +880,7 @@ function triggerLaunch() {
 		providerModel: modelEl ? modelEl.value : undefined,
 		claudeEffort: drawerProvider === 'claude' ? drawerEffort : undefined,
 		learningDocumentId: drawerLearningDocumentEnabled ? drawerLearningDocumentId || undefined : undefined,
+		documentIntentId: drawerDocumentIntentId || undefined,
 		brief: (briefEl && briefEl.value.trim()) ? briefEl.value.trim() : undefined
 	});
 }
@@ -807,6 +909,8 @@ if (drawerLaunchBtn) {
 }
 
 updateModelSelect(drawerProvider, '${continuePrefill?.providerModel ?? lastConfig?.providerModel ?? defaultModel}');
+syncIntentSelection();
+renderIntentPills();
 updateProviderHelp(drawerProvider);
 updateEffortVisibility(drawerProvider);
 updateBriefVisibility(drawerPreset);
@@ -829,6 +933,7 @@ if (document.getElementById('mc-drawer')) {
 
 function buildInitHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpers, defaultPreset: string, defaultProvider: string, defaultModel: string, drawerOpen: boolean): string {
 	const workspaceMode = state.workspaceModeState ? getWorkspaceModeDefinition(state.workspaceModeState.mode) : undefined;
+	const hasLearningDocuments = (state.learningDocuments?.length ?? 0) > 0;
 	const defaultIntentLabel = getWorkflowIntentCopy(defaultPreset as WorkflowPreset, state.workspaceModeState?.mode).label;
 	const modeLine = workspaceMode
 		? `<div class="stat"><strong>Workspace mode</strong><span>${helpers.escapeHtml(workspaceMode.label)}</span></div>`
@@ -837,14 +942,16 @@ function buildInitHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpers
 		? `<div class="stat"><strong>Document actif</strong><span>${helpers.escapeHtml(state.activeLearningDocument ? `${state.activeLearningDocument.title} · ${getLearningDocumentTypeLabel(state.activeLearningDocument.type)}` : 'Aucun document')}</span></div>`
 		: `<div class="stat"><strong>Fast path</strong><span>Goal, provider, optional brief, then launch.</span></div>`;
 	const extraActions = workspaceMode?.supportsLearningDocuments
-		? `<button type="button" class="secondary" data-command="createLearningDocument">Créer un document</button>
+		? `${hasLearningDocuments
+			? `<button type="button" class="secondary" data-command="createLearningDocument">Créer un document</button>
 		<button type="button" class="secondary" data-command="addLearningDocumentSources" ${state.activeLearningDocument ? '' : 'disabled'}>Importer des sources</button>`
+			: `<button type="button" data-command="createLearningDocument">Créer votre premier document</button>`}`
 		: `<button type="button" class="secondary" data-command="init">Open full setup</button>`;
 	return `
 <section class="card hero">
 	<div class="kicker">No active workflow</div>
 	<h3>${workspaceMode?.supportsLearningDocuments ? 'Piloter un document depuis la sidebar' : 'Start a workflow from the sidebar'}</h3>
-	<p class="lead">${workspaceMode?.supportsLearningDocuments ? 'Choisissez un document cible, importez vos sources, puis lancez le provider avec un prompt adapté au template actif.' : 'Use the quick launcher for the common path, then open advanced settings only when you need to change model or provider-specific tuning.'}</p>
+	<p class="lead">${workspaceMode?.supportsLearningDocuments ? (hasLearningDocuments ? 'Choisissez un document cible, importez vos sources, puis lancez le provider avec un prompt adapté au template actif.' : 'Commencez par créer un document de travail. Une fois le document détecté, vous pourrez choisir le mode de travail et lancer l’IA dessus.') : 'Use the quick launcher for the common path, then open advanced settings only when you need to change model or provider-specific tuning.'}</p>
 	<div class="stat-grid" style="margin-top:12px;">
 		${modeLine}
 		<div class="stat">
@@ -855,7 +962,7 @@ function buildInitHero(state: WorkflowDashboardState, helpers: WorkflowUiHelpers
 	</div>
 	<div class="actions" style="margin-top:10px;">
 		<button type="button" class="secondary" data-command="selectWorkspaceMode">${workspaceMode ? 'Changer le type de workspace' : 'Choisir le type de workspace'}</button>
-		<button type="button" data-command="${drawerOpen ? 'closeConfigDrawer' : 'openConfigDrawer'}" aria-expanded="${drawerOpen ? 'true' : 'false'}" aria-controls="mc-drawer" ${drawerOpen ? '' : 'autofocus'}>${drawerOpen ? 'Hide launcher' : 'Start workflow'}</button>
+		<button type="button" data-command="${drawerOpen ? 'closeConfigDrawer' : 'openConfigDrawer'}" aria-expanded="${drawerOpen ? 'true' : 'false'}" aria-controls="mc-drawer" ${drawerOpen ? '' : 'autofocus'} ${workspaceMode?.supportsLearningDocuments && !hasLearningDocuments ? 'disabled' : ''}>${drawerOpen ? 'Hide launcher' : 'Start workflow'}</button>
 		${extraActions}
 	</div>
 </section>`;
@@ -1138,6 +1245,28 @@ function buildProviderLaunchFormPreview(
 	return prompt;
 }
 
+function buildIntentPillsHtml(
+	helpers: WorkflowUiHelpers,
+	workspaceMode: WorkflowDashboardState['workspaceModeState'],
+	selectedLearningDocumentType: string | undefined,
+	preset: WorkflowPreset,
+	documentIntentId: string | undefined
+): string {
+	const documentIntents = getDocumentWorkflowIntents(selectedLearningDocumentType as Parameters<typeof getDocumentWorkflowIntents>[0]);
+	if (documentIntents.length > 0) {
+		const resolvedDocumentIntentId = documentIntents.some((intent) => intent.id === documentIntentId)
+			? documentIntentId
+			: documentIntents[0]?.id;
+		return documentIntents.map((intent) =>
+			`<button type="button" class="drawer-pill ${intent.id === resolvedDocumentIntentId ? 'active' : ''}" data-field="intent" data-value="${intent.id}" data-preset="${intent.preset}">${helpers.escapeHtml(intent.label)}</button>`
+		).join('');
+	}
+
+	return Object.values(WORKFLOW_PRESETS).map((presetDefinition) =>
+		`<button type="button" class="drawer-pill ${presetDefinition.preset === preset ? 'active' : ''}" data-field="preset" data-value="${presetDefinition.preset}">${helpers.escapeHtml(getWorkflowIntentCopy(presetDefinition.preset, workspaceMode?.mode).label)}</button>`
+	).join('');
+}
+
 function buildConfigDrawerHtml(
 	state: WorkflowDashboardState,
 	helpers: WorkflowUiHelpers,
@@ -1149,22 +1278,30 @@ function buildConfigDrawerHtml(
 	const workspaceMode = state.workspaceModeState ? getWorkspaceModeDefinition(state.workspaceModeState.mode) : undefined;
 	const supportsLearningDocuments = Boolean(workspaceMode?.supportsLearningDocuments);
 	const availableLearningDocuments = state.learningDocuments ?? [];
-	const preset = sessionPrefill?.preset ?? lastConfig?.preset ?? configuration.defaultPreset;
+	const hasLearningDocuments = availableLearningDocuments.length > 0;
 	const provider = sessionPrefill?.provider ?? lastConfig?.provider ?? configuration.defaultProvider;
 	const model = sessionPrefill?.providerModel ?? lastConfig?.providerModel ?? '';
 	const effort = sessionPrefill?.claudeEffort ?? lastConfig?.claudeEffort ?? configuration.defaultClaudeEffort;
 	const learningDocumentId = supportsLearningDocuments
-		? (lastConfig?.learningDocumentId ?? state.activeLearningDocument?.id ?? '')
+		? (lastConfig?.learningDocumentId ?? state.activeLearningDocument?.id ?? availableLearningDocuments[0]?.id ?? '')
 		: '';
+	const selectedLearningDocument = availableLearningDocuments.find((document) => document.id === learningDocumentId) ?? availableLearningDocuments[0];
+	const availableDocumentIntents = getDocumentWorkflowIntents(selectedLearningDocument?.type);
+	const documentIntentId = availableDocumentIntents.length > 0
+		? (availableDocumentIntents.some((intent) => intent.id === lastConfig?.documentIntentId)
+			? lastConfig?.documentIntentId
+			: availableDocumentIntents[0]?.id)
+		: undefined;
+	const preset = sessionPrefill?.preset
+		?? availableDocumentIntents.find((intent) => intent.id === documentIntentId)?.preset
+		?? lastConfig?.preset
+		?? configuration.defaultPreset;
 	const brief = sessionPrefill?.brief ?? lastConfig?.brief ?? '';
 
 	const claudeModels = ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
 	const geminiModels = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'];
 
-	const presets = Object.values(WORKFLOW_PRESETS);
-	const presetPills = presets.map((p) =>
-		`<button type="button" class="drawer-pill ${p.preset === preset ? 'active' : ''}" data-field="preset" data-value="${p.preset}">${helpers.escapeHtml(getWorkflowIntentCopy(p.preset, workspaceMode?.mode).label)}</button>`
-	).join('');
+	const intentPills = buildIntentPillsHtml(helpers, state.workspaceModeState, selectedLearningDocument?.type, preset, documentIntentId);
 
 	const providers: ProviderTarget[] = ['claude', 'gemini', 'copilot'];
 	const providerPills = providers.map((p) =>
@@ -1181,7 +1318,7 @@ function buildConfigDrawerHtml(
 	).join('');
 
 	const isNewMode = mode === 'new';
-	const selectedIntent = getWorkflowIntentCopy(preset, workspaceMode?.mode);
+	const selectedIntent = getEffectiveWorkflowIntentCopy(preset, workspaceMode?.mode, documentIntentId);
 	const briefPlaceholder = selectedIntent.briefPlaceholder;
 	const providerHelp = provider === 'claude'
 		? 'Best when you want deeper reasoning. Effort controls quality, speed, and cost.'
@@ -1191,14 +1328,31 @@ function buildConfigDrawerHtml(
 	const documentOptions = availableLearningDocuments.map((document) =>
 		`<option value="${helpers.escapeHtml(document.id)}" ${document.id === learningDocumentId ? 'selected' : ''}>${helpers.escapeHtml(`${document.title} · ${getLearningDocumentTypeLabel(document.type)}`)}</option>`
 	).join('');
-	const briefVisible = preset !== 'explore';
-	const selectedLearningDocument = availableLearningDocuments.find((document) => document.id === learningDocumentId);
-	const selectionSummary = `${getWorkflowIntentCopy(preset, workspaceMode?.mode).label} with ${helpers.getProviderLabel(provider)} · ${model || activeModels[0]}${provider === 'claude' ? ` · ${effort} effort` : ''}${selectedLearningDocument ? ` · ${selectedLearningDocument.title}` : ''}`;
-	const drawerTitle = isNewMode ? 'New workflow' : 'Resume workflow';
+	const briefVisible = documentIntentId ? true : preset !== 'explore';
+	const selectionSummary = `${selectedIntent.label} with ${helpers.getProviderLabel(provider)} · ${model || activeModels[0]}${provider === 'claude' ? ` · ${effort} effort` : ''}${selectedLearningDocument ? ` · ${selectedLearningDocument.title}` : ''}`;
+	const drawerTitle = supportsLearningDocuments && !hasLearningDocuments
+		? 'Créer votre document de travail'
+		: isNewMode ? 'New workflow' : 'Resume workflow';
 	const drawerSubtitle = isNewMode
-		? (supportsLearningDocuments ? 'Choose the target document first, then tune provider settings only when needed.' : 'Keep the common path short. Advanced settings are available below when needed.')
+		? (supportsLearningDocuments
+			? (hasLearningDocuments
+				? 'Choisissez le document cible puis le mode de travail adapté avant d’ajuster le provider si besoin.'
+				: 'Aucun document détecté. Commencez par créer un document de travail, par exemple un compte-rendu.')
+			: 'Keep the common path short. Advanced settings are available below when needed.')
 		: (supportsLearningDocuments ? 'Continue on the selected learning document with an updated preset, provider, or brief.' : 'Override the preset, provider, model, and brief for this continuation step.');
 	const launchBtnLabel = isNewMode ? 'Launch ▶' : 'Continue →';
+	const noDocumentNotice = supportsLearningDocuments && !hasLearningDocuments
+		? `<div class="drawer-group">
+			<div class="drawer-field">
+				<label class="drawer-label">Première étape</label>
+				<p class="drawer-help">Créez d’abord un document de travail dans ce workspace. Tant qu’aucun document n’est détecté, le workflow documentaire reste désactivé.</p>
+				<div class="actions" style="margin-top:8px;">
+					<button type="button" data-command="createLearningDocument">Créer un compte-rendu ou un autre document</button>
+				</div>
+				<span class="drawer-hint">Ensuite vous pourrez importer des sources, choisir un mode de travail et lancer l’IA sur ce document.</span>
+			</div>
+		</div>`
+		: '';
 
 	return `
 
@@ -1213,21 +1367,22 @@ function buildConfigDrawerHtml(
 	<div class="drawer-body">
 		<div class="drawer-intro">
 			<strong id="launch-summary" aria-live="polite">${helpers.escapeHtml(selectionSummary)}</strong>
-			<span>${supportsLearningDocuments ? 'Launch targets the selected learning document and remembers that choice next time.' : 'Launch remembers this setup and reuses it the next time you open the sidebar launcher.'}</span>
+			<span>${supportsLearningDocuments ? (hasLearningDocuments ? 'Launch targets the selected learning document and remembers that choice next time.' : 'Create a learning document first to unlock the documentary workflow launcher.') : 'Launch remembers this setup and reuses it the next time you open the sidebar launcher.'}</span>
 		</div>
+		${noDocumentNotice}
 		${supportsLearningDocuments ? `<div class="drawer-group">
 			<div class="drawer-field">
 				<label class="drawer-label" for="drawer-learning-document">Document cible</label>
 				<p class="drawer-help">Choisissez le document learning-kit sur lequel le provider doit travailler.</p>
-				<select class="drawer-select" id="drawer-learning-document" ${availableLearningDocuments.length > 0 ? '' : 'disabled'}>${documentOptions || '<option value="">Aucun document disponible</option>'}</select>
-				<span class="drawer-hint">${availableLearningDocuments.length > 0 ? 'Le prompt et le contexte utiliseront ce document, son template et ses sources importées.' : 'Créez d’abord un document depuis la section Learning Documents.'}</span>
+				<select class="drawer-select" id="drawer-learning-document" ${hasLearningDocuments ? '' : 'disabled'}>${documentOptions || '<option value="">Aucun document disponible</option>'}</select>
+				<span class="drawer-hint">${hasLearningDocuments ? 'Le prompt et le contexte utiliseront ce document, son template et ses sources importées.' : 'Créez d’abord un document depuis la section Learning Documents.'}</span>
 			</div>
 		</div>` : ''}
-		<div class="drawer-group">
+		${hasLearningDocuments || !supportsLearningDocuments ? `<div class="drawer-group">
 			<div class="drawer-field">
-				<label class="drawer-label">${supportsLearningDocuments ? 'Intent' : 'Goal'}</label>
-				<p class="drawer-help">${supportsLearningDocuments ? 'Choisissez l’intention de travail pour ce document. Cela détermine si un brief est requis.' : 'Pick the workflow outcome first. This controls whether a brief is required.'}</p>
-			<div class="drawer-pills" id="preset-pills">${presetPills}</div>
+				<label class="drawer-label">${supportsLearningDocuments ? 'Mode de travail' : 'Goal'}</label>
+				<p class="drawer-help">${supportsLearningDocuments ? 'Choisissez le mode adapté au document sélectionné. Pour un compte-rendu, les intents proposés remplacent les presets génériques.' : 'Pick the workflow outcome first. This controls whether a brief is required.'}</p>
+			<div class="drawer-pills" id="intent-pills">${intentPills}</div>
 			</div>
 			<div class="drawer-field" id="brief-field"${briefVisible ? '' : ' hidden aria-hidden="true"'}>
 				<label class="drawer-label" for="drawer-brief">Brief</label>
@@ -1265,11 +1420,12 @@ function buildConfigDrawerHtml(
 				</div>
 			</div>
 		</details>
+		` : ''}
 	</div>
 	<div class="drawer-footer">
-		<span class="drawer-validation" id="launch-validation" aria-live="polite">${supportsLearningDocuments ? 'Launch uses the selected document and current provider settings.' : 'Launch uses the current provider and remembers this setup for next time.'}</span>
+		<span class="drawer-validation" id="launch-validation" aria-live="polite">${supportsLearningDocuments ? (hasLearningDocuments ? 'Launch uses the selected document and current provider settings.' : 'Create a learning document first.') : 'Launch uses the current provider and remembers this setup for next time.'}</span>
 		<button type="button" class="secondary" id="drawer-cancel-btn">Cancel</button>
-		<button type="button" id="drawer-launch-btn">${helpers.escapeHtml(launchBtnLabel)}</button>
+		<button type="button" id="drawer-launch-btn" ${supportsLearningDocuments && !hasLearningDocuments ? 'disabled' : ''}>${helpers.escapeHtml(launchBtnLabel)}</button>
 	</div>
 </section>`;
 }

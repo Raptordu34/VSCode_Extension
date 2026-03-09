@@ -7,6 +7,11 @@ export type { ProviderTarget, ProviderAccountConfiguration, ProviderStatusSnapsh
 
 
 export type WorkflowPreset = 'explore' | 'plan' | 'build' | 'debug' | 'review' | 'test';
+export type DocumentWorkflowIntentId =
+	| 'compte-rendu-plan'
+	| 'compte-rendu-source-exploitation'
+	| 'compte-rendu-note-integration'
+	| 'compte-rendu-review';
 export type ContextRefreshMode = 'reuse' | 'smart-refresh' | 'full-rebuild';
 export type CostProfile = 'fast' | 'balanced' | 'strong';
 export type WorkflowRole = 'explorer' | 'architect' | 'implementer' | 'reviewer' | 'tester' | 'debugger';
@@ -33,8 +38,20 @@ export interface WorkflowPresetDefinition {
 	artifactSkillName: string;
 }
 
+export interface DocumentWorkflowIntentDefinition {
+	id: DocumentWorkflowIntentId;
+	preset: WorkflowPreset;
+	label: string;
+	description: string;
+	detail: string;
+	launchInstruction: string;
+	briefPrompt: string;
+	briefPlaceholder: string;
+}
+
 export interface WorkflowExecutionPlan {
 	preset: WorkflowPreset;
+	documentIntentId?: DocumentWorkflowIntentId;
 	provider: ProviderTarget;
 	providerModel?: string;
 	providerAccountId?: string;
@@ -61,6 +78,7 @@ export interface ContextMetadata {
 	activeLearningDocumentTitle?: string;
 	activeLearningDocumentPath?: string;
 	activeLearningDocumentType?: string;
+	documentIntentId?: DocumentWorkflowIntentId;
 	preset: WorkflowPreset;
 	provider: ProviderTarget;
 	providerModel?: string;
@@ -222,6 +240,7 @@ export interface ExtensionConfiguration {
 
 export interface WorkflowQuickPickItem extends vscode.QuickPickItem {
 	presetDefinition?: WorkflowPresetDefinition;
+	documentIntentId?: DocumentWorkflowIntentId;
 	provider?: ProviderTarget;
 	refreshMode?: ContextRefreshMode;
 	costProfile?: CostProfile;
@@ -273,6 +292,7 @@ export interface WorkflowTreeNode {
 
 export interface LastWorkflowConfig {
   preset: WorkflowPreset;
+	documentIntentId?: DocumentWorkflowIntentId;
   provider: ProviderTarget;
   providerModel?: string;
   claudeEffort?: ClaudeEffortLevel;

@@ -18,7 +18,7 @@ import { buildContextBudget, formatContextBudgetSummary } from "../providers/pro
 import { readWorkflowSessionState, readWorkflowBrief, buildSuggestedNextPresets, buildContextGenerationMessage, persistWorkflowArtifacts } from './workflowPersistence.js';
 import { getWorkspaceModeLabel, getWorkspaceModeState } from '../workspace/service.js';
 import { getActiveLearningDocument, getLearningDocumentById } from '../documents/service.js';
-import { getWorkflowIntentCopy } from '../workflow/presets.js';
+import { getEffectiveWorkflowIntentCopy } from '../workflow/presets.js';
 
 export function buildRawContextContent(
 	workflowPlan: WorkflowExecutionPlan,
@@ -39,6 +39,7 @@ export function buildRawContextContent(
 		workspaceModeLabel ? `Workspace mode: ${workspaceModeLabel}` : undefined,
 		activeLearningDocumentSummary ? `Active learning document: ${activeLearningDocumentSummary}` : undefined,
 		`Workflow preset: ${workflowPlan.presetDefinition.label}`,
+		workflowPlan.documentIntentId ? `Document intent: ${getEffectiveWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode, workflowPlan.documentIntentId).label}` : undefined,
 		`Target provider: ${workflowPlan.provider}`,
 		`Provider model: ${formatProviderModel(workflowPlan.provider, workflowPlan.providerModel)}`,
 		`Provider account: ${workflowPlan.providerAccountId ?? 'default'}`,
@@ -48,7 +49,7 @@ export function buildRawContextContent(
 		`Cost policy: ${workflowPlan.costProfile}`,
 		'',
 		'## Workflow Goal',
-		getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode).launchInstruction,
+		getEffectiveWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode, workflowPlan.documentIntentId).launchInstruction,
 		'',
 		'## Workflow Shared Files',
 		`Session file: ${WORKFLOW_SESSION_FILE}`,
@@ -86,6 +87,7 @@ export function buildContextFileContent(metadata: ContextMetadata, optimizedCont
 		`Active learning document: ${metadata.activeLearningDocumentTitle ?? 'none'}`,
 		`Active learning document path: ${metadata.activeLearningDocumentPath ?? 'none'}`,
 		`Active learning document type: ${metadata.activeLearningDocumentType ?? 'none'}`,
+		`Document intent: ${metadata.documentIntentId ?? 'none'}`,
 		`Workflow preset: ${metadata.preset}`,
 		`Workflow provider: ${metadata.provider}`,
 		`Workflow provider model: ${metadata.providerModel ?? 'default'}`,
@@ -149,6 +151,7 @@ export function parseContextMetadata(content: string): ContextMetadata | undefin
 		activeLearningDocumentTitle: values.get('Active learning document') || undefined,
 		activeLearningDocumentPath: values.get('Active learning document path') || undefined,
 		activeLearningDocumentType: values.get('Active learning document type') || undefined,
+		documentIntentId: values.get('Document intent') === 'none' ? undefined : values.get('Document intent') as ContextMetadata['documentIntentId'],
 		preset,
 		provider,
 		providerModel,
@@ -484,6 +487,7 @@ export async function gatherProjectContext(
 			activeLearningDocumentTitle: activeLearningDocument?.title,
 			activeLearningDocumentPath: activeLearningDocument?.relativeDirectory,
 			activeLearningDocumentType: activeLearningDocument?.type,
+			documentIntentId: workflowPlan.documentIntentId,
 			preset: workflowPlan.preset,
 			provider: workflowPlan.provider,
 			providerModel: workflowPlan.providerModel,

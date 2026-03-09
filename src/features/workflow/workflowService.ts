@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { WorkflowDashboardState, WorkflowTreeNode, WorkflowStageStatus, ExtensionConfiguration, WorkflowExecutionPlan, ProjectContext, WorkflowQuickPickItem, ClaudeEffortLevel, WorkflowPreset, WorkflowBrief, WorkflowSessionState, ProviderTarget, LastWorkflowConfig, ArtifactGovernancePolicy } from "./types.js";
 import type { ProviderStatusCache } from "../providers/types.js";
+import type { LearningDocumentRecord } from '../documents/types.js';
 import { PROVIDER_STATUS_CACHE_KEY, CONTEXT_FILE_NAME, LAST_WORKFLOW_CONFIG_KEY, PENDING_COPILOT_PROMPT_KEY, WORKFLOW_HISTORY_COLLAPSE_STATE_KEY } from "./constants.js";
 import { getProviderAccounts, getActiveProviderAccountId, findProviderAccount, getDefaultProviderModel, getDefaultClaudeEffort, getProviderLabel, promptForProviderModel, promptForProviderAccount, buildProviderDetail, promptForProviderTarget, formatProviderModel } from "../providers/providerService.js";
 import { buildWorkspaceUri, fileExists, readUtf8 } from "../../core/workspace.js";
@@ -10,7 +11,7 @@ import { getWorkflowStageStatusLabel, formatWorkflowRoles } from "./ui.js";
 import { getExtensionConfiguration } from "../../core/configuration.js";
 import { mergeProviderStatusCache } from "../providers/providerService.js";
 import { buildProviderLaunchPrompt, buildWorkflowSummary } from "../aiAgents/promptBuilder.js";
-import { WORKFLOW_PRESETS, getWorkflowIntentCopy } from "./presets.js";
+import { WORKFLOW_PRESETS, getDocumentWorkflowIntents, getEffectiveWorkflowIntentCopy, getWorkflowIntentCopy } from "./presets.js";
 import { readWorkflowHistoryIndex, repairWorkflowHistoryIndex } from "../context/workflowHistory.js";
 import { detectGovernancePolicy } from "./artifactGovernance.js";
 import { getWorkspaceModeState } from '../workspace/service.js';
@@ -243,7 +244,11 @@ export function buildSmartContinuationWorkflowPlan(
 }
 
 export function buildWorkflowSummaryDocument(projectContext: ProjectContext): string {
-	const intentCopy = getWorkflowIntentCopy(projectContext.workflowPlan.preset, projectContext.workflowPlan.workspaceMode);
+	const intentCopy = getEffectiveWorkflowIntentCopy(
+		projectContext.workflowPlan.preset,
+		projectContext.workflowPlan.workspaceMode,
+		projectContext.workflowPlan.documentIntentId
+	);
 	const artifactLines = projectContext.artifactPlan?.files.map((artifact) => `- ${artifact.relativePath}`) ?? ['- none'];
 	const optimizationLine = projectContext.optimization.applied
 		? `Optimized by Copilot using ${projectContext.optimization.modelName ?? 'an available model'}`
@@ -294,23 +299,40 @@ export async function promptForWorkflowPlan(configuration: ExtensionConfiguratio
 
 export async function promptForWorkflowPlanWithMode(
 	configuration: ExtensionConfiguration,
-	workspaceMode?: WorkflowExecutionPlan['workspaceMode']
+	workspaceMode?: WorkflowExecutionPlan['workspaceMode'],
+	selectedLearningDocument?: LearningDocumentRecord
 ): Promise<WorkflowExecutionPlan | undefined> {
-	const presetSelection = await vscode.window.showQuickPick<WorkflowQuickPickItem>(
-		Object.values(WORKFLOW_PRESETS).map((presetDefinition) => ({
-			label: getWorkflowIntentCopy(presetDefinition.preset, workspaceMode).label,
-			description: getWorkflowIntentCopy(presetDefinition.preset, workspaceMode).description,
-			detail: `${getWorkflowIntentCopy(presetDefinition.preset, workspaceMode).detail} Roles: ${formatWorkflowRoles(presetDefinition.roles)}. Recommended provider: ${getProviderLabel(presetDefinition.recommendedProvider)}.`,
-			presetDefinition
-		})),
-		{
-			title: '1/7 Workflow Preset',
-			placeHolder: workspaceMode === 'research' || workspaceMode === 'study' || workspaceMode === 'blank'
-				? 'Choisissez l’intention documentaire à préparer'
-				: 'Choose the workflow goal you want to prepare',
-			ignoreFocusOut: true
-		}
-	);
+	const documentIntents = getDocumentWorkflowIntents(selectedLearningDocument?.type);
+	const presetSelection = documentIntents.length > 0
+		? await vscode.window.showQuickPick<WorkflowQuickPickItem>(
+			documentIntents.map((intent) => ({
+				label: intent.label,
+				description: intent.description,
+				detail: `${intent.detail} Preset technique: ${getWorkflowIntentCopy(intent.preset, workspaceMode).label}.`,
+				presetDefinition: WORKFLOW_PRESETS[intent.preset],
+				documentIntentId: intent.id
+			})),
+			{
+				title: '1/7 Intent documentaire',
+				placeHolder: `Choisissez le mode de travail pour ${selectedLearningDocument?.title ?? 'le document sélectionné'}`,
+				ignoreFocusOut: true
+			}
+		)
+		: await vscode.window.showQuickPick<WorkflowQuickPickItem>(
+			Object.values(WORKFLOW_PRESETS).map((presetDefinition) => ({
+				label: getWorkflowIntentCopy(presetDefinition.preset, workspaceMode).label,
+				description: getWorkflowIntentCopy(presetDefinition.preset, workspaceMode).description,
+				detail: `${getWorkflowIntentCopy(presetDefinition.preset, workspaceMode).detail} Roles: ${formatWorkflowRoles(presetDefinition.roles)}. Recommended provider: ${getProviderLabel(presetDefinition.recommendedProvider)}.`,
+				presetDefinition
+			})),
+			{
+				title: '1/7 Workflow Preset',
+				placeHolder: workspaceMode === 'research' || workspaceMode === 'study' || workspaceMode === 'blank'
+					? 'Choisissez l’intention documentaire à préparer'
+					: 'Choose the workflow goal you want to prepare',
+				ignoreFocusOut: true
+			}
+		);
 
 	if (!presetSelection?.presetDefinition) {
 		return undefined;
@@ -465,6 +487,7 @@ export async function promptForWorkflowPlanWithMode(
 
 	const workflowPlan: WorkflowExecutionPlan = {
 		preset: presetSelection.presetDefinition.preset,
+		documentIntentId: presetSelection.documentIntentId,
 		workspaceMode,
 		provider: providerSelection.provider,
 		providerModel,
@@ -479,8 +502,12 @@ export async function promptForWorkflowPlanWithMode(
 		presetDefinition: presetSelection.presetDefinition
 	};
 
+	if (selectedLearningDocument) {
+		workflowPlan.learningDocumentId = selectedLearningDocument.id;
+	}
+
 	if (workflowPlan.preset !== 'explore') {
-		const brief = await promptForWorkflowBrief(workflowPlan.preset, undefined, workspaceMode);
+		const brief = await promptForWorkflowBrief(workflowPlan.preset, undefined, workspaceMode, workflowPlan.documentIntentId);
 		if (!brief) {
 			return undefined;
 		}
@@ -581,7 +608,7 @@ export async function promptForWorkflowContinuation(
 		}
 	}
 
-	const brief = await promptForWorkflowBrief(selectedPreset.preset, session);
+	const brief = await promptForWorkflowBrief(selectedPreset.preset, session, workspaceMode);
 	if (brief && workspaceMode) {
 		brief.taskType = inferTaskType(selectedPreset.preset, brief.rawText);
 	}
@@ -627,9 +654,10 @@ export async function promptForClaudeEffort(defaultEffort: ClaudeEffortLevel): P
 export async function promptForWorkflowBrief(
 	preset: WorkflowPreset,
 	existingSession?: WorkflowSessionState,
-	workspaceMode?: WorkflowExecutionPlan['workspaceMode']
+	workspaceMode?: WorkflowExecutionPlan['workspaceMode'],
+	documentIntentId?: WorkflowExecutionPlan['documentIntentId']
 ): Promise<WorkflowBrief | undefined> {
-	const intentCopy = getWorkflowIntentCopy(preset, workspaceMode);
+	const intentCopy = getEffectiveWorkflowIntentCopy(preset, workspaceMode, documentIntentId);
 	const prompt = await vscode.window.showInputBox({
 		title: existingSession ? 'Workflow Brief For Next Stage' : 'Workflow Brief',
 		prompt: intentCopy.briefPrompt,
@@ -673,7 +701,7 @@ export function inferTaskType(preset: WorkflowPreset, text: string): string {
 }
 export function buildWorkflowPlanSetupSummary(workflowPlan: WorkflowExecutionPlan): string {
 	return [
-		`Preset: ${getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode).label}`,
+		`Preset: ${getEffectiveWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode, workflowPlan.documentIntentId).label}`,
 		`Provider: ${getProviderLabel(workflowPlan.provider)}`,
 		`Model: ${formatProviderModel(workflowPlan.provider, workflowPlan.providerModel)}`,
 		`Account: ${workflowPlan.providerAccountId ?? 'default'}`,

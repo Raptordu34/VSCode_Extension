@@ -13,6 +13,25 @@ import { buildInstructionArtifactContent, buildSharedWorkflowInstruction } from 
 import { WORKFLOW_PRESETS } from '../features/workflow/presets.js';
 import { GENERATED_SECTION_END, GENERATED_SECTION_START } from '../features/workflow/constants.js';
 import { getWorkflowControlHtml } from '../features/workflow/ui.js';
+import { clearLearningDocumentState, createLearningDocument, getLearningDocuments } from '../features/documents/service.js';
+
+function createTestExtensionContext(extensionUri?: vscode.Uri): vscode.ExtensionContext {
+	const workspaceStateStore = new Map<string, unknown>();
+	return {
+		extensionUri: extensionUri ?? vscode.workspace.workspaceFolders?.[0]?.uri ?? vscode.Uri.file(process.cwd()),
+		workspaceState: {
+			get: <T>(key: string, defaultValue?: T) => (workspaceStateStore.has(key) ? workspaceStateStore.get(key) as T : defaultValue as T),
+			keys: () => [...workspaceStateStore.keys()],
+			update: async (key: string, value: unknown) => {
+				if (value === undefined) {
+					workspaceStateStore.delete(key);
+					return;
+				}
+				workspaceStateStore.set(key, value);
+			}
+		} as unknown as vscode.Memento
+	} as vscode.ExtensionContext;
+}
 
 suite('Extension Test Suite', () => {
 	vscode.window.showInformationMessage('Start all tests.');
@@ -1153,6 +1172,114 @@ suite('workflow persistence', () => {
 });
 
 suite('workflow control html', () => {
+	test('creates a full learning document structure and keeps it discoverable', async () => {
+		const tempRoot = vscode.Uri.file(path.join(os.tmpdir(), `aio-learning-doc-${Date.now()}`));
+		await vscode.workspace.fs.createDirectory(tempRoot);
+		const workspaceFolder = {
+			uri: tempRoot,
+			name: 'learning-doc-workspace',
+			index: 0
+		} as vscode.WorkspaceFolder;
+		const context = createTestExtensionContext(vscode.workspace.workspaceFolders?.[0]?.uri);
+
+		const document = await createLearningDocument(context, workspaceFolder, 'compte-rendu', 'Réseaux bayésiens - séance 03');
+		const expectedPaths = [
+			document.indexFile,
+			path.posix.join(document.relativeDirectory, 'components.css'),
+			document.promptFile,
+			path.posix.join(document.relativeDirectory, 'section-EXAMPLE.html'),
+			path.posix.join(document.relativeDirectory, '.github', 'copilot-instructions.md'),
+			path.posix.join(document.relativeDirectory, 'design'),
+			path.posix.join(document.relativeDirectory, 'layouts'),
+			document.sourceDirectory,
+			document.manifestFile
+		];
+
+		for (const relativePath of expectedPaths) {
+			await assert.doesNotReject(async () => {
+				await vscode.workspace.fs.stat(vscode.Uri.joinPath(workspaceFolder.uri, ...relativePath.split('/')));
+			});
+		}
+
+		const discoveredDocuments = await getLearningDocuments(context, workspaceFolder);
+		assert.strictEqual(discoveredDocuments.length, 1);
+		assert.strictEqual(discoveredDocuments[0]?.title, 'Réseaux bayésiens - séance 03');
+		assert.strictEqual(discoveredDocuments[0]?.type, 'compte-rendu');
+	});
+
+	test('reconciles learning documents from disk when workspace state is empty', async () => {
+		const tempRoot = vscode.Uri.file(path.join(os.tmpdir(), `aio-learning-reconcile-${Date.now()}`));
+		await vscode.workspace.fs.createDirectory(tempRoot);
+		const workspaceFolder = {
+			uri: tempRoot,
+			name: 'learning-reconcile-workspace',
+			index: 0
+		} as vscode.WorkspaceFolder;
+		const context = createTestExtensionContext(vscode.workspace.workspaceFolders?.[0]?.uri);
+
+		const createdDocument = await createLearningDocument(context, workspaceFolder, 'compte-rendu', 'Compte rendu test');
+		await clearLearningDocumentState(context, workspaceFolder);
+
+		const reconciledDocuments = await getLearningDocuments(context, workspaceFolder);
+		assert.strictEqual(reconciledDocuments.length, 1);
+		assert.strictEqual(reconciledDocuments[0]?.title, createdDocument.title);
+		assert.strictEqual(reconciledDocuments[0]?.manifestFile, createdDocument.manifestFile);
+		assert.strictEqual(reconciledDocuments[0]?.sourceDirectory, createdDocument.sourceDirectory);
+	});
+
+	test('shows create-document guidance when study mode has no learning documents', () => {
+		const html = getWorkflowControlHtml(
+			{} as vscode.Webview,
+			{
+				workspaceModeState: {
+					mode: 'study',
+					selectedAt: '2026-03-09T10:00:00.000Z',
+					updatedAt: '2026-03-09T10:00:00.000Z'
+				},
+				learningDocuments: [],
+				contextFileExists: false,
+				nextSuggestedPresets: [],
+				artifactCount: 0,
+				providerStatuses: []
+			} as WorkflowDashboardState,
+			'nonce',
+			{
+				createNonce,
+				escapeHtml: (value: string) => value,
+				getProviderLabel: (provider) => provider,
+				getExtensionConfiguration: () => ({
+					treeDepth: 2,
+					readmePreviewLines: 20,
+					contextFilePreviewLines: 80,
+					extraContextFiles: [],
+					showIgnoredDirectories: true,
+					maxEntriesPerDirectory: 40,
+					optimizeWithCopilot: false,
+					modelFamily: '',
+					defaultClaudeModel: 'claude-sonnet-4-6',
+					defaultGeminiModel: 'gemini-3.1-pro-preview',
+					defaultClaudeEffort: 'medium',
+					claudeAccounts: [],
+					geminiAccounts: [],
+					copilotAccounts: [],
+					autoGenerateOnStartup: false,
+					defaultPreset: 'explore',
+					defaultProvider: 'copilot',
+					contextRefreshMode: 'smart-refresh',
+					costProfile: 'balanced',
+					generateNativeArtifacts: true,
+					enabledProviders: ['claude', 'gemini', 'copilot']
+				}),
+				findProviderAccount: () => undefined
+			},
+			false,
+			undefined
+		);
+
+		assert.ok(html.includes('Créer votre premier document'));
+		assert.ok(html.includes('Commencez par créer un document de travail'));
+	});
+
 	test('renders workflow history actions when archived workflows exist', () => {
 		const html = getWorkflowControlHtml(
 			{} as vscode.Webview,
@@ -1278,7 +1405,6 @@ suite('workflow control html', () => {
 		assert.ok(html.includes('Workflow History'));
 		assert.ok(html.includes('Workflow A'));
 		assert.ok(html.includes('Clean Active Generated Files'));
-		assert.ok(html.includes('Branch of Workflow A @ stage 2'));
 		assert.ok(html.includes('data-command="forkWorkflowFromHistory"'));
 		assert.ok(html.includes('data-command="forkWorkflowFromArchivedStage"'));
 		assert.ok(html.includes('data-command="forkWorkflowFromStage"'));

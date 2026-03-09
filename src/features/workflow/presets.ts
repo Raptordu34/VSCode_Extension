@@ -1,5 +1,11 @@
-import type { WorkflowPreset, WorkflowPresetDefinition } from './types.js';
+import type {
+	DocumentWorkflowIntentDefinition,
+	DocumentWorkflowIntentId,
+	WorkflowPreset,
+	WorkflowPresetDefinition
+} from './types.js';
 import type { WorkspaceMode } from '../workspace/types.js';
+import type { LearningDocumentType } from '../documents/types.js';
 
 export const WORKFLOW_PRESETS: Record<WorkflowPreset, WorkflowPresetDefinition> = {
 	explore: {
@@ -72,6 +78,49 @@ export interface WorkflowIntentCopy {
 	briefPrompt: string;
 	briefPlaceholder: string;
 }
+
+const DOCUMENT_WORKFLOW_INTENTS: Record<DocumentWorkflowIntentId, DocumentWorkflowIntentDefinition> = {
+	'compte-rendu-plan': {
+		id: 'compte-rendu-plan',
+		preset: 'plan',
+		label: 'Plan du compte-rendu',
+		description: 'Structurer les sections et priorités du document de cours',
+		detail: 'Définit un plan exploitable pour le compte-rendu avant la phase de rédaction.',
+		launchInstruction: 'Build a concrete plan for the selected compte-rendu: define the sections, ordering, source coverage, and transitions needed before drafting content.',
+		briefPrompt: 'Quel plan ou quelle structure faut-il préparer pour ce compte-rendu ?',
+		briefPlaceholder: 'Exemple: Structurer le compte-rendu avec introduction, notions clés, démonstrations, exemples et synthèse finale'
+	},
+	'compte-rendu-source-exploitation': {
+		id: 'compte-rendu-source-exploitation',
+		preset: 'build',
+		label: 'Exploitation des sources',
+		description: 'Lire les sources et les intégrer proprement dans le compte-rendu',
+		detail: 'Le provider doit lire les fichiers importés, reformuler, compléter et intégrer le contenu dans le document cible.',
+		launchInstruction: 'Read the imported sources for the selected compte-rendu, extract the useful material, reformulate it when needed, and integrate it cleanly into the existing document structure.',
+		briefPrompt: 'Quelles sources ou quelles parties du cours faut-il exploiter dans ce compte-rendu ?',
+		briefPlaceholder: 'Exemple: Intégrer les PDF importés sur les réseaux bayésiens dans les sections définition, intuition et exemple'
+	},
+	'compte-rendu-note-integration': {
+		id: 'compte-rendu-note-integration',
+		preset: 'build',
+		label: 'Conversion de notes',
+		description: 'Transformer des notes brutes en contenu structuré dans le compte-rendu',
+		detail: 'Le provider part des notes ou mots-clés donnés par l’utilisateur et les convertit en contenu clair, cohérent et complété.',
+		launchInstruction: 'Treat the brief as raw class notes or keywords, infer the intended meaning, and integrate them into the selected compte-rendu as polished, coherent course content.',
+		briefPrompt: 'Quelles notes, mots-clés ou éléments bruts faut-il intégrer dans le compte-rendu ?',
+		briefPlaceholder: 'Exemple: Notes de cours sur la loi a priori, le théorème de Bayes et un exemple médical à intégrer dans le compte-rendu'
+	},
+	'compte-rendu-review': {
+		id: 'compte-rendu-review',
+		preset: 'review',
+		label: 'Relecture / amélioration',
+		description: 'Clarifier, homogénéiser et améliorer le compte-rendu',
+		detail: 'Relit le document comme support d’apprentissage et améliore clarté, cohérence et qualité rédactionnelle.',
+		launchInstruction: 'Review the selected compte-rendu for clarity, pedagogy, consistency, and completeness, then improve weak sections without breaking the template structure.',
+		briefPrompt: 'Quelle partie du compte-rendu faut-il relire ou améliorer ?',
+		briefPlaceholder: 'Exemple: Revoir la section sur l’inférence pour la rendre plus claire et mieux reliée aux exemples'
+	}
+};
 
 function buildDefaultWorkflowIntentCopy(preset: WorkflowPreset): WorkflowIntentCopy {
 	const definition = WORKFLOW_PRESETS[preset];
@@ -251,4 +300,45 @@ export function getWorkflowIntentCopy(preset: WorkflowPreset, workspaceMode?: Wo
 	}
 
 	return buildDefaultWorkflowIntentCopy(preset);
+}
+
+export function getDocumentWorkflowIntent(documentIntentId: DocumentWorkflowIntentId | undefined): DocumentWorkflowIntentDefinition | undefined {
+	if (!documentIntentId) {
+		return undefined;
+	}
+
+	return DOCUMENT_WORKFLOW_INTENTS[documentIntentId];
+}
+
+export function getDocumentWorkflowIntents(documentType: LearningDocumentType | undefined): DocumentWorkflowIntentDefinition[] {
+	if (documentType !== 'compte-rendu') {
+		return [];
+	}
+
+	return [
+		DOCUMENT_WORKFLOW_INTENTS['compte-rendu-plan'],
+		DOCUMENT_WORKFLOW_INTENTS['compte-rendu-source-exploitation'],
+		DOCUMENT_WORKFLOW_INTENTS['compte-rendu-note-integration'],
+		DOCUMENT_WORKFLOW_INTENTS['compte-rendu-review']
+	];
+}
+
+export function getEffectiveWorkflowIntentCopy(
+	preset: WorkflowPreset,
+	workspaceMode?: WorkspaceMode,
+	documentIntentId?: DocumentWorkflowIntentId
+): WorkflowIntentCopy {
+	const documentIntent = getDocumentWorkflowIntent(documentIntentId);
+	if (documentIntent) {
+		return {
+			label: documentIntent.label,
+			description: documentIntent.description,
+			detail: documentIntent.detail,
+			launchInstruction: documentIntent.launchInstruction,
+			briefPrompt: documentIntent.briefPrompt,
+			briefPlaceholder: documentIntent.briefPlaceholder
+		};
+	}
+
+	return getWorkflowIntentCopy(preset, workspaceMode);
 }

@@ -9,12 +9,12 @@ import { gatherProjectContext, buildContextGenerationMessage } from '../context/
 import { readWorkflowBrief, readWorkflowSessionState } from '../context/workflowPersistence.js';
 import { launchProvider } from '../aiAgents/agentLauncher.js';
 import { CONTEXT_FILE_NAME } from './constants.js';
-import { WorkflowDashboardState, ProjectContext, WorkflowQuickPickItem, ProviderTarget, WorkflowPreset, ClaudeEffortLevel, WorkflowTreeNode } from './types.js';
+import { WorkflowDashboardState, ProjectContext, WorkflowQuickPickItem, ProviderTarget, WorkflowPreset, ClaudeEffortLevel, WorkflowTreeNode, DocumentWorkflowIntentId } from './types.js';
 import { buildWorkspaceUri } from '../../core/workspace.js';
 import { archiveActiveWorkflowState, buildWorkflowHistoryQuickPickLabel, cleanActiveWorkflowFiles, deleteWorkflowFromHistory, forkWorkflowFromHistory, forkWorkflowFromHistoryAtStage, readWorkflowArchiveManifest, readWorkflowHistoryIndex, resetOrchestratorWorkspaceFiles, resetWorkflowRuntimeFiles, restoreWorkflowFromHistory } from '../context/workflowHistory.js';
 import { appendGitignoreRules } from './artifactGovernance.js';
 import { clearWorkspaceModeState, ensureWorkspaceMode, getWorkspaceModeDefinition, getWorkspaceModeState, supportsLearningDocuments } from '../workspace/service.js';
-import { clearLearningDocumentState, LEARNING_DOCUMENTS_ROOT } from '../documents/service.js';
+import { clearLearningDocumentState, getLearningDocuments, LEARNING_DOCUMENTS_ROOT, promptForLearningDocument } from '../documents/service.js';
 import { LAST_WORKFLOW_CONFIG_KEY, PENDING_COPILOT_PROMPT_KEY } from './constants.js';
 import { saveWorkflowHistoryCollapsedIds } from './workflowService.js';
 import { getWorkflowIntentCopy } from './presets.js';
@@ -98,7 +98,7 @@ export function registerWorkflowCommands(
 			EventBus.fire('refresh');
 		}),
 
-		vscode.commands.registerCommand('ai-context-orchestrator.smartInitAI', async (preset?: string, overrides?: { provider?: string; providerModel?: string; claudeEffort?: string; learningDocumentId?: string; brief?: string }) => {
+		vscode.commands.registerCommand('ai-context-orchestrator.smartInitAI', async (preset?: string, overrides?: { provider?: string; providerModel?: string; claudeEffort?: string; learningDocumentId?: string; documentIntentId?: DocumentWorkflowIntentId; brief?: string }) => {
 			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder to initialize');
 			if (!workspaceFolder) {return;}
 			const configuration = getExtensionConfiguration();
@@ -108,12 +108,14 @@ export function registerWorkflowCommands(
 				providerModel: overrides.providerModel,
 				claudeEffort: overrides.claudeEffort as ClaudeEffortLevel | undefined,
 				learningDocumentId: overrides.learningDocumentId,
+				documentIntentId: overrides.documentIntentId as DocumentWorkflowIntentId | undefined,
 				brief: overrides.brief
 			} : undefined;
 			await runSmartInitAiFlow(context, resolvedPreset, workspaceFolder, resolvedOverrides);
 			if (resolvedOverrides) {
 				await saveLastWorkflowConfig(context, {
 					preset: resolvedPreset,
+					documentIntentId: resolvedOverrides.documentIntentId as DocumentWorkflowIntentId | undefined,
 					provider: resolvedOverrides.provider ?? configuration.defaultProvider,
 					providerModel: resolvedOverrides.providerModel,
 					claudeEffort: resolvedOverrides.claudeEffort,
@@ -144,7 +146,7 @@ export function registerWorkflowCommands(
 			EventBus.fire('refresh');
 		}),
 
-		vscode.commands.registerCommand('ai-context-orchestrator.smartContinueAI', async (overrides?: { preset?: string; provider?: string; providerModel?: string; claudeEffort?: string; learningDocumentId?: string; brief?: string }) => {
+		vscode.commands.registerCommand('ai-context-orchestrator.smartContinueAI', async (overrides?: { preset?: string; provider?: string; providerModel?: string; claudeEffort?: string; learningDocumentId?: string; documentIntentId?: DocumentWorkflowIntentId; brief?: string }) => {
 			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder to continue');
 			if (!workspaceFolder) {return;}
 			await runSmartContinueAiFlow(context, workspaceFolder, overrides ? {
@@ -153,12 +155,14 @@ export function registerWorkflowCommands(
 				providerModel: overrides.providerModel,
 				claudeEffort: overrides.claudeEffort as ClaudeEffortLevel | undefined,
 				learningDocumentId: overrides.learningDocumentId,
+				documentIntentId: overrides.documentIntentId as DocumentWorkflowIntentId | undefined,
 				brief: overrides.brief
 			} : undefined);
 			if (overrides) {
 				const configuration = getExtensionConfiguration();
 				await saveLastWorkflowConfig(context, {
 					preset: (overrides.preset as WorkflowPreset | undefined) ?? configuration.defaultPreset,
+					documentIntentId: overrides.documentIntentId as DocumentWorkflowIntentId | undefined,
 					provider: (overrides.provider as ProviderTarget | undefined) ?? configuration.defaultProvider,
 					providerModel: overrides.providerModel,
 					claudeEffort: overrides.claudeEffort as ClaudeEffortLevel | undefined,
@@ -207,6 +211,7 @@ async function runSmartInitAiFlow(
 		providerModel?: string;
 		claudeEffort?: ClaudeEffortLevel;
 		learningDocumentId?: string;
+		documentIntentId?: DocumentWorkflowIntentId;
 		brief?: string;
 	}
 ): Promise<void> {
@@ -223,6 +228,7 @@ async function runSmartInitAiFlow(
 	if (overrides?.providerModel !== undefined) { workflowPlan.providerModel = overrides.providerModel; }
 	if (overrides?.claudeEffort) { workflowPlan.claudeEffort = overrides.claudeEffort; }
 	if (overrides?.learningDocumentId !== undefined) { workflowPlan.learningDocumentId = overrides.learningDocumentId; }
+	if (overrides?.documentIntentId !== undefined) { workflowPlan.documentIntentId = overrides.documentIntentId; }
 	if (overrides?.brief) {
 		workflowPlan.brief = {
 			taskType: inferTaskType(preset, overrides.brief),
@@ -249,6 +255,7 @@ async function runSmartContinueAiFlow(
 		providerModel?: string;
 		claudeEffort?: ClaudeEffortLevel;
 		learningDocumentId?: string;
+		documentIntentId?: DocumentWorkflowIntentId;
 		brief?: string;
 	}
 ): Promise<void> {
@@ -273,6 +280,9 @@ async function runSmartContinueAiFlow(
 	if (overrides?.learningDocumentId !== undefined) {
 		workflowPlan.learningDocumentId = overrides.learningDocumentId;
 	}
+	if (overrides?.documentIntentId !== undefined) {
+		workflowPlan.documentIntentId = overrides.documentIntentId;
+	}
 	const projectContext = await gatherProjectContext(context, false, workflowPlan, workspaceFolder);
 	if (!projectContext) {return;}
 
@@ -288,17 +298,19 @@ async function runInitAiFlow(context: vscode.ExtensionContext, workspaceFolder: 
 	}
 
 	if (supportsLearningDocuments(workspaceModeState.mode)) {
+		const learningDocuments = await getLearningDocuments(context, workspaceFolder);
+		const hasLearningDocuments = learningDocuments.length > 0;
 		const action = await vscode.window.showQuickPick([
 			{
 				label: 'Créer un document learning-kit',
-				description: 'Initialiser un document documentaire structuré',
+				description: hasLearningDocuments ? 'Ajouter un nouveau document documentaire structuré' : 'Première étape: créer un document de travail structuré',
 				action: 'create-document'
 			},
-			{
+			...(hasLearningDocuments ? [{
 				label: `Démarrer ${getWorkflowIntentCopy('build', workspaceModeState.mode).label.toLowerCase()}`,
-				description: 'Ouvrir la configuration de workflow avec des intents adaptés au mode documentaire',
+				description: 'Choisir le document cible puis lancer un workflow avec un intent adapté',
 				action: 'launch-assistant'
-			},
+			}] : []),
 			{
 				label: 'Changer le type de workspace',
 				description: `Mode actuel: ${getWorkspaceModeDefinition(workspaceModeState.mode).label}`,
@@ -306,9 +318,11 @@ async function runInitAiFlow(context: vscode.ExtensionContext, workspaceFolder: 
 			}
 		], {
 			title: 'Initialisation du workspace',
-			placeHolder: workspaceModeState.mode === 'research'
-				? 'Choisissez comment démarrer votre workflow documentaire de recherche'
-				: 'Choisissez comment démarrer votre workflow documentaire',
+			placeHolder: hasLearningDocuments
+				? (workspaceModeState.mode === 'research'
+					? 'Choisissez comment démarrer votre workflow documentaire de recherche'
+					: 'Choisissez le document puis le workflow documentaire à lancer')
+				: 'Aucun document détecté: commencez par créer un document de travail',
 			ignoreFocusOut: true
 		});
 
@@ -325,10 +339,22 @@ async function runInitAiFlow(context: vscode.ExtensionContext, workspaceFolder: 
 			await vscode.commands.executeCommand('ai-context-orchestrator.createLearningDocument');
 			return;
 		}
+
+		if (!hasLearningDocuments) {
+			void vscode.window.showInformationMessage('Commencez par créer un document de travail, par exemple un compte-rendu, avant de lancer un workflow documentaire.');
+			return;
+		}
 	}
 
 	const configuration = getExtensionConfiguration();
-	const workflowPlan = await promptForWorkflowPlanWithMode(configuration, workspaceModeState.mode);
+	const selectedLearningDocument = supportsLearningDocuments(workspaceModeState.mode)
+		? await promptForLearningDocument(context, workspaceFolder, 'Choisissez le document cible pour ce workflow')
+		: undefined;
+	if (supportsLearningDocuments(workspaceModeState.mode) && !selectedLearningDocument) {
+		void vscode.window.showInformationMessage('Sélectionnez d’abord un document de travail pour démarrer un workflow documentaire.');
+		return;
+	}
+	const workflowPlan = await promptForWorkflowPlanWithMode(configuration, workspaceModeState.mode, selectedLearningDocument);
 	if (!workflowPlan) {return;}
 	workflowPlan.startNewWorkflow = true;
 

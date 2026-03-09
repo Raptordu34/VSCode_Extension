@@ -12,6 +12,104 @@ import {
 } from './service.js';
 import type { LearningDocumentType } from './types.js';
 
+type SourceSelectionAction = 'add-files' | 'remove-file' | 'import' | 'cancel';
+
+interface SourceSelectionItem extends vscode.QuickPickItem {
+	action: SourceSelectionAction;
+	uri?: vscode.Uri;
+}
+
+async function promptForLearningDocumentSources(
+	workspaceFolder: vscode.WorkspaceFolder,
+	initialSelection: vscode.Uri[] = []
+): Promise<vscode.Uri[] | undefined> {
+	const selectedByPath = new Map(initialSelection.map((uri) => [uri.fsPath, uri]));
+
+	while (true) {
+		const selectedUris = [...selectedByPath.values()];
+		const selectionItems: SourceSelectionItem[] = [
+			{
+				label: '$(add) Ajouter des fichiers',
+				description: selectedUris.length > 0 ? `${selectedUris.length} fichier(s) sélectionné(s)` : 'Aucun fichier sélectionné pour le moment',
+				detail: 'Ouvre le sélecteur natif et ajoute un ou plusieurs fichiers à importer.',
+				action: 'add-files'
+			},
+			{
+				label: '$(cloud-upload) Importer la sélection',
+				description: selectedUris.length > 0 ? `${selectedUris.length} fichier(s) prêt(s) à être copiés` : 'Ajoutez au moins un fichier avant l’import',
+				detail: 'Copie tous les fichiers sélectionnés dans le dossier sources du document.',
+				action: 'import',
+				alwaysShow: true
+			},
+			{
+				label: '$(close) Annuler',
+				description: 'Fermer sans importer de source',
+				action: 'cancel'
+			}
+		];
+
+		const selectedFileItems = selectedUris.map((uri, index) => ({
+			label: `$(file) ${uri.path.split('/').pop() ?? uri.fsPath}`,
+			description: `Sélection ${index + 1}`,
+			detail: `${uri.fsPath} · cliquez pour retirer ce fichier de la sélection`,
+			action: 'remove-file' as const,
+			uri
+		}));
+
+		const selection = await vscode.window.showQuickPick<SourceSelectionItem>(
+			[
+				...selectionItems,
+				...(selectedFileItems.length > 0 ? [{ label: 'Fichiers sélectionnés', kind: vscode.QuickPickItemKind.Separator, action: 'cancel' as const }] : []),
+				...selectedFileItems
+			],
+			{
+				title: 'Importer des sources dans le document',
+				placeHolder: selectedUris.length > 0
+					? 'Ajoutez d’autres fichiers, retirez-en, ou lancez l’import.'
+					: 'Commencez par ajouter un ou plusieurs fichiers source.',
+				ignoreFocusOut: true
+			}
+		);
+
+		if (!selection || selection.action === 'cancel') {
+			return undefined;
+		}
+
+		if (selection.action === 'add-files') {
+			const pickedUris = await vscode.window.showOpenDialog({
+				canSelectFiles: true,
+				canSelectFolders: false,
+				canSelectMany: true,
+				openLabel: 'Ajouter à la sélection',
+				defaultUri: workspaceFolder.uri,
+				title: 'Sélectionnez un ou plusieurs fichiers à importer'
+			});
+			if (!pickedUris || pickedUris.length === 0) {
+				continue;
+			}
+
+			for (const uri of pickedUris) {
+				selectedByPath.set(uri.fsPath, uri);
+			}
+			continue;
+		}
+
+		if (selection.action === 'remove-file' && selection.uri) {
+			selectedByPath.delete(selection.uri.fsPath);
+			continue;
+		}
+
+		if (selection.action === 'import') {
+			if (selectedUris.length === 0) {
+				void vscode.window.showWarningMessage('Ajoutez au moins un fichier avant de lancer l’import.');
+				continue;
+			}
+
+			return selectedUris;
+		}
+	}
+}
+
 async function ensureDocumentWorkspaceMode(
 	context: vscode.ExtensionContext,
 	workspaceFolder: vscode.WorkspaceFolder
@@ -121,13 +219,7 @@ export function registerDocumentCommands(context: vscode.ExtensionContext): void
 				}
 			}
 
-			const sourceUris = await vscode.window.showOpenDialog({
-				canSelectFiles: true,
-				canSelectFolders: false,
-				canSelectMany: true,
-				openLabel: 'Importer dans le dossier sources du document',
-				defaultUri: workspaceFolder.uri
-			});
+			const sourceUris = await promptForLearningDocumentSources(workspaceFolder);
 			if (!sourceUris || sourceUris.length === 0) {
 				return;
 			}

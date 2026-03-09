@@ -22,7 +22,7 @@ import { replaceManagedBlock } from '../aiAgents/promptBuilder.js';
 import { formatWorkflowRoles } from '../workflow/ui.js';
 import { archiveActiveWorkflowState } from './workflowHistory.js';
 import { createNonce } from '../../utils/index.js';
-import { getWorkflowIntentCopy } from '../workflow/presets.js';
+import { getEffectiveWorkflowIntentCopy } from '../workflow/presets.js';
 
 export interface WorkspaceWriteOperation {
 	uri: vscode.Uri;
@@ -297,7 +297,7 @@ export function buildWorkflowStageContent(
 	stage: WorkflowStageRecord,
 	brief?: WorkflowBrief
 ): string {
-	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
+	const intentCopy = getEffectiveWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode, workflowPlan.documentIntentId);
 	return [
 		`# Stage ${String(stage.index).padStart(2, '0')} ${intentCopy.label}`,
 		'',
@@ -337,7 +337,7 @@ export function buildWorkflowStageContent(
 }
 
 export function buildContextGenerationMessage(projectContext: ProjectContext): string {
-	const intentCopy = getWorkflowIntentCopy(projectContext.workflowPlan.preset, projectContext.workflowPlan.workspaceMode);
+	const intentCopy = getEffectiveWorkflowIntentCopy(projectContext.workflowPlan.preset, projectContext.workflowPlan.workspaceMode, projectContext.workflowPlan.documentIntentId);
 	const parts = [
 		`${intentCopy.label} workflow prepared for ${projectContext.workflowPlan.provider}.`,
 		projectContext.reused
@@ -381,7 +381,7 @@ export async function persistWorkflowArtifacts(
 	const workflowId = workflowPlan.workflowId ?? (isNewWorkflow ? `workflow-${Date.now().toString(36)}-${createNonce().slice(0, 8)}` : existingSession?.workflowId);
 	const branchId = workflowPlan.branchId ?? existingSession?.branchId ?? 'main';
 	const createdAt = isNewWorkflow ? new Date().toISOString() : existingSession?.createdAt;
-	const intentCopy = getWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode);
+	const intentCopy = getEffectiveWorkflowIntentCopy(workflowPlan.preset, workflowPlan.workspaceMode, workflowPlan.documentIntentId);
 	const label = brief?.goal ?? (workflowPlan.preset === 'explore' ? `${intentCopy.label}` : `${intentCopy.label} workflow`);
 	const stage: WorkflowStageRecord = {
 		index: nextIndex,

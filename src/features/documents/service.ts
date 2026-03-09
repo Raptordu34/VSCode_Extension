@@ -10,7 +10,10 @@ import type {
 
 const LEARNING_DOCUMENT_STORAGE_PREFIX = 'aiContextOrchestrator.learningDocuments';
 export const LEARNING_DOCUMENTS_ROOT = 'learning-documents';
-const TEMPLATE_ROOT_SEGMENTS = ['learning-kit-global', 'learning-kit'];
+const TEMPLATE_ROOT_CANDIDATES = [
+	['learning-kit'],
+	['learning-kit-global', 'learning-kit']
+];
 
 export const LEARNING_DOCUMENT_DEFINITIONS: Record<LearningDocumentType, LearningDocumentDefinition> = {
 	'compte-rendu': {
@@ -90,6 +93,10 @@ interface LearningDocumentManifest {
 	sources: LearningDocumentSourceRecord[];
 }
 
+function isLearningDocumentType(value: string): value is LearningDocumentType {
+	return Object.prototype.hasOwnProperty.call(LEARNING_DOCUMENT_DEFINITIONS, value);
+}
+
 function getStorageKey(folder: vscode.WorkspaceFolder): string {
 	return `${LEARNING_DOCUMENT_STORAGE_PREFIX}:${folder.uri.toString()}`;
 }
@@ -123,13 +130,29 @@ function ensureUniqueSlug(state: LearningDocumentState, baseSlug: string): strin
 	return `${baseSlug}-${index}`;
 }
 
-function getTemplateRootUri(extensionUri: vscode.Uri): vscode.Uri {
-	return vscode.Uri.joinPath(extensionUri, ...TEMPLATE_ROOT_SEGMENTS);
+async function pathExists(targetUri: vscode.Uri): Promise<boolean> {
+	try {
+		await vscode.workspace.fs.stat(targetUri);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
-function getDocumentTemplateUri(extensionUri: vscode.Uri, type: LearningDocumentType): vscode.Uri {
+async function resolveTemplateRootUri(extensionUri: vscode.Uri): Promise<vscode.Uri> {
+	for (const segments of TEMPLATE_ROOT_CANDIDATES) {
+		const candidate = vscode.Uri.joinPath(extensionUri, ...segments);
+		if (await pathExists(vscode.Uri.joinPath(candidate, 'templates'))) {
+			return candidate;
+		}
+	}
+
+	throw new Error('Learning-kit templates were not found in the extension assets.');
+}
+
+async function getDocumentTemplateUri(extensionUri: vscode.Uri, type: LearningDocumentType): Promise<vscode.Uri> {
 	const definition = getLearningDocumentDefinition(type);
-	return vscode.Uri.joinPath(getTemplateRootUri(extensionUri), 'templates', definition.templateFolderName);
+	return vscode.Uri.joinPath(await resolveTemplateRootUri(extensionUri), 'templates', definition.templateFolderName);
 }
 
 export async function promptForLearningDocumentType(currentType?: LearningDocumentType): Promise<LearningDocumentType | undefined> {
@@ -158,6 +181,165 @@ async function readTextFile(fileUri: vscode.Uri): Promise<string> {
 
 async function writeTextFile(fileUri: vscode.Uri, content: string): Promise<void> {
 	await vscode.workspace.fs.writeFile(fileUri, Buffer.from(content, 'utf8'));
+}
+
+function getDocumentDirectoryName(relativeDirectory: string): string {
+	return path.posix.basename(relativeDirectory);
+}
+
+function normalizeSourceRecords(
+	sources: LearningDocumentSourceRecord[] | undefined,
+	sourceDirectory: string
+): LearningDocumentSourceRecord[] {
+	if (!Array.isArray(sources)) {
+		return [];
+	}
+
+	return sources
+		.filter((source) => typeof source?.relativePath === 'string' && typeof source?.label === 'string')
+		.map((source) => ({
+			label: source.label,
+			relativePath: source.relativePath.startsWith(sourceDirectory)
+				? source.relativePath
+				: path.posix.join(sourceDirectory, path.posix.basename(source.relativePath)),
+			importedAt: source.importedAt,
+			originPath: source.originPath
+		}));
+}
+
+function buildLearningDocumentRecordFromManifest(
+	workspaceFolder: vscode.WorkspaceFolder,
+	directoryName: string,
+	manifest: LearningDocumentManifest,
+	existingDocument?: LearningDocumentRecord
+): LearningDocumentRecord | undefined {
+	if (!manifest.title?.trim() || !isLearningDocumentType(manifest.type)) {
+		return undefined;
+	}
+
+	const slug = manifest.slug?.trim() || existingDocument?.slug || directoryName;
+	const relativeDirectory = path.posix.join(LEARNING_DOCUMENTS_ROOT, directoryName);
+	const sourceDirectory = path.posix.join(relativeDirectory, 'sources');
+	const promptFile = path.posix.join(relativeDirectory, 'PROMPT.md');
+	const manifestFile = path.posix.join(relativeDirectory, 'document.json');
+	const createdAt = manifest.createdAt || existingDocument?.createdAt || new Date().toISOString();
+	const updatedAt = manifest.updatedAt || existingDocument?.updatedAt || createdAt;
+	const sources = normalizeSourceRecords(manifest.sources, sourceDirectory);
+
+	return {
+		id: existingDocument?.id ?? slug,
+		type: manifest.type,
+		title: manifest.title.trim(),
+		slug,
+		relativeDirectory,
+		indexFile: path.posix.join(relativeDirectory, 'index.html'),
+		sourceDirectory,
+		promptFile,
+		manifestFile,
+		createdAt,
+		updatedAt,
+		sources
+	};
+}
+
+async function readManifestFromDirectory(
+	workspaceFolder: vscode.WorkspaceFolder,
+	directoryName: string,
+	existingDocument?: LearningDocumentRecord
+): Promise<LearningDocumentRecord | undefined> {
+	const manifestUri = vscode.Uri.joinPath(workspaceFolder.uri, LEARNING_DOCUMENTS_ROOT, directoryName, 'document.json');
+	if (!(await pathExists(manifestUri))) {
+		return undefined;
+	}
+
+	try {
+		const manifestContent = await readTextFile(manifestUri);
+		const manifest = JSON.parse(manifestContent) as LearningDocumentManifest;
+		return buildLearningDocumentRecordFromManifest(workspaceFolder, directoryName, manifest, existingDocument);
+	} catch {
+		return undefined;
+	}
+}
+
+function normalizeLearningDocumentState(state: LearningDocumentState): LearningDocumentState {
+	const documents = [...state.documents].sort((left, right) => left.relativeDirectory.localeCompare(right.relativeDirectory));
+	const activeDocumentId = documents.some((document) => document.id === state.activeDocumentId)
+		? state.activeDocumentId
+		: documents[0]?.id;
+
+	return {
+		activeDocumentId,
+		documents
+	};
+}
+
+function areDocumentStatesEqual(left: LearningDocumentState, right: LearningDocumentState): boolean {
+	return JSON.stringify(normalizeLearningDocumentState(left)) === JSON.stringify(normalizeLearningDocumentState(right));
+}
+
+async function reconcileLearningDocumentState(
+	context: vscode.ExtensionContext,
+	workspaceFolder: vscode.WorkspaceFolder
+): Promise<LearningDocumentState> {
+	const storedState = await readState(context, workspaceFolder);
+	const learningDocumentsRootUri = vscode.Uri.joinPath(workspaceFolder.uri, LEARNING_DOCUMENTS_ROOT);
+	if (!(await pathExists(learningDocumentsRootUri))) {
+		const emptyState: LearningDocumentState = { documents: [] };
+		if (!areDocumentStatesEqual(storedState, emptyState)) {
+			await writeState(context, workspaceFolder, emptyState);
+		}
+		return emptyState;
+	}
+
+	const entries = await vscode.workspace.fs.readDirectory(learningDocumentsRootUri);
+	const directoryEntries = entries.filter(([, type]) => type === vscode.FileType.Directory).map(([name]) => name);
+	const storedByDirectory = new Map(storedState.documents.map((document) => [getDocumentDirectoryName(document.relativeDirectory), document]));
+	const discoveredByDirectory = new Map<string, LearningDocumentRecord>();
+
+	for (const directoryName of directoryEntries) {
+		const discoveredDocument = await readManifestFromDirectory(workspaceFolder, directoryName, storedByDirectory.get(directoryName));
+		if (discoveredDocument) {
+			discoveredByDirectory.set(directoryName, discoveredDocument);
+		}
+	}
+
+	const documents: LearningDocumentRecord[] = [];
+	for (const storedDocument of storedState.documents) {
+		const directoryName = getDocumentDirectoryName(storedDocument.relativeDirectory);
+		const discoveredDocument = discoveredByDirectory.get(directoryName);
+		if (discoveredDocument) {
+			documents.push(discoveredDocument);
+			continue;
+		}
+
+		if (directoryEntries.includes(directoryName)) {
+			documents.push(storedDocument);
+		}
+	}
+
+	for (const directoryName of [...discoveredByDirectory.keys()].sort((left, right) => left.localeCompare(right))) {
+		if (documents.some((document) => getDocumentDirectoryName(document.relativeDirectory) === directoryName)) {
+			continue;
+		}
+
+		const discoveredDocument = discoveredByDirectory.get(directoryName);
+		if (discoveredDocument) {
+			documents.push(discoveredDocument);
+		}
+	}
+
+	const nextState: LearningDocumentState = {
+		activeDocumentId: documents.some((document) => document.id === storedState.activeDocumentId)
+			? storedState.activeDocumentId
+			: documents[0]?.id,
+		documents
+	};
+
+	if (!areDocumentStatesEqual(storedState, nextState)) {
+		await writeState(context, workspaceFolder, nextState);
+	}
+
+	return nextState;
 }
 
 async function copyDirectoryRecursive(sourceUri: vscode.Uri, targetUri: vscode.Uri): Promise<void> {
@@ -237,14 +419,14 @@ export async function getLearningDocumentState(
 	context: vscode.ExtensionContext,
 	workspaceFolder: vscode.WorkspaceFolder
 ): Promise<LearningDocumentState> {
-	return readState(context, workspaceFolder);
+	return reconcileLearningDocumentState(context, workspaceFolder);
 }
 
 export async function getLearningDocuments(
 	context: vscode.ExtensionContext,
 	workspaceFolder: vscode.WorkspaceFolder
 ): Promise<LearningDocumentRecord[]> {
-	const state = await readState(context, workspaceFolder);
+	const state = await reconcileLearningDocumentState(context, workspaceFolder);
 	return state.documents;
 }
 
@@ -257,7 +439,7 @@ export async function getLearningDocumentById(
 		return undefined;
 	}
 
-	const state = await readState(context, workspaceFolder);
+	const state = await reconcileLearningDocumentState(context, workspaceFolder);
 	return state.documents.find((document) => document.id === documentId);
 }
 
@@ -265,7 +447,7 @@ export async function getActiveLearningDocument(
 	context: vscode.ExtensionContext,
 	workspaceFolder: vscode.WorkspaceFolder
 ): Promise<LearningDocumentRecord | undefined> {
-	const state = await readState(context, workspaceFolder);
+	const state = await reconcileLearningDocumentState(context, workspaceFolder);
 	return state.documents.find((document) => document.id === state.activeDocumentId) ?? state.documents[0];
 }
 
@@ -274,7 +456,7 @@ export async function setActiveLearningDocument(
 	workspaceFolder: vscode.WorkspaceFolder,
 	documentId: string
 ): Promise<LearningDocumentRecord | undefined> {
-	const state = await readState(context, workspaceFolder);
+	const state = await reconcileLearningDocumentState(context, workspaceFolder);
 	const document = state.documents.find((candidate) => candidate.id === documentId);
 	if (!document) {
 		return undefined;
@@ -293,7 +475,7 @@ export async function promptForLearningDocument(
 	workspaceFolder: vscode.WorkspaceFolder,
 	placeHolder: string
 ): Promise<LearningDocumentRecord | undefined> {
-	const state = await readState(context, workspaceFolder);
+	const state = await reconcileLearningDocumentState(context, workspaceFolder);
 	if (state.documents.length === 0) {
 		return undefined;
 	}
@@ -326,7 +508,7 @@ export async function createLearningDocument(
 	type: LearningDocumentType,
 	title: string
 ): Promise<LearningDocumentRecord> {
-	const state = await readState(context, workspaceFolder);
+	const state = await reconcileLearningDocumentState(context, workspaceFolder);
 	const baseSlug = slugifyDocumentTitle(title);
 	const slug = ensureUniqueSlug(state, baseSlug);
 	const createdAt = new Date().toISOString();
@@ -336,17 +518,18 @@ export async function createLearningDocument(
 	const sourceDirectory = path.posix.join(relativeDirectory, 'sources');
 	const manifestFile = path.posix.join(relativeDirectory, 'document.json');
 	const documentDirectoryUri = vscode.Uri.joinPath(workspaceFolder.uri, ...relativeDirectory.split('/'));
-	const templateUri = getDocumentTemplateUri(context.extensionUri, type);
-	const kitRootUri = getTemplateRootUri(context.extensionUri);
+	const kitRootUri = await resolveTemplateRootUri(context.extensionUri);
+	const templateUri = await getDocumentTemplateUri(context.extensionUri, type);
+	const [indexTemplate, componentTemplate, promptTemplate, exampleTemplate] = await Promise.all([
+		readTextFile(vscode.Uri.joinPath(templateUri, 'index.html')),
+		readTextFile(vscode.Uri.joinPath(templateUri, 'components.css')),
+		readTextFile(vscode.Uri.joinPath(templateUri, 'PROMPT.md')),
+		readTextFile(vscode.Uri.joinPath(templateUri, 'section-EXAMPLE.html'))
+	]);
 
 	await vscode.workspace.fs.createDirectory(documentDirectoryUri);
 	await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(workspaceFolder.uri, ...sourceDirectory.split('/')));
 	await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(workspaceFolder.uri, ...path.posix.join(relativeDirectory, '.github').split('/')));
-
-	const indexTemplate = await readTextFile(vscode.Uri.joinPath(templateUri, 'index.html'));
-	const componentTemplate = await readTextFile(vscode.Uri.joinPath(templateUri, 'components.css'));
-	const promptTemplate = await readTextFile(vscode.Uri.joinPath(templateUri, 'PROMPT.md'));
-	const exampleTemplate = await readTextFile(vscode.Uri.joinPath(templateUri, 'section-EXAMPLE.html'));
 
 	const definition = getLearningDocumentDefinition(type);
 	const subtitle = `${definition.label} • ${createdAt.slice(0, 10)}`;
@@ -421,7 +604,7 @@ export async function importSourcesIntoLearningDocument(
 	document: LearningDocumentRecord,
 	sourceUris: vscode.Uri[]
 ): Promise<LearningDocumentRecord> {
-	const state = await readState(context, workspaceFolder);
+	const state = await reconcileLearningDocumentState(context, workspaceFolder);
 	const existingDocument = state.documents.find((candidate) => candidate.id === document.id);
 	if (!existingDocument) {
 		throw new Error('Learning document not found in workspace state.');
