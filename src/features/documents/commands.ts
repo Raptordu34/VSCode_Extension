@@ -12,11 +12,45 @@ import {
 } from './service.js';
 import type { LearningDocumentType } from './types.js';
 
-type SourceSelectionAction = 'add-files' | 'remove-file' | 'import' | 'cancel';
+type SourceSelectionAction = 'add-files' | 'browse-folder' | 'remove-file' | 'import' | 'cancel';
 
 interface SourceSelectionItem extends vscode.QuickPickItem {
 	action: SourceSelectionAction;
 	uri?: vscode.Uri;
+}
+
+async function promptFilesFromFolder(folderUri: vscode.Uri): Promise<vscode.Uri[]> {
+	let entries: [string, vscode.FileType][];
+	try {
+		entries = await vscode.workspace.fs.readDirectory(folderUri);
+	} catch {
+		void vscode.window.showWarningMessage('Impossible de lire le contenu de ce dossier.');
+		return [];
+	}
+
+	const fileEntries = entries
+		.filter(([, type]) => type === vscode.FileType.File)
+		.map(([name]) => name)
+		.sort((a, b) => a.localeCompare(b));
+
+	if (fileEntries.length === 0) {
+		void vscode.window.showWarningMessage('Ce dossier ne contient aucun fichier.');
+		return [];
+	}
+
+	const items = fileEntries.map((name) => ({
+		label: `$(file) ${name}`,
+		name
+	}));
+
+	const selected = await vscode.window.showQuickPick(items, {
+		canPickMany: true,
+		title: `Fichiers dans : ${folderUri.fsPath}`,
+		placeHolder: 'Cochez les fichiers à importer (Espace pour cocher, Entrée pour valider)',
+		ignoreFocusOut: true
+	});
+
+	return (selected ?? []).map((item) => vscode.Uri.joinPath(folderUri, item.name));
 }
 
 async function promptForLearningDocumentSources(
@@ -28,6 +62,12 @@ async function promptForLearningDocumentSources(
 	while (true) {
 		const selectedUris = [...selectedByPath.values()];
 		const selectionItems: SourceSelectionItem[] = [
+			{
+				label: '$(folder-opened) Choisir dans un dossier',
+				description: 'Sélection multiple dans VSCode',
+				detail: 'Navigue vers un dossier, puis coche les fichiers à importer (sans dialog système).',
+				action: 'browse-folder'
+			},
 			{
 				label: '$(add) Ajouter des fichiers',
 				description: selectedUris.length > 0 ? `${selectedUris.length} fichier(s) sélectionné(s)` : 'Aucun fichier sélectionné pour le moment',
@@ -73,6 +113,26 @@ async function promptForLearningDocumentSources(
 
 		if (!selection || selection.action === 'cancel') {
 			return undefined;
+		}
+
+		if (selection.action === 'browse-folder') {
+			const folderUris = await vscode.window.showOpenDialog({
+				canSelectFiles: false,
+				canSelectFolders: true,
+				canSelectMany: false,
+				openLabel: 'Sélectionner ce dossier',
+				defaultUri: workspaceFolder.uri,
+				title: 'Choisissez le dossier contenant vos sources'
+			});
+			if (!folderUris || folderUris.length === 0) {
+				continue;
+			}
+
+			const pickedUris = await promptFilesFromFolder(folderUris[0]);
+			for (const uri of pickedUris) {
+				selectedByPath.set(uri.fsPath, uri);
+			}
+			continue;
 		}
 
 		if (selection.action === 'add-files') {

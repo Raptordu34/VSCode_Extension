@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import { normalizeWorkspaceRelativePath } from '../core/workspace.js';
 import { commitFileTransaction, persistWorkflowArtifacts, readWorkflowSessionState, type WorkspaceWriteOperation } from '../features/context/workflowPersistence.js';
 import { archiveActiveWorkflowState, cleanActiveWorkflowFiles, forkWorkflowFromHistory, forkWorkflowFromHistoryAtStage, readWorkflowArchiveManifest, readWorkflowHistoryIndex, restoreWorkflowFromHistory } from '../features/context/workflowHistory.js';
-import { initializeSourceAnalysisBatch, readSourceAnalysisBatch, updateSourceAnalysisJobStatus } from '../features/context/sourceAnalysisBatch.js';
+import { initializeSourceAnalysisBatch, readReconciledSourceAnalysisBatch, readSourceAnalysisBatch, updateSourceAnalysisJobStatus } from '../features/context/sourceAnalysisBatch.js';
 import type { ArtifactPlan, ContextMetadata, ExtensionConfiguration, ProjectContext, SourceAnalysisBatch, WorkflowDashboardState, WorkflowExecutionPlan, WorkflowSessionState } from '../features/workflow/types.js';
 import { computeSignature, escapeShellArg, createNonce } from '../utils/index.js';
 import { applyContextBudgetConfiguration, detectTechStack } from '../features/context/contextBuilder.js';
@@ -660,6 +660,147 @@ suite('workflow persistence', () => {
 		const updatedBatch = await updateSourceAnalysisJobStatus(tempRoot, batch.jobs[0].id, 'completed', 'Done');
 		assert.strictEqual(updatedBatch?.jobs[0].status, 'completed');
 		assert.strictEqual(updatedBatch?.jobs[0].notes, 'Done');
+	});
+
+	test('reconciles distributed source jobs from analysis file content and syncs session state', async () => {
+		const tempRoot = vscode.Uri.file(path.join(os.tmpdir(), `aio-batch-reconcile-${Date.now()}`));
+		await vscode.workspace.fs.createDirectory(tempRoot);
+
+		const workspaceFolder = {
+			uri: tempRoot,
+			name: 'temp-workspace',
+			index: 0
+		} as vscode.WorkspaceFolder;
+		const presetDefinition = WORKFLOW_PRESETS.build;
+		const workflowPlan: WorkflowExecutionPlan = {
+			preset: 'build',
+			provider: 'claude',
+			providerModel: 'claude-sonnet-4-6',
+			providerAccountId: 'claude-main',
+			roles: [...presetDefinition.roles],
+			refreshMode: 'full-rebuild',
+			costProfile: 'balanced',
+			optimizeWithCopilot: false,
+			generateNativeArtifacts: true,
+			presetDefinition,
+			learningDocumentId: 'doc-1',
+			documentIntentId: 'compte-rendu-source-exploitation',
+			brief: {
+				taskType: 'analysis',
+				goal: 'Analyser les sources une par une',
+				constraints: [],
+				rawText: 'Analyser les sources une par une'
+			}
+		};
+		const projectContext: ProjectContext = {
+			workspaceFolder,
+			contextFile: vscode.Uri.joinPath(tempRoot, '.ai-context.md'),
+			content: '',
+			optimization: {
+				content: '',
+				applied: false,
+				reason: 'test'
+			},
+			metadata: {
+				generatedAt: '2026-03-09T00:00:00.000Z',
+				signature: 'sig-batch',
+				preset: 'build',
+				provider: 'claude',
+				providerModel: 'claude-sonnet-4-6',
+				providerAccountId: 'claude-main',
+				refreshMode: 'full-rebuild',
+				costProfile: 'balanced',
+				reused: false,
+				keyFiles: [],
+				instructionFiles: [],
+				commands: [],
+				artifactFiles: []
+			},
+			workflowPlan,
+			activeLearningDocument: {
+				id: 'doc-1',
+				title: 'Compte rendu test',
+				type: 'compte-rendu',
+				slug: 'compte-rendu-test',
+				relativeDirectory: 'learning-documents/doc-1',
+				manifestFile: 'learning-documents/doc-1/document.json',
+				indexFile: 'learning-documents/doc-1/index.html',
+				promptFile: 'learning-documents/doc-1/.instructions.md',
+				sourceDirectory: 'learning-documents/doc-1/sources',
+				createdAt: '2026-03-09T00:00:00.000Z',
+				updatedAt: '2026-03-09T00:00:00.000Z',
+				sources: [
+					{ relativePath: 'sources/source-a.md', label: 'Source A', importedAt: '2026-03-09T00:00:00.000Z' },
+					{ relativePath: 'sources/source-b.md', label: 'Source B', importedAt: '2026-03-09T00:00:00.000Z' }
+				]
+			},
+			reused: false,
+			workflowSession: {
+				workspaceName: 'temp-workspace',
+				workspaceFolderId: tempRoot.toString(),
+				workflowId: 'workflow-1',
+				branchId: 'main',
+				createdAt: '2026-03-09T00:00:00.000Z',
+				updatedAt: '2026-03-09T00:00:00.000Z',
+				currentStageIndex: 1,
+				currentPreset: 'build',
+				currentProvider: 'claude',
+				currentProviderModel: 'claude-sonnet-4-6',
+				currentProviderAccountId: 'claude-main',
+				currentClaudeAccountId: 'claude-main',
+				currentClaudeEffort: 'medium',
+				briefFile: '.ai-orchestrator/brief.md',
+				stages: [{
+					index: 1,
+					workflowId: 'workflow-1',
+					branchId: 'main',
+					preset: 'build',
+					provider: 'claude',
+					providerModel: 'claude-sonnet-4-6',
+					providerAccountId: 'claude-main',
+					status: 'prepared',
+					stageFile: '.ai-orchestrator/stages/01-build.md',
+					generatedAt: '2026-03-09T00:00:00.000Z',
+					briefSummary: 'Analyser les sources une par une',
+					contextFile: '.ai-context.md',
+					claudeAccountId: 'claude-main',
+					claudeEffort: 'medium',
+					artifactFiles: [],
+					upstreamStageFiles: []
+				}]
+			},
+			currentStage: {
+				index: 1,
+				workflowId: 'workflow-1',
+				branchId: 'main',
+				preset: 'build',
+				provider: 'claude',
+				providerModel: 'claude-sonnet-4-6',
+				providerAccountId: 'claude-main',
+				status: 'prepared',
+				stageFile: '.ai-orchestrator/stages/01-build.md',
+				generatedAt: '2026-03-09T00:00:00.000Z',
+				briefSummary: 'Analyser les sources une par une',
+				contextFile: '.ai-context.md',
+				claudeAccountId: 'claude-main',
+				claudeEffort: 'medium',
+				artifactFiles: [],
+				upstreamStageFiles: []
+			},
+			brief: workflowPlan.brief
+		};
+
+		const batch = await initializeSourceAnalysisBatch(projectContext);
+		const jobFileUri = vscode.Uri.joinPath(tempRoot, ...batch.jobs[0].outputFile.split('/'));
+		await vscode.workspace.fs.writeFile(jobFileUri, Buffer.from('# Source Analysis Source A\n\n## Analysis Notes\n- Extra content\n', 'utf8'));
+
+		const reconciledBatch = await readReconciledSourceAnalysisBatch(tempRoot) as SourceAnalysisBatch;
+		const syncedSession = await readWorkflowSessionState(tempRoot) as WorkflowSessionState;
+
+		assert.strictEqual(reconciledBatch.jobs[0].status, 'completed');
+		assert.ok(reconciledBatch.jobs[0].completedAt);
+		assert.strictEqual(reconciledBatch.jobs[1].status, 'queued');
+		assert.strictEqual(syncedSession.sourceAnalysisBatch?.jobs[0]?.status, 'completed');
 	});
 
 	test('rejects malformed persisted session state', async () => {
@@ -1536,6 +1677,110 @@ suite('workflow control html', () => {
 
 		assert.ok(html.includes('Créer votre premier document'));
 		assert.ok(html.includes('Commencez par créer un document de travail'));
+	});
+
+	test('renders distributed source batch mini-view with direct job actions', () => {
+		const html = getWorkflowControlHtml(
+			{} as vscode.Webview,
+			{
+				workspaceModeState: {
+					mode: 'study',
+					selectedAt: '2026-03-09T10:00:00.000Z',
+					updatedAt: '2026-03-09T10:00:00.000Z'
+				},
+				activeLearningDocument: {
+					id: 'doc-1',
+					title: 'Compte rendu test',
+					type: 'compte-rendu',
+					slug: 'compte-rendu-test',
+					relativeDirectory: 'learning-documents/doc-1',
+					manifestFile: 'learning-documents/doc-1/document.json',
+					indexFile: 'learning-documents/doc-1/index.html',
+					promptFile: 'learning-documents/doc-1/.instructions.md',
+					sourceDirectory: 'learning-documents/doc-1/sources',
+					createdAt: '2026-03-09T00:00:00.000Z',
+					updatedAt: '2026-03-09T00:00:00.000Z',
+					sources: [
+						{ relativePath: 'sources/source-a.md', label: 'Source A', importedAt: '2026-03-09T00:00:00.000Z' },
+						{ relativePath: 'sources/source-b.md', label: 'Source B', importedAt: '2026-03-09T00:00:00.000Z' }
+					]
+				},
+				sourceAnalysisBatch: {
+					batchId: 'batch-1',
+					workflowId: 'workflow-1',
+					stageIndex: 1,
+					mode: 'distributed',
+					learningDocumentId: 'doc-1',
+					learningDocumentTitle: 'Compte rendu test',
+					provider: 'claude',
+					briefGoal: 'Analyser les sources',
+					jobs: [
+						{
+							id: 'job-1',
+							sourceRelativePath: 'sources/source-a.md',
+							sourceLabel: 'Source A',
+							outputFile: '.ai-orchestrator/analysis/analysis-01-source-a.md',
+							status: 'completed',
+							provider: 'claude',
+							completedAt: '2026-03-09T10:05:00.000Z'
+						},
+						{
+							id: 'job-2',
+							sourceRelativePath: 'sources/source-b.md',
+							sourceLabel: 'Source B',
+							outputFile: '.ai-orchestrator/analysis/analysis-02-source-b.md',
+							status: 'queued',
+							provider: 'claude'
+						}
+					],
+					createdAt: '2026-03-09T10:00:00.000Z',
+					updatedAt: '2026-03-09T10:05:00.000Z'
+				},
+				learningDocuments: [],
+				contextFileExists: false,
+				nextSuggestedPresets: [],
+				artifactCount: 0,
+				providerStatuses: []
+			} as WorkflowDashboardState,
+			'nonce',
+			{
+				createNonce,
+				escapeHtml: (value: string) => value,
+				getProviderLabel: (provider) => provider,
+				getExtensionConfiguration: () => ({
+					treeDepth: 2,
+					readmePreviewLines: 20,
+					contextFilePreviewLines: 80,
+					extraContextFiles: [],
+					showIgnoredDirectories: true,
+					maxEntriesPerDirectory: 40,
+					optimizeWithCopilot: false,
+					modelFamily: '',
+					defaultClaudeModel: 'claude-sonnet-4-6',
+					defaultGeminiModel: 'gemini-3.1-pro-preview',
+					defaultClaudeEffort: 'medium',
+					claudeAccounts: [],
+					geminiAccounts: [],
+					copilotAccounts: [],
+					autoGenerateOnStartup: false,
+					defaultPreset: 'explore',
+					defaultProvider: 'copilot',
+					contextRefreshMode: 'smart-refresh',
+					costProfile: 'balanced',
+					generateNativeArtifacts: true,
+					enabledProviders: ['claude', 'gemini', 'copilot']
+				}),
+				findProviderAccount: () => undefined
+			},
+			false,
+			undefined
+		);
+
+		assert.ok(html.includes('Batch batch-1 · 1/2 job(s) completed'));
+		assert.ok(html.includes('Source A'));
+		assert.ok(html.includes('Open report'));
+		assert.ok(html.includes('setDistributedSourceAnalysisJobStatus'));
+		assert.ok(html.includes('openDistributedSourceAnalysisReport'));
 	});
 
 	test('renders workflow history actions when archived workflows exist', () => {

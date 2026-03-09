@@ -19,7 +19,7 @@ import { readWorkflowSessionState, readWorkflowBrief, buildSuggestedNextPresets,
 import { getWorkspaceModeLabel, getWorkspaceModeState } from '../workspace/service.js';
 import { getActiveLearningDocument, getLearningDocumentById } from '../documents/service.js';
 import { getEffectiveWorkflowIntentCopy } from '../workflow/presets.js';
-import { buildSourceAnalysisSynthesisSection, readSourceAnalysisBatch } from './sourceAnalysisBatch.js';
+import { buildSourceAnalysisSynthesisSection, readReconciledSourceAnalysisBatch } from './sourceAnalysisBatch.js';
 
 export function buildRawContextContent(
 	workflowPlan: WorkflowExecutionPlan,
@@ -426,7 +426,7 @@ export async function gatherProjectContext(
 			? await getLearningDocumentById(context, workspaceFolder, workflowPlan.learningDocumentId)
 			: await getActiveLearningDocument(context, workspaceFolder);
 		const sourceAnalysisBatch = workflowPlan.sourceAnalysisBatchId
-			? await readSourceAnalysisBatch(workspaceFolder.uri)
+			? await readReconciledSourceAnalysisBatch(workspaceFolder.uri)
 			: undefined;
 		const sourceAnalysisJob = sourceAnalysisBatch?.jobs.find((job) => job.id === workflowPlan.sourceAnalysisJobId);
 		const sourceAnalysisSummary = sourceAnalysisBatch && !sourceAnalysisJob

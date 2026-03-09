@@ -19,6 +19,8 @@ import type {
 	LastWorkflowConfig,
 	ProviderAccountConfiguration,
 	ProviderTarget,
+	SourceAnalysisJob,
+	SourceAnalysisJobStatus,
 	WorkflowDashboardState,
 	WorkflowStageStatus,
 	WorkflowHistoryEntry,
@@ -42,6 +44,41 @@ export interface WorkflowUiHelpers {
 		provider: ProviderTarget,
 		accountId: string | undefined
 	): ProviderAccountConfiguration | undefined;
+}
+
+function getSourceAnalysisJobStatusLabel(status: SourceAnalysisJobStatus): string {
+	switch (status) {
+		case 'completed':
+			return 'Completed';
+		case 'running':
+			return 'Running';
+		case 'failed':
+			return 'Failed';
+		case 'queued':
+		default:
+			return 'Queued';
+	}
+}
+
+function buildDistributedSourceJobHtml(job: SourceAnalysisJob, helpers: WorkflowUiHelpers): string {
+	const statusLabel = getSourceAnalysisJobStatusLabel(job.status);
+	const actions = ['queued', 'running', 'completed', 'failed'] as const;
+	return `
+	<div class="provider-row provider-card" style="gap:10px; align-items:stretch;">
+		<div class="provider-title-row" style="align-items:flex-start; gap:8px;">
+			<div>
+				<strong>${helpers.escapeHtml(job.sourceLabel)}</strong>
+				<div class="small provider-detail">${helpers.escapeHtml(job.sourceRelativePath)}</div>
+			</div>
+			<span class="history-badge provider-badge">${helpers.escapeHtml(statusLabel)}</span>
+		</div>
+		<div class="small provider-detail">${helpers.escapeHtml(job.outputFile)}</div>
+		<div class="actions dense-actions" style="margin-top:4px; flex-wrap:wrap;">
+			<button type="button" class="secondary small-btn" data-command="openDistributedSourceAnalysisReport" data-target="${helpers.escapeHtml(job.outputFile)}">Open report</button>
+			${actions.map((status) => `<button type="button" class="secondary small-btn" data-command="setDistributedSourceAnalysisJobStatus" data-target="${helpers.escapeHtml(job.id)}" data-status="${status}" ${status === job.status ? 'disabled' : ''}>${helpers.escapeHtml(getSourceAnalysisJobStatusLabel(status))}</button>`).join('')}
+		</div>
+		${job.completedAt ? `<div class="small provider-refresh-meta">Completed ${helpers.escapeHtml(job.completedAt)}</div>` : ''}
+	</div>`;
 }
 
 export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
@@ -71,7 +108,7 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 			localResourceRoots: [this.extensionUri]
 		};
 
-		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; providerModel?: string; claudeEffort?: string; learningDocumentId?: string; documentIntentId?: string; brief?: string; stageIndex?: number; target?: string; collapsed?: boolean }) => {
+		webviewView.webview.onDidReceiveMessage(async (message: { command?: string; provider?: ProviderTarget; preset?: string; providerModel?: string; claudeEffort?: string; learningDocumentId?: string; documentIntentId?: string; brief?: string; stageIndex?: number; target?: string; collapsed?: boolean; status?: SourceAnalysisJobStatus }) => {
 			switch (message.command) {
 				case 'selectWorkspaceMode':
 					await vscode.commands.executeCommand('ai-context-orchestrator.selectWorkspaceMode');
@@ -93,6 +130,12 @@ export class WorkflowControlViewProvider implements vscode.WebviewViewProvider {
 					return;
 				case 'manageDistributedSourceAnalysis':
 					await vscode.commands.executeCommand('ai-context-orchestrator.manageDistributedSourceAnalysis');
+					return;
+				case 'openDistributedSourceAnalysisReport':
+					await vscode.commands.executeCommand('ai-context-orchestrator.openDistributedSourceAnalysisReport', message.target);
+					return;
+				case 'setDistributedSourceAnalysisJobStatus':
+					await vscode.commands.executeCommand('ai-context-orchestrator.setDistributedSourceAnalysisJobStatus', message.target, message.status);
 					return;
 				case 'runDistributedSourceSynthesis':
 					await vscode.commands.executeCommand('ai-context-orchestrator.runDistributedSourceSynthesis');
@@ -466,6 +509,9 @@ export function getWorkflowControlHtml(
 		? state.sourceAnalysisBatch
 		: undefined;
 	const canRunDistributedSourceAnalysis = state.activeLearningDocument?.type === 'compte-rendu' && (state.activeLearningDocument.sources.length ?? 0) > 0;
+	const distributedBatchJobsHtml = distributedSourceBatch
+		? `<div style="margin-top:12px; display:grid; gap:8px;">${distributedSourceBatch.jobs.map((job) => buildDistributedSourceJobHtml(job, helpers)).join('')}</div>`
+		: '';
 	const completedDistributedJobs = distributedSourceBatch?.jobs.filter((job) => job.status === 'completed').length ?? 0;
 	const distributedSourceHtml = canRunDistributedSourceAnalysis ? `
 	<div class="actions" style="margin-top:8px; flex-wrap:wrap;">
@@ -475,7 +521,8 @@ export function getWorkflowControlHtml(
 	</div>
 	<p class="section-footnote" style="margin-top:8px;">${distributedSourceBatch
 		? helpers.escapeHtml(`Batch ${distributedSourceBatch.batchId} · ${completedDistributedJobs}/${distributedSourceBatch.jobs.length} job(s) completed`)
-		: 'Le mode distribué crée un fichier d’analyse par source dans .ai-orchestrator/analysis puis lance une synthèse finale.'}</p>` : '';
+		: 'Le mode distribué crée un fichier d’analyse par source dans .ai-orchestrator/analysis puis lance une synthèse finale.'}</p>
+	${distributedBatchJobsHtml}` : '';
 	const learningDocumentsHtml = learningMode?.supportsLearningDocuments ? `
 <details class="mc-section" open>
 <summary class="mc-section-header">

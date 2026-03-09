@@ -1142,7 +1142,7 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 				if (button.disabled) {
 					return;
 				}
-				vscode.postMessage({ command: button.dataset.command, provider: button.dataset.provider, target: button.dataset.target });
+				vscode.postMessage({ command: button.dataset.command, provider: button.dataset.provider, target: button.dataset.target, status: button.dataset.status });
 			});
 		}
 		for (const button of document.querySelectorAll('button[data-scroll-target]')) {

@@ -10,7 +10,7 @@ import type {
 	SourceAnalysisJobStatus,
 	WorkflowSessionState
 } from '../workflow/types.js';
-import { commitFileTransaction, type WorkspaceWriteOperation, writeWorkflowSessionState } from './workflowPersistence.js';
+import { commitFileTransaction, type WorkspaceWriteOperation, readWorkflowSessionState, writeWorkflowSessionState } from './workflowPersistence.js';
 
 function toUtf8Bytes(content: string): Uint8Array {
 	return Buffer.from(content, 'utf8');
@@ -54,20 +54,24 @@ function buildBatchContent(batch: SourceAnalysisBatch): string {
 	return `${JSON.stringify(batch, null, 2)}\n`;
 }
 
-function buildInitialAnalysisFileContent(projectContext: ProjectContext, job: SourceAnalysisJob): string {
+function normalizeAnalysisContent(content: string): string {
+	return content.replace(/\r\n/g, '\n').trimEnd();
+}
+
+function buildInitialAnalysisFileContentForBatch(batch: Pick<SourceAnalysisBatch, 'batchId' | 'briefGoal' | 'createdAt'>, job: SourceAnalysisJob): string {
 	return [
 		`# Source Analysis ${job.sourceLabel}`,
 		'',
-		`- Batch: ${projectContext.sourceAnalysisBatch?.batchId ?? 'unknown'}`,
+		`- Batch: ${batch.batchId}`,
 		`- Job: ${job.id}`,
 		`- Source: ${job.sourceRelativePath}`,
 		`- Provider: ${job.provider}`,
 		`- Provider model: ${job.providerModel ?? 'default'}`,
 		`- Status: ${job.status}`,
-		`- Created at: ${projectContext.sourceAnalysisBatch?.createdAt ?? new Date().toISOString()}`,
+		`- Created at: ${batch.createdAt}`,
 		'',
 		'## Objective',
-		projectContext.brief?.goal ?? 'Analyze the assigned source and extract reusable material for the learning document.',
+		batch.briefGoal,
 		'',
 		'## Source Scope',
 		`- Read only the assigned source file: ${job.sourceRelativePath}`,
@@ -83,6 +87,38 @@ function buildInitialAnalysisFileContent(projectContext: ProjectContext, job: So
 		'## Analysis Notes',
 		'- Fill this file with the analysis for the assigned source only.'
 	].join('\n').trimEnd() + '\n';
+}
+
+function buildInitialAnalysisFileContent(projectContext: ProjectContext, job: SourceAnalysisJob): string {
+	return buildInitialAnalysisFileContentForBatch({
+		batchId: projectContext.sourceAnalysisBatch?.batchId ?? 'unknown',
+		briefGoal: projectContext.brief?.goal ?? 'Analyze the assigned source and extract reusable material for the learning document.',
+		createdAt: projectContext.sourceAnalysisBatch?.createdAt ?? new Date().toISOString()
+	}, job);
+}
+
+function isCompletedAnalysisOutput(content: string, batch: SourceAnalysisBatch, job: SourceAnalysisJob): boolean {
+	const normalizedActualContent = normalizeAnalysisContent(content);
+	if (!normalizedActualContent) {
+		return false;
+	}
+
+	const normalizedInitialContent = normalizeAnalysisContent(buildInitialAnalysisFileContentForBatch(batch, job));
+	return normalizedActualContent !== normalizedInitialContent;
+}
+
+async function syncBatchIntoWorkflowSession(workspaceUri: vscode.Uri, batch: SourceAnalysisBatch): Promise<void> {
+	const session = await readWorkflowSessionState(workspaceUri);
+	if (!session) {
+		return;
+	}
+
+	const nextSession: WorkflowSessionState = {
+		...session,
+		updatedAt: batch.updatedAt,
+		sourceAnalysisBatch: batch
+	};
+	await writeWorkflowSessionState(workspaceUri, nextSession);
 }
 
 export function getSourceAnalysisOutputFileName(index: number, sourceRelativePath: string): string {
@@ -123,6 +159,8 @@ export async function writeSourceAnalysisBatch(workspaceUri: vscode.Uri, batch: 
 		uri: batchUri,
 		content: toUtf8Bytes(buildBatchContent(batch))
 	}]);
+
+	await syncBatchIntoWorkflowSession(workspaceUri, batch);
 	}
 
 export async function initializeSourceAnalysisBatch(projectContext: ProjectContext): Promise<SourceAnalysisBatch> {
@@ -236,6 +274,54 @@ export async function updateSourceAnalysisJobStatus(
 
 	await writeSourceAnalysisBatch(workspaceUri, nextBatch);
 	return nextBatch;
+}
+
+export async function reconcileSourceAnalysisBatch(workspaceUri: vscode.Uri, batch: SourceAnalysisBatch): Promise<SourceAnalysisBatch> {
+	let didChange = false;
+	const reconciledJobs = await Promise.all(batch.jobs.map(async (job) => {
+		const outputUri = buildWorkspaceUri(workspaceUri, job.outputFile);
+		if (!outputUri) {
+			return job;
+		}
+
+		try {
+			const content = await readUtf8(outputUri);
+			if (!isCompletedAnalysisOutput(content, batch, job) || job.status === 'completed') {
+				return job;
+			}
+
+			didChange = true;
+			return {
+				...job,
+				status: 'completed' as const,
+				completedAt: job.completedAt ?? new Date().toISOString()
+			};
+		} catch {
+			return job;
+		}
+	}));
+
+	if (!didChange) {
+		await syncBatchIntoWorkflowSession(workspaceUri, batch);
+		return batch;
+	}
+
+	const nextBatch: SourceAnalysisBatch = {
+		...batch,
+		jobs: reconciledJobs,
+		updatedAt: new Date().toISOString()
+	};
+	await writeSourceAnalysisBatch(workspaceUri, nextBatch);
+	return nextBatch;
+}
+
+export async function readReconciledSourceAnalysisBatch(workspaceUri: vscode.Uri): Promise<SourceAnalysisBatch | undefined> {
+	const batch = await readSourceAnalysisBatch(workspaceUri);
+	if (!batch) {
+		return undefined;
+	}
+
+	return reconcileSourceAnalysisBatch(workspaceUri, batch);
 }
 
 export async function buildSourceAnalysisSynthesisSection(workspaceUri: vscode.Uri, batch: SourceAnalysisBatch): Promise<string> {

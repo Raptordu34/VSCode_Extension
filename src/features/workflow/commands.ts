@@ -7,7 +7,7 @@ import { buildSmartDefaultWorkflowPlan, openWorkspaceRelativeFile, promptForWork
 import { WORKFLOW_PRESETS } from './presets.js';
 import { gatherProjectContext, buildContextGenerationMessage } from '../context/contextBuilder.js';
 import { readWorkflowBrief, readWorkflowSessionState } from '../context/workflowPersistence.js';
-import { initializeSourceAnalysisBatch, readSourceAnalysisBatch, updateSourceAnalysisJobStatus, writeSourceAnalysisBatch } from '../context/sourceAnalysisBatch.js';
+import { initializeSourceAnalysisBatch, readReconciledSourceAnalysisBatch, updateSourceAnalysisJobStatus, writeSourceAnalysisBatch } from '../context/sourceAnalysisBatch.js';
 import { launchProvider } from '../aiAgents/agentLauncher.js';
 import { CONTEXT_FILE_NAME, WORKFLOW_SOURCE_ANALYSIS_BATCH_FILE } from './constants.js';
 import { WorkflowDashboardState, ProjectContext, WorkflowQuickPickItem, ProviderTarget, WorkflowPreset, ClaudeEffortLevel, WorkflowTreeNode, DocumentWorkflowIntentId, SourceAnalysisBatch, SourceAnalysisJob } from './types.js';
@@ -186,6 +186,20 @@ export function registerWorkflowCommands(
 			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose distributed source analysis you want to manage');
 			if (!workspaceFolder) {return;}
 			await runManageDistributedSourceAnalysisFlow(workspaceFolder);
+			EventBus.fire('refresh');
+		}),
+
+		vscode.commands.registerCommand('ai-context-orchestrator.openDistributedSourceAnalysisReport', async (relativePath?: string) => {
+			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose distributed source analysis report should be opened');
+			if (!workspaceFolder || !relativePath) {return;}
+			await openWorkspaceRelativeFile(workspaceFolder.uri, relativePath);
+			EventBus.fire('refresh');
+		}),
+
+		vscode.commands.registerCommand('ai-context-orchestrator.setDistributedSourceAnalysisJobStatus', async (jobId?: string, status?: SourceAnalysisJob['status']) => {
+			const workspaceFolder = await resolveCommandWorkspaceFolder('Choose the workspace folder whose distributed source analysis job should be updated');
+			if (!workspaceFolder || !jobId || !status) {return;}
+			await runSetDistributedSourceAnalysisJobStatusFlow(workspaceFolder, jobId, status);
 			EventBus.fire('refresh');
 		}),
 
@@ -648,36 +662,45 @@ async function runDistributedSourceAnalysisFlow(context: vscode.ExtensionContext
 		return;
 	}
 
+	const MAX_CONCURRENT_AGENTS = 3;
+	const LAUNCH_DELAY_MS = 2000;
+
 	let currentBatch = batch;
-	for (const job of selectedJobs) {
-		currentBatch = (await updateSourceAnalysisJobStatus(workspaceFolder.uri, job.id, 'running', 'Launched from the distributed source analysis command.')) ?? currentBatch;
-		const currentJob = currentBatch.jobs.find((candidate) => candidate.id === job.id) ?? job;
-		const jobWorkflowPlan = {
-			...projectContext.workflowPlan,
-			sourceAnalysisMode: 'distributed' as const,
-			sourceAnalysisBatchId: currentBatch.batchId,
-			sourceAnalysisJobId: currentJob.id,
-			targetSourceRelativePath: currentJob.sourceRelativePath,
-			targetSourceOutputFile: currentJob.outputFile
-		};
-		const jobContext: ProjectContext = {
-			...projectContext,
-			workflowPlan: jobWorkflowPlan,
-			sourceAnalysisBatch: currentBatch,
-			sourceAnalysisJob: currentJob,
-			workflowSession: {
-				...projectContext.workflowSession,
-				sourceAnalysisBatch: currentBatch
-			}
-		};
-		await launchProvider(context, jobWorkflowPlan, jobContext);
+	for (let i = 0; i < selectedJobs.length; i += MAX_CONCURRENT_AGENTS) {
+		const jobSlice = selectedJobs.slice(i, i + MAX_CONCURRENT_AGENTS);
+		for (const job of jobSlice) {
+			currentBatch = (await updateSourceAnalysisJobStatus(workspaceFolder.uri, job.id, 'running', 'Launched from the distributed source analysis command.')) ?? currentBatch;
+			const currentJob = currentBatch.jobs.find((candidate) => candidate.id === job.id) ?? job;
+			const jobWorkflowPlan = {
+				...projectContext.workflowPlan,
+				sourceAnalysisMode: 'distributed' as const,
+				sourceAnalysisBatchId: currentBatch.batchId,
+				sourceAnalysisJobId: currentJob.id,
+				targetSourceRelativePath: currentJob.sourceRelativePath,
+				targetSourceOutputFile: currentJob.outputFile
+			};
+			const jobContext: ProjectContext = {
+				...projectContext,
+				workflowPlan: jobWorkflowPlan,
+				sourceAnalysisBatch: currentBatch,
+				sourceAnalysisJob: currentJob,
+				workflowSession: {
+					...projectContext.workflowSession,
+					sourceAnalysisBatch: currentBatch
+				}
+			};
+			await launchProvider(context, jobWorkflowPlan, jobContext);
+		}
+		if (i + MAX_CONCURRENT_AGENTS < selectedJobs.length) {
+			await new Promise(resolve => setTimeout(resolve, LAUNCH_DELAY_MS));
+		}
 	}
 
 	void vscode.window.showInformationMessage(`${selectedJobs.length} source analysis terminal(s) launched for ${activeLearningDocument.title}.`);
 }
 
 async function runManageDistributedSourceAnalysisFlow(workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
-	const batch = await readSourceAnalysisBatch(workspaceFolder.uri);
+	const batch = await readReconciledSourceAnalysisBatch(workspaceFolder.uri);
 	if (!batch) {
 		void vscode.window.showInformationMessage('No distributed source analysis batch is available yet.');
 		return;
@@ -745,6 +768,27 @@ async function runManageDistributedSourceAnalysisFlow(workspaceFolder: vscode.Wo
 	void vscode.window.showInformationMessage(`${job.sourceLabel} marked as ${action.action}.`);
 }
 
+async function runSetDistributedSourceAnalysisJobStatusFlow(
+	workspaceFolder: vscode.WorkspaceFolder,
+	jobId: string,
+	status: SourceAnalysisJob['status']
+): Promise<void> {
+	const batch = await readReconciledSourceAnalysisBatch(workspaceFolder.uri);
+	if (!batch) {
+		void vscode.window.showInformationMessage('No distributed source analysis batch is available yet.');
+		return;
+	}
+
+	const job = batch.jobs.find((candidate) => candidate.id === jobId);
+	if (!job) {
+		void vscode.window.showWarningMessage('The selected distributed source analysis job could not be found.');
+		return;
+	}
+
+	await updateSourceAnalysisJobStatus(workspaceFolder.uri, job.id, status);
+	void vscode.window.showInformationMessage(`${job.sourceLabel} marked as ${status}.`);
+}
+
 async function runDistributedSourceSynthesisFlow(context: vscode.ExtensionContext, workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
 	const existingSession = await readWorkflowSessionState(workspaceFolder.uri);
 	if (!existingSession?.workflowId) {
@@ -752,7 +796,7 @@ async function runDistributedSourceSynthesisFlow(context: vscode.ExtensionContex
 		return;
 	}
 
-	const batch = await readSourceAnalysisBatch(workspaceFolder.uri);
+	const batch = await readReconciledSourceAnalysisBatch(workspaceFolder.uri);
 	if (!batch) {
 		void vscode.window.showInformationMessage('No distributed source analysis batch is available yet.');
 		return;
