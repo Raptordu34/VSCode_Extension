@@ -1,0 +1,36 @@
+/* learning-kit/templates/comparatif/components.css */
+@import url('../../design/base.css');
+
+.comparison-grid {
+    display: grid;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.comparison-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.compare-card {
+    background: linear-gradient(160deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.01) 40%, transparent 70%), rgba(255,255,255,0.04);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px;
+    padding: 1.5rem;
+}
+.compare-card.highlight { border-color: rgba(249,115,22,0.35); border-top-color: rgba(255,200,150,0.4); box-shadow: 0 0 20px rgba(249,115,22,0.1); }
+.compare-card h4 { margin: 0 0 0.8rem; color: var(--accent); }
+
+.verdict {
+    background: rgba(249,115,22,0.1);
+    border: 1px solid rgba(249,115,22,0.25);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin-top: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.verdict::before { content: '→ '; color: var(--accent); }

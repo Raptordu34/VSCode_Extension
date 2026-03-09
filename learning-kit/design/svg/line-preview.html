@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lines — SVG Preview</title>
+  <style>
+    body {
+      background: #1a1814;
+      color: #e8e4df;
+      font-family: 'Inter', system-ui, sans-serif;
+      padding: 2rem 3rem;
+      margin: 0;
+    }
+    h1 { color: #d67556; font-size: 1.4rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: #9e9a94; font-size: 0.85rem; margin-bottom: 3rem; }
+    .section-title {
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em;
+      text-transform: uppercase; color: #9e9a94;
+      margin: 2.5rem 0 1rem;
+      border-bottom: 1px solid #2e2b27; padding-bottom: 0.4rem;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; }
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      display: flex; flex-direction: column; align-items: flex-start;
+      gap: 0.75rem; min-width: 240px;
+    }
+    .card-label { font-size: 0.75rem; font-weight: 500; color: #b8b4ae; font-family: 'Menlo','Consolas',monospace; }
+    .card-canvas {
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.2); border-radius: 6px;
+      padding: 0.8rem 1rem; width: 100%; box-sizing: border-box;
+    }
+    .card-desc { font-size: 0.7rem; color: #6e6a64; line-height: 1.4; }
+
+    /* demo inline */
+    .inline-demo {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px; padding: 1rem 1.5rem;
+      font-size: 0.9rem; color: #e8e4df; margin-top: 1.5rem;
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    }
+    .label-tag {
+      font-size: 0.72rem; color: #d67556; background: rgba(214,117,86,0.1);
+      border: 1px solid rgba(214,117,86,0.25); border-radius: 4px;
+      padding: 0.15rem 0.5rem; font-family: 'Menlo','Consolas',monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Lines — SVG Elements</h1>
+  <p class="subtitle">Traits simples horizontaux et verticaux · <code style="color:#d67556">learning-kit/design/svg/lines.md</code></p>
+
+  <!-- HORIZONTAUX -->
+  <div class="section-title">Horizontaux — accent (#d67556)</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">line-h · thin</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6" stroke="#d67556" stroke-width="1" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">stroke-width 1 — séparateur léger</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">line-h · regular</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6" stroke="#d67556" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">stroke-width 2 — usage principal</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">line-h · thick</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6" stroke="#d67556" stroke-width="3.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">stroke-width 3.5 — emphase forte</div>
+    </div>
+
+  </div>
+
+  <!-- MUTED -->
+  <div class="section-title">Horizontaux — muted (#9e9a94)</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">line-h · muted thin</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6" stroke="#9e9a94" stroke-width="1" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">Relation secondaire, passif</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">line-h · muted regular</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6" stroke="#9e9a94" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">Axe de graphe, grille</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">line-h · white overlay</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6" stroke="rgba(255,255,255,0.18)" stroke-width="1" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">Séparateur sur fond sombre</div>
+    </div>
+
+  </div>
+
+  <!-- VERTICAUX -->
+  <div class="section-title">Verticaux</div>
+  <div class="row">
+
+    <div class="card" style="min-width:120px;">
+      <div class="card-label">line-v · accent</div>
+      <div class="card-canvas" style="min-height:100px;">
+        <svg width="12" height="80" viewBox="0 0 12 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="6" y1="4" x2="6" y2="76" stroke="#d67556" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">Séparateur vertical</div>
+    </div>
+
+    <div class="card" style="min-width:120px;">
+      <div class="card-label">line-v · muted</div>
+      <div class="card-canvas" style="min-height:100px;">
+        <svg width="12" height="80" viewBox="0 0 12 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="6" y1="4" x2="6" y2="76" stroke="#9e9a94" stroke-width="1" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">Axe, timeline</div>
+    </div>
+
+    <div class="card" style="min-width:120px;">
+      <div class="card-label">line-v · avec nœuds</div>
+      <div class="card-canvas" style="min-height:100px;">
+        <svg width="12" height="80" viewBox="0 0 12 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="6" y1="4" x2="6" y2="76" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="6" cy="4"  r="3" fill="#d67556"/>
+          <circle cx="6" cy="40" r="2.5" fill="none" stroke="#d67556" stroke-width="1.5"/>
+          <circle cx="6" cy="76" r="3" fill="#d67556"/>
+        </svg>
+      </div>
+      <div class="card-desc">Timeline avec points d'étape</div>
+    </div>
+
+    <div class="card" style="min-width:120px;">
+      <div class="card-label">line-v · thick accent</div>
+      <div class="card-canvas" style="min-height:100px;">
+        <svg width="12" height="80" viewBox="0 0 12 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="6" y1="4" x2="6" y2="76" stroke="#d67556" stroke-width="3.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">Barre de section, emphase</div>
+    </div>
+
+  </div>
+
+  <!-- USAGE DEMO -->
+  <div class="section-title">Exemple d'utilisation — séparateur de section</div>
+  <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1.5rem;">
+    <div style="font-size:0.85rem; color:#9e9a94; margin-bottom:0.75rem;">Partie I — Définitions</div>
+    <div style="display:flex; justify-content:flex-start;">
+      <svg width="80" height="4" viewBox="0 0 80 4" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="2" y1="2" x2="78" y2="2" stroke="#d67556" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div style="margin-top:0.75rem; font-size:0.9rem; color:#dedad5; line-height:1.6;">
+      Une définition est un énoncé qui précise le sens d'un terme…
+    </div>
+    <div style="margin: 1rem 0; display:flex; justify-content:center;">
+      <svg width="200" height="4" viewBox="0 0 200 4" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="4" y1="2" x2="196" y2="2" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div style="font-size:0.85rem; color:#9e9a94; margin-bottom:0.75rem;">Partie II — Théorèmes</div>
+    <div style="display:flex; justify-content:flex-start;">
+      <svg width="80" height="4" viewBox="0 0 80 4" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="2" y1="2" x2="78" y2="2" stroke="#d67556" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+
+</body>
+</html>

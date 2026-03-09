@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITRE}}</title>
+    <link rel="stylesheet" href="../../layouts/sidebar-iframe.css">
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="cursor-halo" id="cursor-halo"></div>
+
+    <div class="app-container">
+        <nav class="sidebar glass-panel">
+            <div class="sidebar-header">
+                <h1>{{TITRE}}</h1>
+                <p>{{SOUS_TITRE}}</p>
+            </div>
+            <div class="nav-links" id="nav-links">
+                <!-- Boutons nav générés ou à remplir manuellement -->
+                <!-- Exemple :
+                <button class="nav-btn active" onclick="loadSection('section-intro.html', this)">
+                    <span class="icon"><svg ...></svg></span> Introduction
+                </button>
+                -->
+                <button class="nav-btn" onclick="loadSection('section-EXAMPLE.html', this)">Exemple</button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div class="glass-panel content-wrapper">
+                <button id="toggle-view-btn" class="floating-toggle-btn" onclick="toggleMode()">
+                    <span>📄</span> Passer en Mode Résumé
+                </button>
+                <iframe id="content-frame" src="" frameborder="0"></iframe>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const halo = document.getElementById('cursor-halo');
+        function moveHalo(x, y) { halo.style.left = x + 'px'; halo.style.top = y + 'px'; }
+        document.addEventListener('mousemove', (e) => moveHalo(e.clientX, e.clientY));
+        function attachIframeHalo(frame) {
+            try { frame.contentWindow.document.addEventListener('mousemove', (e) => { const r = frame.getBoundingClientRect(); moveHalo(r.left + e.clientX, r.top + e.clientY); }); } catch(e) {}
+        }
+
+        let isCompactMode = localStorage.getItem('isCompactMode') === 'true';
+
+        window.onload = () => {
+            const buttons = document.querySelectorAll('.nav-btn');
+            if (!buttons.length) { updateToggleButtonUI(); return; }
+
+            const savedSection = localStorage.getItem('currentSection');
+            const firstSection = buttons[0].getAttribute('onclick').match(/'([^']+)'/)?.[1] || '';
+
+            // Vérifier que la section sauvegardée correspond à un bouton existant
+            const savedIsValid = savedSection && Array.from(buttons).some(b => b.getAttribute('onclick')?.includes(savedSection));
+            const target = savedIsValid ? savedSection : firstSection;
+
+            if (target) loadSection(target, null);
+            buttons.forEach(b => {
+                if (b.getAttribute('onclick')?.includes(target)) b.classList.add('active');
+            });
+            updateToggleButtonUI();
+        };
+
+        function loadSection(url, button) {
+            const frame = document.getElementById('content-frame');
+            frame.style.opacity = 0;
+            localStorage.setItem('currentSection', url);
+            setTimeout(() => {
+                frame.src = url;
+                frame.onload = () => {
+                    frame.style.opacity = 1;
+                    applyModeToFrame();
+                    attachIframeHalo(frame);
+                    const pos = localStorage.getItem('scroll_' + url);
+                    if (pos) frame.contentWindow.scrollTo(0, parseInt(pos));
+                    frame.contentWindow.addEventListener('scroll', () => {
+                        localStorage.setItem('scroll_' + url, frame.contentWindow.scrollY);
+                    });
+                };
+            }, 300);
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            if (button) button.classList.add('active');
+        }
+
+        function toggleMode() {
+            isCompactMode = !isCompactMode;
+            localStorage.setItem('isCompactMode', isCompactMode);
+            updateToggleButtonUI();
+            applyModeToFrame();
+        }
+
+        function updateToggleButtonUI() {
+            const btn = document.getElementById('toggle-view-btn');
+            btn.innerHTML = isCompactMode ? '<span>📖</span> Passer en Mode Détaillé' : '<span>📄</span> Passer en Mode Résumé';
+        }
+
+        function applyModeToFrame() {
+            const frame = document.getElementById('content-frame');
+            try {
+                const body = frame.contentWindow.document.body;
+                body.classList.toggle('mode-compact', isCompactMode);
+                body.classList.toggle('mode-detailed', !isCompactMode);
+                frame.contentWindow.document.querySelectorAll('.compact-content').forEach(el => {
+                    el.style.display = isCompactMode ? 'block' : 'none';
+                });
+            } catch(e) {}
+        }
+    </script>
+</body>
+</html>

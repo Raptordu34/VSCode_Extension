@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Callouts — SVG Preview</title>
+  <style>
+    body {
+      background: #1a1814;
+      color: #e8e4df;
+      font-family: 'Inter', system-ui, sans-serif;
+      padding: 2rem 3rem;
+      margin: 0;
+    }
+    h1 { color: #d67556; font-size: 1.4rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: #9e9a94; font-size: 0.85rem; margin-bottom: 3rem; }
+    .section-title {
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em;
+      text-transform: uppercase; color: #9e9a94;
+      margin: 2.5rem 0 1rem;
+      border-bottom: 1px solid #2e2b27; padding-bottom: 0.4rem;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; }
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      display: flex; flex-direction: column; align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .card-label { font-size: 0.75rem; font-weight: 500; color: #b8b4ae; font-family: 'Menlo','Consolas',monospace; }
+    .card-canvas {
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.2); border-radius: 6px;
+      padding: 1rem 1.2rem;
+    }
+    .card-desc { font-size: 0.7rem; color: #6e6a64; line-height: 1.4; }
+    .node-text { font-family: 'Inter', system-ui, sans-serif; }
+  </style>
+</head>
+<body>
+
+  <h1>Callouts — SVG Elements</h1>
+  <p class="subtitle">Bulles d'annotation avec queue directionnelle · <code style="color:#d67556">learning-kit/design/svg/callouts.md</code></p>
+
+  <!-- DIRECTIONS -->
+  <div class="section-title">Directions — accent terracotta</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">callout-right</div>
+      <div class="card-canvas">
+        <svg width="144" height="40" viewBox="0 0 144 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="118" height="38" rx="8"
+            fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5"/>
+          <polygon points="119,14 141,20 119,26"
+            fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5" stroke-linejoin="round"/>
+          <line x1="119" y1="15" x2="119" y2="25" stroke="rgba(214,117,86,0.1)" stroke-width="2.5"/>
+          <text x="60" y="24" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#dedad5">annotation</text>
+        </svg>
+      </div>
+      <div class="card-desc">Queue à droite — annote un élément à droite</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">callout-left</div>
+      <div class="card-canvas">
+        <svg width="144" height="40" viewBox="0 0 144 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="25" y="1" width="118" height="38" rx="8"
+            fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5"/>
+          <polygon points="25,14 3,20 25,26"
+            fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5" stroke-linejoin="round"/>
+          <line x1="25" y1="15" x2="25" y2="25" stroke="rgba(214,117,86,0.1)" stroke-width="2.5"/>
+          <text x="84" y="24" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#dedad5">annotation</text>
+        </svg>
+      </div>
+      <div class="card-desc">Queue à gauche — annote un élément à gauche</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">callout-bottom</div>
+      <div class="card-canvas">
+        <svg width="130" height="58" viewBox="0 0 130 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="128" height="36" rx="8"
+            fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5"/>
+          <polygon points="57,37 65,56 73,37"
+            fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5" stroke-linejoin="round"/>
+          <line x1="58" y1="37" x2="72" y2="37" stroke="rgba(214,117,86,0.1)" stroke-width="2.5"/>
+          <text x="65" y="23" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#dedad5">annotation</text>
+        </svg>
+      </div>
+      <div class="card-desc">Queue en bas — annote un élément en dessous</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">callout-top</div>
+      <div class="card-canvas">
+        <svg width="130" height="58" viewBox="0 0 130 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="21" width="128" height="36" rx="8"
+            fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5"/>
+          <polygon points="57,21 65,2 73,21"
+            fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5" stroke-linejoin="round"/>
+          <line x1="58" y1="21" x2="72" y2="21" stroke="rgba(214,117,86,0.1)" stroke-width="2.5"/>
+          <text x="65" y="43" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#dedad5">annotation</text>
+        </svg>
+      </div>
+      <div class="card-desc">Queue en haut — annote un élément au-dessus</div>
+    </div>
+
+  </div>
+
+  <!-- COULEURS -->
+  <div class="section-title">Variantes de couleur</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">accent · terracotta</div>
+      <div class="card-canvas">
+        <svg width="144" height="40" viewBox="0 0 144 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="118" height="38" rx="8"
+            fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5"/>
+          <polygon points="119,14 141,20 119,26" fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5" stroke-linejoin="round"/>
+          <line x1="119" y1="15" x2="119" y2="25" stroke="rgba(214,117,86,0.1)" stroke-width="2.5"/>
+          <text x="60" y="24" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#d67556" font-weight="500">Important</text>
+        </svg>
+      </div>
+      <div class="card-desc">Usage général, mise en évidence</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">teal · scientifique</div>
+      <div class="card-canvas">
+        <svg width="144" height="40" viewBox="0 0 144 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="118" height="38" rx="8"
+            fill="rgba(91,166,160,0.1)" stroke="#5ba6a0" stroke-width="1.5"/>
+          <polygon points="119,14 141,20 119,26" fill="rgba(91,166,160,0.1)" stroke="#5ba6a0" stroke-width="1.5" stroke-linejoin="round"/>
+          <line x1="119" y1="15" x2="119" y2="25" stroke="rgba(91,166,160,0.1)" stroke-width="2.5"/>
+          <text x="60" y="24" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#5ba6a0" font-weight="500">Définition</text>
+        </svg>
+      </div>
+      <div class="card-desc">Contenu scientifique, théorèmes</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">muted · neutre</div>
+      <div class="card-canvas">
+        <svg width="144" height="40" viewBox="0 0 144 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="118" height="38" rx="8"
+            fill="rgba(158,154,148,0.08)" stroke="#9e9a94" stroke-width="1.5"/>
+          <polygon points="119,14 141,20 119,26" fill="rgba(158,154,148,0.08)" stroke="#9e9a94" stroke-width="1.5" stroke-linejoin="round"/>
+          <line x1="119" y1="15" x2="119" y2="25" stroke="rgba(158,154,148,0.08)" stroke-width="2.5"/>
+          <text x="60" y="24" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#9e9a94">Note</text>
+        </svg>
+      </div>
+      <div class="card-desc">Commentaire secondaire, aparté</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">white · overlay</div>
+      <div class="card-canvas">
+        <svg width="144" height="40" viewBox="0 0 144 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="118" height="38" rx="8"
+            fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+          <polygon points="119,14 141,20 119,26" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linejoin="round"/>
+          <line x1="119" y1="15" x2="119" y2="25" stroke="rgba(255,255,255,0.07)" stroke-width="2.5"/>
+          <text x="60" y="24" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="10" fill="rgba(255,255,255,0.7)">Neutre</text>
+        </svg>
+      </div>
+      <div class="card-desc">Sur fond sombre, glassmorphisme</div>
+    </div>
+
+  </div>
+
+  <!-- BRACKET-LABEL -->
+  <div class="section-title">Bracket-label — crochet avec annotation</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">bracket-right</div>
+      <div class="card-canvas" style="min-height:90px;">
+        <svg width="16" height="80" viewBox="0 0 16 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="10" y1="2" x2="10" y2="78" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="10" y1="2"  x2="3"  y2="2"  stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="10" y1="78" x2="3"  y2="78" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">Crochet ] — délimite une zone à annoter à droite</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">bracket-left</div>
+      <div class="card-canvas" style="min-height:90px;">
+        <svg width="16" height="80" viewBox="0 0 16 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="6" y1="2" x2="6" y2="78" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="6" y1="2"  x2="13" y2="2"  stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="6" y1="78" x2="13" y2="78" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">Crochet [ — délimite une zone à annoter à gauche</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">bracket-top (horizontal)</div>
+      <div class="card-canvas">
+        <svg width="120" height="16" viewBox="0 0 120 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="2"  y1="10" x2="118" y2="10" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="2"  y1="10" x2="2"   y2="3"  stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="118" y1="10" x2="118" y2="3" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">Crochet horizontal — délimite une zone en bas</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">bracket-bottom (horizontal)</div>
+      <div class="card-canvas">
+        <svg width="120" height="16" viewBox="0 0 120 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="2"  y1="6" x2="118" y2="6"  stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="2"  y1="6" x2="2"   y2="13" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="118" y1="6" x2="118" y2="13" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-desc">Crochet horizontal — délimite une zone en haut</div>
+    </div>
+
+  </div>
+
+  <!-- USAGE -->
+  <div class="section-title">Exemples d'utilisation</div>
+
+  <!-- Annotation de code -->
+  <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1.5rem 2rem; display:flex; align-items:center; gap:1.5rem;">
+    <div style="font-family:'Menlo','Consolas',monospace; font-size:0.82rem; color:#dedad5; line-height:2; white-space:pre;">def merge_sort(arr):
+    if len(arr) &lt;= 1:
+        return arr
+    mid = len(arr) // 2
+    return merge(merge_sort(arr[:mid]),
+                 merge_sort(arr[mid:]))</div>
+    <div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">
+      <svg width="16" height="96" viewBox="0 0 16 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="10" y1="2" x2="10" y2="94" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="10" y1="2"  x2="3"  y2="2"  stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="10" y1="94" x2="3"  y2="94" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <svg width="160" height="40" viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="25" y="1" width="134" height="38" rx="8"
+          fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5"/>
+        <polygon points="25,14 3,20 25,26" fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5" stroke-linejoin="round"/>
+        <line x1="25" y1="15" x2="25" y2="25" stroke="rgba(214,117,86,0.1)" stroke-width="2.5"/>
+        <text x="92" y="19" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="9.5" fill="#d67556" font-weight="600">divide &amp; conquer</text>
+        <text x="92" y="32" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="9" fill="#9e9a94">O(n log n)</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Annotation de schéma -->
+  <div style="margin-top:1.5rem; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1.5rem 2rem;">
+    <div style="display:flex; align-items:center; justify-content:center; gap:0; position:relative;">
+
+      <svg width="420" height="80" viewBox="0 0 420 80" fill="none" xmlns="http://www.w3.org/2000/svg"
+           style="font-family:'Inter',system-ui,sans-serif;">
+        <!-- Bloc central -->
+        <rect x="145" y="22" width="130" height="36" rx="7"
+          fill="rgba(214,117,86,0.08)" stroke="#d67556" stroke-width="1.5"/>
+        <text x="210" y="44" text-anchor="middle" font-size="11" fill="#dedad5">Algorithme</text>
+
+        <!-- Callout bas gauche -->
+        <rect x="10" y="38" width="110" height="32" rx="7"
+          fill="rgba(91,166,160,0.1)" stroke="#5ba6a0" stroke-width="1.5"/>
+        <polygon points="120,48 140,44 120,60" fill="rgba(91,166,160,0.1)" stroke="#5ba6a0" stroke-width="1.5" stroke-linejoin="round"/>
+        <line x1="120" y1="49" x2="120" y2="59" stroke="rgba(91,166,160,0.1)" stroke-width="2.5"/>
+        <text x="65" y="58" text-anchor="middle" font-size="9.5" fill="#5ba6a0">entrée : O(n)</text>
+
+        <!-- Callout bas droite -->
+        <rect x="300" y="38" width="110" height="32" rx="7"
+          fill="rgba(158,154,148,0.08)" stroke="#9e9a94" stroke-width="1.5"/>
+        <polygon points="300,48 280,44 300,60" fill="rgba(158,154,148,0.08)" stroke="#9e9a94" stroke-width="1.5" stroke-linejoin="round"/>
+        <line x1="300" y1="49" x2="300" y2="59" stroke="rgba(158,154,148,0.08)" stroke-width="2.5"/>
+        <text x="355" y="58" text-anchor="middle" font-size="9.5" fill="#9e9a94">sortie : trié</text>
+      </svg>
+
+    </div>
+  </div>
+
+</body>
+</html>

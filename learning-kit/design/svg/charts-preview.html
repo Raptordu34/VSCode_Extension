@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Charts — SVG Preview</title>
+  <style>
+    body {
+      background: #1a1814;
+      color: #e8e4df;
+      font-family: 'Inter', system-ui, sans-serif;
+      padding: 2rem 3rem;
+      margin: 0;
+    }
+    h1 { color: #d67556; font-size: 1.4rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: #9e9a94; font-size: 0.85rem; margin-bottom: 3rem; }
+    .section-title {
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em;
+      text-transform: uppercase; color: #9e9a94;
+      margin: 2.5rem 0 1rem;
+      border-bottom: 1px solid #2e2b27; padding-bottom: 0.4rem;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; }
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 1.5rem 1.75rem;
+      display: flex; flex-direction: column; align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .card-label { font-size: 0.75rem; font-weight: 500; color: #b8b4ae; font-family: 'Menlo','Consolas',monospace; }
+    .card-desc { font-size: 0.7rem; color: #6e6a64; line-height: 1.4; }
+  </style>
+</head>
+<body>
+
+  <h1>Charts — SVG Templates</h1>
+  <p class="subtitle">Graphiques statiques avec données fictives · <code style="color:#d67556">learning-kit/design/svg/charts.md</code></p>
+  <p style="font-size:0.78rem; color:#6e6a64; max-width:520px; line-height:1.5; margin-bottom:2rem;">
+    Ces SVG sont des <strong style="color:#9e9a94">templates à données fixes</strong> — remplacer les coordonnées et valeurs pour les adapter.
+    Pas de JavaScript requis.
+  </p>
+
+  <!-- BAR CHART HORIZONTAL -->
+  <div class="section-title">chart-bar-h — Barres horizontales</div>
+  <div class="row">
+    <div class="card">
+      <div class="card-label">chart-bar-h · 320×180</div>
+      <svg width="320" height="180" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg"
+           style="font-family:'Inter',system-ui,sans-serif;">
+
+        <!-- Axe Y (vertical) -->
+        <line x1="80" y1="10" x2="80" y2="155" stroke="#9e9a94" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+        <!-- Axe X (horizontal) -->
+        <line x1="80" y1="155" x2="310" y2="155" stroke="#9e9a94" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+
+        <!-- Barre 1 — Python 85% -->
+        <rect x="80" y="18" width="198" height="18" rx="3" fill="rgba(214,117,86,0.8)"/>
+        <text x="75" y="31" text-anchor="end" font-size="9" fill="#9e9a94">Python</text>
+        <text x="284" y="31" font-size="9" fill="#d67556" font-weight="500">85%</text>
+
+        <!-- Barre 2 — JavaScript 72% -->
+        <rect x="80" y="46" width="169" height="18" rx="3" fill="rgba(214,117,86,0.6)"/>
+        <text x="75" y="59" text-anchor="end" font-size="9" fill="#9e9a94">JavaScript</text>
+        <text x="255" y="59" font-size="9" fill="#d67556" font-weight="500">72%</text>
+
+        <!-- Barre 3 — Rust 60% -->
+        <rect x="80" y="74" width="140" height="18" rx="3" fill="rgba(214,117,86,0.45)"/>
+        <text x="75" y="87" text-anchor="end" font-size="9" fill="#9e9a94">Rust</text>
+        <text x="226" y="87" font-size="9" fill="#d67556" font-weight="500">60%</text>
+
+        <!-- Barre 4 — Go 48% -->
+        <rect x="80" y="102" width="112" height="18" rx="3" fill="rgba(91,166,160,0.55)"/>
+        <text x="75" y="115" text-anchor="end" font-size="9" fill="#9e9a94">Go</text>
+        <text x="198" y="115" font-size="9" fill="#5ba6a0" font-weight="500">48%</text>
+
+        <!-- Barre 5 — C++ 35% -->
+        <rect x="80" y="130" width="82" height="18" rx="3" fill="rgba(158,154,148,0.35)"/>
+        <text x="75" y="143" text-anchor="end" font-size="9" fill="#9e9a94">C++</text>
+        <text x="168" y="143" font-size="9" fill="#9e9a94" font-weight="500">35%</text>
+
+        <!-- Titre -->
+        <text x="195" y="170" text-anchor="middle" font-size="9" fill="#6e6a64">Popularité des langages (fictif)</text>
+      </svg>
+      <div class="card-desc">Comparatif horizontal — idéal pour listes de catégories</div>
+    </div>
+  </div>
+
+  <!-- BAR CHART VERTICAL -->
+  <div class="section-title">chart-bar-v — Barres verticales</div>
+  <div class="row">
+    <div class="card">
+      <div class="card-label">chart-bar-v · 280×180</div>
+      <svg width="280" height="180" viewBox="0 0 280 180" fill="none" xmlns="http://www.w3.org/2000/svg"
+           style="font-family:'Inter',system-ui,sans-serif;">
+
+        <!-- Lignes de grille horizontales -->
+        <line x1="30" y1="20"  x2="270" y2="20"  stroke="#9e9a94" stroke-width="0.5" opacity="0.2"/>
+        <line x1="30" y1="52"  x2="270" y2="52"  stroke="#9e9a94" stroke-width="0.5" opacity="0.2"/>
+        <line x1="30" y1="84"  x2="270" y2="84"  stroke="#9e9a94" stroke-width="0.5" opacity="0.2"/>
+        <line x1="30" y1="116" x2="270" y2="116" stroke="#9e9a94" stroke-width="0.5" opacity="0.2"/>
+
+        <!-- Labels axe Y -->
+        <text x="26" y="23"  text-anchor="end" font-size="8" fill="#6e6a64">100</text>
+        <text x="26" y="55"  text-anchor="end" font-size="8" fill="#6e6a64">75</text>
+        <text x="26" y="87"  text-anchor="end" font-size="8" fill="#6e6a64">50</text>
+        <text x="26" y="119" text-anchor="end" font-size="8" fill="#6e6a64">25</text>
+
+        <!-- Axe X -->
+        <line x1="30" y1="148" x2="270" y2="148" stroke="#9e9a94" stroke-width="1" opacity="0.4" stroke-linecap="round"/>
+
+        <!-- Barres (hauteur max = 128px pour 100%) -->
+        <!-- Q1 → 62% = 79px -->
+        <rect x="42"  y="69" width="28" height="79" rx="3" fill="rgba(214,117,86,0.55)"/>
+        <text x="56"  y="161" text-anchor="middle" font-size="8" fill="#9e9a94">Q1</text>
+        <text x="56"  y="64"  text-anchor="middle" font-size="8" fill="#d67556">62%</text>
+
+        <!-- Q2 → 78% = 100px -->
+        <rect x="90"  y="48" width="28" height="100" rx="3" fill="rgba(214,117,86,0.7)"/>
+        <text x="104" y="161" text-anchor="middle" font-size="8" fill="#9e9a94">Q2</text>
+        <text x="104" y="43"  text-anchor="middle" font-size="8" fill="#d67556">78%</text>
+
+        <!-- Q3 → 91% = 116px -->
+        <rect x="138" y="32" width="28" height="116" rx="3" fill="rgba(214,117,86,0.85)"/>
+        <text x="152" y="161" text-anchor="middle" font-size="8" fill="#9e9a94">Q3</text>
+        <text x="152" y="27"  text-anchor="middle" font-size="8" fill="#d67556" font-weight="600">91%</text>
+
+        <!-- Q4 → 85% = 109px -->
+        <rect x="186" y="39" width="28" height="109" rx="3" fill="rgba(214,117,86,0.75)"/>
+        <text x="200" y="161" text-anchor="middle" font-size="8" fill="#9e9a94">Q4</text>
+        <text x="200" y="34"  text-anchor="middle" font-size="8" fill="#d67556">85%</text>
+
+        <!-- Moyen → 55% = 70px -->
+        <rect x="234" y="78" width="28" height="70" rx="3" fill="rgba(91,166,160,0.5)"/>
+        <text x="248" y="161" text-anchor="middle" font-size="8" fill="#9e9a94">Moy.</text>
+        <text x="248" y="73"  text-anchor="middle" font-size="8" fill="#5ba6a0">55%</text>
+
+        <!-- Titre -->
+        <text x="150" y="175" text-anchor="middle" font-size="9" fill="#6e6a64">Performance par trimestre</text>
+      </svg>
+      <div class="card-desc">Évolution temporelle — séries comparées sur périodes</div>
+    </div>
+  </div>
+
+  <!-- DONUT CHART -->
+  <div class="section-title">chart-donut — Camembert / Donut</div>
+  <div class="row">
+    <div class="card">
+      <div class="card-label">chart-donut · 200×200</div>
+      <!--
+        Donut SVG : chaque arc est un <circle> avec stroke-dasharray.
+        Rayon r=54, Circonférence = 2π×54 ≈ 339.3
+        Chaque segment : dash = (valeur% × 339.3), gap = reste
+        stroke-dashoffset décale le point de départ.
+
+        Segments (total 100%) :
+        A = 42% → dash=142.5  offset=0
+        B = 28% → dash=94.9   offset=-142.5  (= -(A))
+        C = 18% → dash=61.1   offset=-237.4  (= -(A+B))
+        D = 12% → dash=40.7   offset=-298.5  (= -(A+B+C))
+        Rotation -90° pour partir du haut (transform rotate(-90) sur le centre)
+      -->
+      <svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg"
+           style="font-family:'Inter',system-ui,sans-serif;">
+        <g transform="rotate(-90 100 100)">
+          <!-- Segment A — 42% — terracotta -->
+          <circle cx="100" cy="100" r="54" fill="none"
+            stroke="#d67556" stroke-width="22" stroke-opacity="0.85"
+            stroke-dasharray="142.5 339.3"
+            stroke-dashoffset="0"
+            stroke-linecap="butt"/>
+          <!-- Segment B — 28% — teal -->
+          <circle cx="100" cy="100" r="54" fill="none"
+            stroke="#5ba6a0" stroke-width="22" stroke-opacity="0.75"
+            stroke-dasharray="94.9 339.3"
+            stroke-dashoffset="-142.5"
+            stroke-linecap="butt"/>
+          <!-- Segment C — 18% — muted -->
+          <circle cx="100" cy="100" r="54" fill="none"
+            stroke="#9e9a94" stroke-width="22" stroke-opacity="0.6"
+            stroke-dasharray="61.1 339.3"
+            stroke-dashoffset="-237.4"
+            stroke-linecap="butt"/>
+          <!-- Segment D — 12% — blanc translucide -->
+          <circle cx="100" cy="100" r="54" fill="none"
+            stroke="rgba(255,255,255,0.25)" stroke-width="22"
+            stroke-dasharray="40.7 339.3"
+            stroke-dashoffset="-298.5"
+            stroke-linecap="butt"/>
+        </g>
+        <!-- Trou central -->
+        <circle cx="100" cy="100" r="42" fill="#1a1814"/>
+        <!-- Valeur centrale -->
+        <text x="100" y="96" text-anchor="middle" font-size="18" font-weight="700" fill="#d67556">42%</text>
+        <text x="100" y="110" text-anchor="middle" font-size="8" fill="#9e9a94">principal</text>
+
+        <!-- Légende -->
+        <rect x="10" y="168" width="8" height="8" rx="2" fill="#d67556" opacity="0.85"/>
+        <text x="22" y="176" font-size="8" fill="#9e9a94">Catégorie A (42%)</text>
+        <rect x="10" y="182" width="8" height="8" rx="2" fill="#5ba6a0" opacity="0.75"/>
+        <text x="22" y="190" font-size="8" fill="#9e9a94">Catégorie B (28%)</text>
+        <rect x="110" y="168" width="8" height="8" rx="2" fill="#9e9a94" opacity="0.6"/>
+        <text x="122" y="176" font-size="8" fill="#9e9a94">Catégorie C (18%)</text>
+        <rect x="110" y="182" width="8" height="8" rx="2" fill="rgba(255,255,255,0.25)"/>
+        <text x="122" y="190" font-size="8" fill="#9e9a94">Catégorie D (12%)</text>
+      </svg>
+      <div class="card-desc">Répartition de parts — technique stroke-dasharray sur cercle</div>
+    </div>
+  </div>
+
+  <!-- LINE CHART -->
+  <div class="section-title">chart-line — Courbe avec axes</div>
+  <div class="row">
+    <div class="card">
+      <div class="card-label">chart-line · 320×180</div>
+      <svg width="320" height="180" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg"
+           style="font-family:'Inter',system-ui,sans-serif;">
+
+        <!-- Grille -->
+        <line x1="40" y1="20"  x2="310" y2="20"  stroke="#9e9a94" stroke-width="0.5" opacity="0.15"/>
+        <line x1="40" y1="55"  x2="310" y2="55"  stroke="#9e9a94" stroke-width="0.5" opacity="0.15"/>
+        <line x1="40" y1="90"  x2="310" y2="90"  stroke="#9e9a94" stroke-width="0.5" opacity="0.15"/>
+        <line x1="40" y1="125" x2="310" y2="125" stroke="#9e9a94" stroke-width="0.5" opacity="0.15"/>
+
+        <!-- Axes -->
+        <line x1="40" y1="15" x2="40" y2="148" stroke="#9e9a94" stroke-width="1" opacity="0.4" stroke-linecap="round"/>
+        <line x1="40" y1="148" x2="315" y2="148" stroke="#9e9a94" stroke-width="1" opacity="0.4" stroke-linecap="round"/>
+
+        <!-- Labels axe Y -->
+        <text x="36" y="23"  text-anchor="end" font-size="8" fill="#6e6a64">100</text>
+        <text x="36" y="58"  text-anchor="end" font-size="8" fill="#6e6a64">75</text>
+        <text x="36" y="93"  text-anchor="end" font-size="8" fill="#6e6a64">50</text>
+        <text x="36" y="128" text-anchor="end" font-size="8" fill="#6e6a64">25</text>
+
+        <!-- Labels axe X -->
+        <text x="63"  y="160" text-anchor="middle" font-size="8" fill="#6e6a64">Jan</text>
+        <text x="109" y="160" text-anchor="middle" font-size="8" fill="#6e6a64">Mar</text>
+        <text x="155" y="160" text-anchor="middle" font-size="8" fill="#6e6a64">Mai</text>
+        <text x="201" y="160" text-anchor="middle" font-size="8" fill="#6e6a64">Juil</text>
+        <text x="247" y="160" text-anchor="middle" font-size="8" fill="#6e6a64">Sep</text>
+        <text x="293" y="160" text-anchor="middle" font-size="8" fill="#6e6a64">Nov</text>
+
+        <!-- Aire sous la courbe principale (fill) -->
+        <path d="M 63 108 C 80 100, 95 90, 109 85
+                   C 125 80, 138 60, 155 52
+                   C 170 44, 185 48, 201 42
+                   C 217 36, 232 28, 247 32
+                   C 263 36, 278 55, 293 50
+                   L 293 148 L 63 148 Z"
+          fill="url(#grad-line)" opacity="0.3"/>
+        <defs>
+          <linearGradient id="grad-line" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#d67556" stop-opacity="0.6"/>
+            <stop offset="100%" stop-color="#d67556" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Courbe principale -->
+        <path d="M 63 108 C 80 100, 95 90, 109 85
+                   C 125 80, 138 60, 155 52
+                   C 170 44, 185 48, 201 42
+                   C 217 36, 232 28, 247 32
+                   C 263 36, 278 55, 293 50"
+          stroke="#d67556" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- Courbe secondaire (teal) -->
+        <path d="M 63 125 C 80 120, 95 115, 109 110
+                   C 125 104, 138 98, 155 95
+                   C 170 92, 185 88, 201 84
+                   C 217 80, 232 76, 247 72
+                   C 263 68, 278 74, 293 70"
+          stroke="#5ba6a0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 3"/>
+
+        <!-- Points de données (courbe principale) -->
+        <circle cx="63"  cy="108" r="3" fill="#d67556"/>
+        <circle cx="109" cy="85"  r="3" fill="#d67556"/>
+        <circle cx="155" cy="52"  r="3" fill="#d67556"/>
+        <circle cx="201" cy="42"  r="4" fill="#d67556" stroke="#1a1814" stroke-width="1.5"/><!-- max -->
+        <circle cx="247" cy="32"  r="3" fill="#d67556"/>
+        <circle cx="293" cy="50"  r="3" fill="#d67556"/>
+
+        <!-- Annotation max -->
+        <line x1="201" y1="42" x2="201" y2="28" stroke="#d67556" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>
+        <text x="205" y="26" font-size="8" fill="#d67556" font-weight="600">max</text>
+
+        <!-- Légende -->
+        <line x1="40" y1="172" x2="58" y2="172" stroke="#d67556" stroke-width="2"/>
+        <text x="62" y="175" font-size="8" fill="#9e9a94">Série A</text>
+        <line x1="110" y1="172" x2="128" y2="172" stroke="#5ba6a0" stroke-width="1.5" stroke-dasharray="5 3"/>
+        <text x="132" y="175" font-size="8" fill="#9e9a94">Série B</text>
+      </svg>
+      <div class="card-desc">Tendance temporelle avec deux séries et aire sous courbe</div>
+    </div>
+  </div>
+
+  <!-- SPARKLINE -->
+  <div class="section-title">chart-sparkline — Mini courbe inline</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">sparkline · 80×24</div>
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <svg width="80" height="24" viewBox="0 0 80 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 2 18 C 12 16, 18 12, 26 10 C 34 8, 40 14, 50 8 C 58 4, 66 6, 78 4"
+            stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="78" cy="4" r="2.5" fill="#d67556"/>
+        </svg>
+        <span style="font-size:0.85rem; color:#dedad5;">Performance <span style="color:#d67556; font-weight:600;">↑ 12%</span></span>
+      </div>
+      <div class="card-desc">Inline sans axes — tendance dans un tableau ou une métrique</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">sparkline · négatif</div>
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <svg width="80" height="24" viewBox="0 0 80 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 2 6 C 12 8, 20 6, 30 10 C 40 14, 48 10, 58 16 C 66 20, 72 18, 78 20"
+            stroke="#9e9a94" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="78" cy="20" r="2.5" fill="#9e9a94"/>
+        </svg>
+        <span style="font-size:0.85rem; color:#dedad5;">Latence <span style="color:#9e9a94; font-weight:600;">↓ 8%</span></span>
+      </div>
+      <div class="card-desc">Tendance descendante, couleur muted</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">sparkline · barres</div>
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <svg width="60" height="24" viewBox="0 0 60 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2"  y="14" width="5" height="8"  rx="1.5" fill="rgba(214,117,86,0.5)"/>
+          <rect x="10" y="10" width="5" height="12" rx="1.5" fill="rgba(214,117,86,0.6)"/>
+          <rect x="18" y="16" width="5" height="6"  rx="1.5" fill="rgba(214,117,86,0.45)"/>
+          <rect x="26" y="6"  width="5" height="16" rx="1.5" fill="rgba(214,117,86,0.75)"/>
+          <rect x="34" y="8"  width="5" height="14" rx="1.5" fill="rgba(214,117,86,0.7)"/>
+          <rect x="42" y="4"  width="5" height="18" rx="1.5" fill="#d67556"/>
+          <rect x="50" y="9"  width="5" height="13" rx="1.5" fill="rgba(214,117,86,0.65)"/>
+        </svg>
+        <span style="font-size:0.85rem; color:#dedad5;">Volume <span style="color:#d67556; font-weight:600;">+34</span></span>
+      </div>
+      <div class="card-desc">Micro bar chart — histogramme compact</div>
+    </div>
+
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,40 @@
+/* learning-kit/templates/fiche-revision/components.css */
+@import url('../../design/base.css');
+
+.revision-card {
+    background: linear-gradient(160deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.01) 40%, transparent 70%), rgba(255,255,255,0.04);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-left: 4px solid var(--accent);
+    border-radius: 14px;
+    padding: 1.2rem 1.5rem;
+    margin-bottom: 1rem;
+}
+.revision-card .question { font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem; font-size: 1.1rem; }
+.revision-card .answer { color: var(--text-body); font-size: 1.05rem; }
+
+.badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-left: 0.5rem;
+}
+.badge-high { background: rgba(249,115,22,0.25); color: var(--accent); border: 1px solid rgba(249,115,22,0.4); }
+.badge-med  { background: rgba(148,163,184,0.15); color: var(--text-secondary); border: 1px solid rgba(148,163,184,0.3); }
+.badge-low  { background: rgba(100,116,139,0.1); color: var(--text-secondary); border: 1px solid rgba(100,116,139,0.2); }
+
+.theme-title {
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin: 2rem 0 0.8rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid rgba(249,115,22,0.3);
+}

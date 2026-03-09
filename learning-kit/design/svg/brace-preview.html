@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Braces — SVG Preview</title>
+  <style>
+    body {
+      background: #1a1814;
+      color: #e8e4df;
+      font-family: 'Inter', system-ui, sans-serif;
+      padding: 2rem 3rem;
+      margin: 0;
+    }
+    h1 { color: #d67556; font-size: 1.4rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: #9e9a94; font-size: 0.85rem; margin-bottom: 3rem; }
+    .section-title {
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em;
+      text-transform: uppercase; color: #9e9a94;
+      margin: 2.5rem 0 1rem;
+      border-bottom: 1px solid #2e2b27; padding-bottom: 0.4rem;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; }
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      display: flex; flex-direction: column; align-items: flex-start;
+      gap: 0.75rem; min-width: 200px;
+    }
+    .card-label { font-size: 0.75rem; font-weight: 500; color: #b8b4ae; font-family: 'Menlo','Consolas',monospace; }
+    .card-canvas {
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.2); border-radius: 6px;
+      padding: 0.8rem 1rem; width: 100%; box-sizing: border-box;
+    }
+    .card-desc { font-size: 0.7rem; color: #6e6a64; line-height: 1.4; }
+
+    /* layout pour demo inline avec accolade */
+    .annotated {
+      display: flex; flex-direction: column; align-items: center; gap: 0;
+    }
+    .annotated-content {
+      display: flex; gap: 0.5rem; align-items: center;
+    }
+    .anno-label {
+      font-size: 0.72rem; color: #d67556;
+      font-style: italic; margin-top: 2px;
+    }
+
+    /* demo horizontal avec contenu */
+    .h-annotate {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 0;
+    }
+    .h-annotate-label {
+      font-size: 0.7rem; color: #d67556; margin-left: 0;
+      align-self: center;
+    }
+
+    .code-block {
+      background: rgba(214,117,86,0.06); border: 1px solid rgba(214,117,86,0.15);
+      border-radius: 6px; padding: 0.6rem 1rem;
+      font-family: 'Menlo','Consolas',monospace; font-size: 0.78rem;
+      color: #dedad5; line-height: 1.8; white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Braces — SVG Elements</h1>
+  <p class="subtitle">Accolades courbes pour grouper et annoter · <code style="color:#d67556">learning-kit/design/svg/braces.md</code></p>
+  <p style="font-size:0.8rem; color:#6e6a64; max-width:480px; line-height:1.5; margin-bottom:2rem;">
+    Construites avec deux beziers cubiques symétriques.
+    La "pointe" centrale indique la direction de l'annotation.
+  </p>
+
+  <!-- HORIZONTALES -->
+  <div class="section-title">Horizontales (200×28)</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">brace-bottom ⌣</div>
+      <div class="card-canvas">
+        <svg width="200" height="28" viewBox="0 0 200 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Pointe vers le bas — annote ce qui est AU-DESSUS -->
+          <path d="M 4 4 C 0 4, 0 24, 100 24 C 200 24, 200 4, 196 4"
+            stroke="#d67556" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="card-desc">Pointe vers le bas — annote le contenu au-dessus</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">brace-top ⌢</div>
+      <div class="card-canvas">
+        <svg width="200" height="28" viewBox="0 0 200 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Pointe vers le haut — annote ce qui est EN-DESSOUS -->
+          <path d="M 4 24 C 0 24, 0 4, 100 4 C 200 4, 200 24, 196 24"
+            stroke="#d67556" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="card-desc">Pointe vers le haut — annote le contenu en-dessous</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">brace-bottom · muted</div>
+      <div class="card-canvas">
+        <svg width="200" height="28" viewBox="0 0 200 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 4 4 C 0 4, 0 24, 100 24 C 200 24, 200 4, 196 4"
+            stroke="#9e9a94" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="card-desc">Groupement secondaire / neutre</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">brace-bottom · small (100×20)</div>
+      <div class="card-canvas">
+        <svg width="100" height="20" viewBox="0 0 100 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 3 3 C 0 3, 0 17, 50 17 C 100 17, 100 3, 97 3"
+            stroke="#d67556" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="card-desc">Taille réduite — grouper 2–3 mots inline</div>
+    </div>
+
+  </div>
+
+  <!-- VERTICALES -->
+  <div class="section-title">Verticales (28×120)</div>
+  <div class="row">
+
+    <div class="card" style="min-width:130px;">
+      <div class="card-label">brace-right }</div>
+      <div class="card-canvas" style="min-height:140px;">
+        <svg width="28" height="120" viewBox="0 0 28 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Pointe vers la droite — annote ce qui est À GAUCHE -->
+          <path d="M 4 4 C 4 0, 24 0, 24 60 C 24 120, 4 120, 4 116"
+            stroke="#d67556" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="card-desc">Pointe droite — annote le contenu à gauche</div>
+    </div>
+
+    <div class="card" style="min-width:130px;">
+      <div class="card-label">brace-left {</div>
+      <div class="card-canvas" style="min-height:140px;">
+        <svg width="28" height="120" viewBox="0 0 28 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Pointe vers la gauche — annote ce qui est À DROITE -->
+          <path d="M 24 4 C 24 0, 4 0, 4 60 C 4 120, 24 120, 24 116"
+            stroke="#d67556" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="card-desc">Pointe gauche — annote le contenu à droite</div>
+    </div>
+
+    <div class="card" style="min-width:130px;">
+      <div class="card-label">brace-right · muted</div>
+      <div class="card-canvas" style="min-height:140px;">
+        <svg width="28" height="120" viewBox="0 0 28 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 4 4 C 4 0, 24 0, 24 60 C 24 120, 4 120, 4 116"
+            stroke="#9e9a94" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="card-desc">Groupement secondaire vertical</div>
+    </div>
+
+  </div>
+
+  <!-- USAGE : annotation de code -->
+  <div class="section-title">Exemple — annotation de code</div>
+  <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1.5rem; display:flex; align-items:flex-start; gap:0.5rem;">
+
+    <div class="code-block">for i in range(n):
+    for j in range(i):
+        result += a[i][j]</div>
+
+    <div style="display:flex; flex-direction:column; align-items:flex-start; gap:0;">
+      <svg width="28" height="80" viewBox="0 0 28 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 4 4 C 4 0, 24 0, 24 40 C 24 80, 4 80, 4 76"
+          stroke="#d67556" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+    <div style="display:flex; align-items:center; height:80px;">
+      <span style="font-size:0.75rem; color:#d67556; font-style:italic;">O(n²)</span>
+    </div>
+
+  </div>
+
+  <!-- USAGE : annotation de texte horizontal -->
+  <div class="section-title">Exemple — annotation de texte (horizontal)</div>
+  <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1.5rem 2rem;">
+    <div style="display:flex; align-items:baseline; gap:0.4rem; font-size:0.95rem; color:#dedad5; flex-wrap:wrap;">
+      <span>La complexité est</span>
+      <div style="display:inline-flex; flex-direction:column; align-items:center; gap:0;">
+        <span style="font-family:'Menlo',monospace; color:#d67556; font-size:0.9rem;">O(n log n)</span>
+        <svg width="100" height="16" viewBox="0 0 100 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 3 3 C 0 3, 0 13, 50 13 C 100 13, 100 3, 97 3"
+            stroke="#d67556" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span style="font-size:0.65rem; color:#d67556; font-style:italic;">complexité du tri</span>
+      </div>
+      <span>dans le cas moyen.</span>
+    </div>
+  </div>
+
+  <!-- USAGE : groupement mathématique -->
+  <div class="section-title">Exemple — groupement mathématique vertical</div>
+  <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1.5rem 2rem;">
+    <div style="display:flex; align-items:flex-start; gap:0.5rem;">
+
+      <div style="display:flex; flex-direction:column; gap:0.4rem; font-size:0.85rem; color:#dedad5; line-height:1.8; font-family:'Menlo',monospace;">
+        <span>x₁ = 2</span>
+        <span>x₂ = 5</span>
+        <span>x₃ = 8</span>
+      </div>
+
+      <svg width="28" height="72" viewBox="0 0 28 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 4 4 C 4 0, 24 0, 24 36 C 24 72, 4 72, 4 68"
+          stroke="#d67556" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+
+      <div style="display:flex; align-items:center; height:72px;">
+        <div style="display:flex; flex-direction:column; gap:0.15rem;">
+          <span style="font-size:0.75rem; color:#d67556; font-style:italic;">suite arithmétique</span>
+          <span style="font-size:0.7rem; color:#9e9a94;">raison r = 3</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>

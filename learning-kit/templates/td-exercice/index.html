@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITRE}}</title>
+    <link rel="stylesheet" href="../../layouts/sidebar-iframe.css">
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="cursor-halo" id="cursor-halo"></div>
+
+    <div class="app-container">
+        <nav class="sidebar glass-panel">
+            <div class="sidebar-header">
+                <h1>{{TITRE}}</h1>
+                <p>{{SOUS_TITRE}}</p>
+            </div>
+            <div class="nav-links" id="nav-links">
+                <!-- Exemple :
+                <button class="nav-btn active" onclick="loadSection('section-ex1.html', this)">
+                    <span class="icon"><svg ...></svg></span> Exercice 1
+                </button>
+                -->
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div class="glass-panel content-wrapper">
+                <iframe id="content-frame" src="" frameborder="0"></iframe>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const halo = document.getElementById('cursor-halo');
+        function moveHalo(x, y) { halo.style.left = x + 'px'; halo.style.top = y + 'px'; }
+        document.addEventListener('mousemove', (e) => moveHalo(e.clientX, e.clientY));
+        function attachIframeHalo(frame) {
+            try { frame.contentWindow.document.addEventListener('mousemove', (e) => { const r = frame.getBoundingClientRect(); moveHalo(r.left + e.clientX, r.top + e.clientY); }); } catch(e) {}
+        }
+
+        window.onload = () => {
+            const savedSection = localStorage.getItem('currentSection_td');
+            const buttons = document.querySelectorAll('.nav-btn');
+            const firstSection = buttons.length ? buttons[0].getAttribute('onclick').match(/'([^']+)'/)?.[1] : '';
+            const target = savedSection || firstSection;
+            if (target) loadSection(target, null);
+            if (savedSection) {
+                buttons.forEach(b => { if (b.getAttribute('onclick')?.includes(savedSection)) b.classList.add('active'); });
+            } else if (buttons.length) {
+                buttons[0].classList.add('active');
+            }
+        };
+
+        function loadSection(url, button) {
+            const frame = document.getElementById('content-frame');
+            frame.style.opacity = 0;
+            localStorage.setItem('currentSection_td', url);
+            setTimeout(() => {
+                frame.src = url;
+                frame.onload = () => {
+                    frame.style.opacity = 1;
+                    attachIframeHalo(frame);
+                    const pos = localStorage.getItem('scroll_td_' + url);
+                    if (pos) frame.contentWindow.scrollTo(0, parseInt(pos));
+                    frame.contentWindow.addEventListener('scroll', () => {
+                        localStorage.setItem('scroll_td_' + url, frame.contentWindow.scrollY);
+                    });
+                };
+            }, 300);
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            if (button) button.classList.add('active');
+        }
+    </script>
+</body>
+</html>

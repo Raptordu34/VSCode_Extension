@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arrows — SVG Preview</title>
+  <style>
+    body {
+      background: #1a1814;
+      color: #e8e4df;
+      font-family: 'Inter', system-ui, sans-serif;
+      padding: 2rem 3rem;
+      margin: 0;
+    }
+
+    h1 {
+      color: #d67556;
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      color: #9e9a94;
+      font-size: 0.85rem;
+      margin-bottom: 3rem;
+    }
+
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #9e9a94;
+      margin: 2.5rem 0 1rem;
+      border-bottom: 1px solid #2e2b27;
+      padding-bottom: 0.4rem;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      align-items: flex-start;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+      min-width: 160px;
+    }
+
+    .card-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #b8b4ae;
+      font-family: 'Menlo', 'Consolas', monospace;
+    }
+
+    .card-canvas {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.2);
+      border-radius: 6px;
+      padding: 0.6rem 0.8rem;
+    }
+
+    .card-desc {
+      font-size: 0.7rem;
+      color: #6e6a64;
+      line-height: 1.4;
+    }
+
+    /* Inline usage demo */
+    .inline-demo {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 1rem 1.5rem;
+      font-size: 0.9rem;
+      color: #e8e4df;
+      margin-top: 1.5rem;
+    }
+
+    .inline-demo span {
+      display: inline-flex;
+      align-items: center;
+      vertical-align: middle;
+      margin: 0 4px;
+    }
+
+    /* Connector demo */
+    .connector-demo {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-top: 1.5rem;
+    }
+
+    .block {
+      background: rgba(214,117,86,0.12);
+      border: 1px solid rgba(214,117,86,0.3);
+      border-radius: 8px;
+      padding: 0.6rem 1rem;
+      font-size: 0.8rem;
+      color: #d67556;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Arrows — SVG Elements</h1>
+  <p class="subtitle">Preview de toutes les variantes · <code style="color:#d67556">learning-kit/design/svg/arrows.md</code></p>
+
+  <!-- ICONS 24x24 -->
+  <div class="section-title">Icones inline 24x24</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">arrow-right</div>
+      <div class="card-canvas">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 20 12 L 13 6.5 L 13 10 Q 5 10 4.5 12 Q 5 14 13 14 L 13 17.5 Z" fill="#d67556"/>
+        </svg>
+      </div>
+      <div class="card-desc">Fleche droite simple</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">arrow-left</div>
+      <div class="card-canvas">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 4 12 L 11 6.5 L 11 10 Q 19 10 19.5 12 Q 19 14 11 14 L 11 17.5 Z" fill="#d67556"/>
+        </svg>
+      </div>
+      <div class="card-desc">Fleche gauche simple</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">arrow-up</div>
+      <div class="card-canvas">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 12 4 L 6.5 11 L 10 11 Q 10 19 12 19.5 Q 14 19 14 11 L 17.5 11 Z" fill="#d67556"/>
+        </svg>
+      </div>
+      <div class="card-desc">Fleche haut simple</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">arrow-down</div>
+      <div class="card-canvas">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 12 20 L 6.5 13 L 10 13 Q 10 5 12 4.5 Q 14 5 14 13 L 17.5 13 Z" fill="#d67556"/>
+        </svg>
+      </div>
+      <div class="card-desc">Fleche bas simple</div>
+    </div>
+
+  </div>
+
+  <!-- CONNECTORS 200x40 -->
+  <div class="section-title">Connecteurs 200x40</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">arrow-curved-right</div>
+      <div class="card-canvas">
+        <svg width="200" height="40" viewBox="0 0 200 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 10 24 C 60 5, 140 5, 180 20" stroke="#d67556" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+          <path d="M 188 21 L 179 15 Q 182 21 179 27 Z" fill="#d67556"/>
+        </svg>
+      </div>
+      <div class="card-desc">Arc vers le haut, gauche vers droite</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">arrow-double</div>
+      <div class="card-canvas">
+        <svg width="200" height="40" viewBox="0 0 200 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="22" y1="20" x2="178" y2="20" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M 15 20 L 22 15.5 Q 20 20 22 24.5 Z" fill="#d67556"/>
+          <path d="M 185 20 L 178 15.5 Q 180 20 178 24.5 Z" fill="#d67556"/>
+        </svg>
+      </div>
+      <div class="card-desc">Double tete (←→), relation symmetrique</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">arrow-bidirectional</div>
+      <div class="card-canvas">
+        <svg width="200" height="40" viewBox="0 0 200 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Fleche du haut : gauche -> droite -->
+          <line x1="15" y1="14" x2="177" y2="14" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M 184 14 L 177 9.5 Q 179 14 177 18.5 Z" fill="#d67556"/>
+          <!-- Fleche du bas : droite -> gauche -->
+          <line x1="185" y1="26" x2="23" y2="26" stroke="#9e9a94" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M 16 26 L 23 21.5 Q 21 26 23 30.5 Z" fill="#9e9a94"/>
+        </svg>
+      </div>
+      <div class="card-desc">Deux flux paralleles (ex: requete/reponse)</div>
+    </div>
+
+  </div>
+
+  <!-- USAGE EXAMPLES -->
+  <div class="section-title">Exemples d'utilisation</div>
+
+  <div class="inline-demo">
+    Usage inline dans du texte :
+    Etape 1
+    <span>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 20 12 L 13 6.5 L 13 10 Q 5 10 4.5 12 Q 5 14 13 14 L 13 17.5 Z" fill="#d67556"/>
+      </svg>
+    </span>
+    Etape 2
+    <span>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 20 12 L 13 6.5 L 13 10 Q 5 10 4.5 12 Q 5 14 13 14 L 13 17.5 Z" fill="#d67556"/>
+      </svg>
+    </span>
+    Etape 3
+  </div>
+
+  <div class="connector-demo">
+    <div class="block">Bloc A</div>
+    <svg width="200" height="40" viewBox="0 0 200 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="15" y1="14" x2="177" y2="14" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M 184 14 L 177 9.5 Q 179 14 177 18.5 Z" fill="#d67556"/>
+      <line x1="185" y1="26" x2="23" y2="26" stroke="#9e9a94" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M 16 26 L 23 21.5 Q 21 26 23 30.5 Z" fill="#9e9a94"/>
+    </svg>
+    <div class="block">Bloc B</div>
+  </div>
+
+</body>
+</html>

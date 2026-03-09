@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITRE}}</title>
+    <link rel="stylesheet" href="../../layouts/sidebar-iframe.css">
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="cursor-halo" id="cursor-halo"></div>
+    <div class="app-container">
+        <nav class="sidebar glass-panel">
+            <div class="sidebar-header">
+                <h1>{{TITRE}}</h1>
+                <p>{{SOUS_TITRE}}</p>
+            </div>
+            <div class="nav-links" id="nav-links">
+                <!-- Sections type rapport : intro, contexte, méthodo, résultats, conclusion -->
+            </div>
+        </nav>
+        <main class="main-content">
+            <div class="glass-panel content-wrapper">
+                <iframe id="content-frame" src="" frameborder="0"></iframe>
+            </div>
+        </main>
+    </div>
+    <script>
+        const halo = document.getElementById('cursor-halo');
+        function moveHalo(x, y) { halo.style.left = x + 'px'; halo.style.top = y + 'px'; }
+        document.addEventListener('mousemove', (e) => moveHalo(e.clientX, e.clientY));
+        function attachIframeHalo(f) { try { f.contentWindow.document.addEventListener('mousemove', (e) => { const r = f.getBoundingClientRect(); moveHalo(r.left + e.clientX, r.top + e.clientY); }); } catch(e) {} }
+        window.onload = () => {
+            const saved = localStorage.getItem('currentSection_rp');
+            const btns = document.querySelectorAll('.nav-btn');
+            const first = btns.length ? btns[0].getAttribute('onclick').match(/'([^']+)'/)?.[1] : '';
+            const target = saved || first;
+            if (target) loadSection(target, null);
+            if (saved) { btns.forEach(b => { if (b.getAttribute('onclick')?.includes(saved)) b.classList.add('active'); }); }
+            else if (btns.length) btns[0].classList.add('active');
+        };
+        function loadSection(url, btn) {
+            const f = document.getElementById('content-frame');
+            f.style.opacity = 0;
+            localStorage.setItem('currentSection_rp', url);
+            setTimeout(() => { f.src = url; f.onload = () => { f.style.opacity = 1; attachIframeHalo(f); const p = localStorage.getItem('scroll_rp_' + url); if (p) f.contentWindow.scrollTo(0, parseInt(p)); f.contentWindow.addEventListener('scroll', () => localStorage.setItem('scroll_rp_' + url, f.contentWindow.scrollY)); }; }, 300);
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+        }
+    </script>
+</body>
+</html>

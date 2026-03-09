@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="./components.css">
+</head>
+<body>
+
+    <h2>Exercice N : Titre de l'exercice</h2>
+
+    <div class="question">
+        <h3 style="margin-top: 0;">Question 1</h3>
+        <p>Énoncé de la question. Ex : Créer une vue matérialisée qui calcule la moyenne des notes par cours.</p>
+    </div>
+
+    <div class="hint">
+        Indice : penser à la clause <code>GROUP BY</code> et à <code>CREATE MATERIALIZED VIEW</code>.
+    </div>
+
+    <div class="solution">
+        <h3 style="margin-top: 0;">Solution</h3>
+        <p>Explication de la démarche :</p>
+        <ul>
+            <li>Étape 1 : identifier les colonnes nécessaires</li>
+            <li>Étape 2 : écrire la requête de base</li>
+        </ul>
+        <p>Requête finale :</p>
+        <code>CREATE MATERIALIZED VIEW vm_moyennes AS SELECT ID_cours, AVG(Note) AS moyenne FROM Inscriptions GROUP BY ID_cours;</code>
+    </div>
+
+    <div class="question">
+        <h3 style="margin-top: 0;">Question 2</h3>
+        <p>Deuxième question de l'exercice...</p>
+    </div>
+
+    <div class="solution">
+        <h3 style="margin-top: 0;">Solution</h3>
+        <p>Réponse à la question 2...</p>
+    </div>
+
+</body>
+</html>

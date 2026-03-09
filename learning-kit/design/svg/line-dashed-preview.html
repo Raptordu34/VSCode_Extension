@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lines Dashed — SVG Preview</title>
+  <style>
+    body {
+      background: #1a1814;
+      color: #e8e4df;
+      font-family: 'Inter', system-ui, sans-serif;
+      padding: 2rem 3rem;
+      margin: 0;
+    }
+    h1 { color: #d67556; font-size: 1.4rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: #9e9a94; font-size: 0.85rem; margin-bottom: 3rem; }
+    .section-title {
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em;
+      text-transform: uppercase; color: #9e9a94;
+      margin: 2.5rem 0 1rem;
+      border-bottom: 1px solid #2e2b27; padding-bottom: 0.4rem;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; }
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      display: flex; flex-direction: column; align-items: flex-start;
+      gap: 0.75rem; min-width: 240px;
+    }
+    .card-label { font-size: 0.75rem; font-weight: 500; color: #b8b4ae; font-family: 'Menlo','Consolas',monospace; }
+    .card-canvas {
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.2); border-radius: 6px;
+      padding: 0.8rem 1rem; width: 100%; box-sizing: border-box;
+    }
+    .card-desc { font-size: 0.7rem; color: #6e6a64; line-height: 1.4; }
+    .card-code { font-size: 0.65rem; color: #6e6a64; font-family: 'Menlo','Consolas',monospace; }
+
+    /* Animations */
+    @keyframes dash-flow-right {
+      to { stroke-dashoffset: -20; }
+    }
+    @keyframes dash-flow-left {
+      to { stroke-dashoffset: 20; }
+    }
+    @keyframes dash-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.35; }
+    }
+    .anim-flow { animation: dash-flow-right 0.8s linear infinite; }
+    .anim-flow-left { animation: dash-flow-left 0.8s linear infinite; }
+    .anim-pulse { animation: dash-pulse 2s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+
+  <h1>Lines Dashed — SVG Elements</h1>
+  <p class="subtitle">Traits pointillés, tiretés, animés · <code style="color:#d67556">learning-kit/design/svg/lines.md</code></p>
+
+  <!-- PATTERNS DE BASE -->
+  <div class="section-title">Patterns — accent (#d67556)</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">dots · 2,6</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6"
+            stroke="#d67556" stroke-width="2.5" stroke-linecap="round"
+            stroke-dasharray="2 6"/>
+        </svg>
+      </div>
+      <div class="card-code">dasharray="2 6"</div>
+      <div class="card-desc">Points ronds — relation optionnelle, flux possible</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">short-dash · 6,4</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6"
+            stroke="#d67556" stroke-width="1.5" stroke-linecap="round"
+            stroke-dasharray="6 4"/>
+        </svg>
+      </div>
+      <div class="card-code">dasharray="6 4"</div>
+      <div class="card-desc">Tirets courts — connecteur discret standard</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">long-dash · 14,6</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6"
+            stroke="#d67556" stroke-width="1.5" stroke-linecap="round"
+            stroke-dasharray="14 6"/>
+        </svg>
+      </div>
+      <div class="card-code">dasharray="14 6"</div>
+      <div class="card-desc">Tirets longs — dépendance abstraite, pseudo-code</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">dash-dot · 10,4,2,4</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6"
+            stroke="#d67556" stroke-width="1.5" stroke-linecap="round"
+            stroke-dasharray="10 4 2 4"/>
+        </svg>
+      </div>
+      <div class="card-code">dasharray="10 4 2 4"</div>
+      <div class="card-desc">Tiret-point — relation composée, UML</div>
+    </div>
+
+  </div>
+
+  <!-- MUTED -->
+  <div class="section-title">Patterns — muted (#9e9a94)</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">dots · muted</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6"
+            stroke="#9e9a94" stroke-width="2.5" stroke-linecap="round"
+            stroke-dasharray="2 6"/>
+        </svg>
+      </div>
+      <div class="card-desc">Relation implicite, grille de fond</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">short-dash · muted</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6"
+            stroke="#9e9a94" stroke-width="1.5" stroke-linecap="round"
+            stroke-dasharray="6 4"/>
+        </svg>
+      </div>
+      <div class="card-desc">Connecteur passif, lien secondaire</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">white overlay</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6"
+            stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-linecap="round"
+            stroke-dasharray="6 4"/>
+        </svg>
+      </div>
+      <div class="card-desc">Grille ou délimitation sur fond dark</div>
+    </div>
+
+  </div>
+
+  <!-- ANIMATIONS -->
+  <div class="section-title">Animés — flux directionnel</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">flow → (droite)</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6"
+            class="anim-flow"
+            stroke="#d67556" stroke-width="2" stroke-linecap="round"
+            stroke-dasharray="8 6"/>
+        </svg>
+      </div>
+      <div class="card-code">animation: dash-flow-right 0.8s linear infinite</div>
+      <div class="card-desc">Flux actif de gauche à droite — données en transit</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">flow ← (gauche)</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6"
+            class="anim-flow-left"
+            stroke="#9e9a94" stroke-width="2" stroke-linecap="round"
+            stroke-dasharray="8 6"/>
+        </svg>
+      </div>
+      <div class="card-code">stroke-dashoffset: +20 → 0</div>
+      <div class="card-desc">Flux retour — réponse, signal inverse</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">pulse (optionnel)</div>
+      <div class="card-canvas">
+        <svg width="200" height="12" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="4" y1="6" x2="196" y2="6"
+            class="anim-pulse"
+            stroke="#d67556" stroke-width="1.5" stroke-linecap="round"
+            stroke-dasharray="6 4"/>
+        </svg>
+      </div>
+      <div class="card-code">opacity 1 ↔ 0.35 sur 2s</div>
+      <div class="card-desc">Connexion conditionnelle, état indéterminé</div>
+    </div>
+
+  </div>
+
+  <!-- VERTICAL DASHED -->
+  <div class="section-title">Vertical tiretés</div>
+  <div class="row">
+
+    <div class="card" style="min-width:120px;">
+      <div class="card-label">dots · vertical</div>
+      <div class="card-canvas" style="min-height:100px;">
+        <svg width="12" height="80" viewBox="0 0 12 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="6" y1="4" x2="6" y2="76"
+            stroke="#d67556" stroke-width="2.5" stroke-linecap="round"
+            stroke-dasharray="2 6"/>
+        </svg>
+      </div>
+      <div class="card-desc">Continuation d'un flux vertical</div>
+    </div>
+
+    <div class="card" style="min-width:120px;">
+      <div class="card-label">short-dash · vertical</div>
+      <div class="card-canvas" style="min-height:100px;">
+        <svg width="12" height="80" viewBox="0 0 12 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="6" y1="4" x2="6" y2="76"
+            stroke="#9e9a94" stroke-width="1.5" stroke-linecap="round"
+            stroke-dasharray="6 4"/>
+        </svg>
+      </div>
+      <div class="card-desc">Axe de timeline optionnel</div>
+    </div>
+
+  </div>
+
+  <!-- USAGE DEMO -->
+  <div class="section-title">Exemple — diagramme de flux conditionnel</div>
+  <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1.5rem; display:flex; align-items:center; gap:0; flex-wrap:wrap;">
+    <div style="background:rgba(214,117,86,0.12); border:1px solid rgba(214,117,86,0.3); border-radius:8px; padding:0.5rem 0.9rem; font-size:0.8rem; color:#d67556;">Requête</div>
+    <svg width="100" height="20" viewBox="0 0 100 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="4" y1="10" x2="88" y2="10" class="anim-flow" stroke="#d67556" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="6 4"/>
+      <path d="M 96 10 L 86 5.5 Q 88 10 86 14.5 Z" fill="#d67556"/>
+    </svg>
+    <div style="background:rgba(214,117,86,0.12); border:1px solid rgba(214,117,86,0.3); border-radius:8px; padding:0.5rem 0.9rem; font-size:0.8rem; color:#d67556;">API</div>
+    <svg width="100" height="20" viewBox="0 0 100 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="96" y1="10" x2="12" y2="10" class="anim-flow" stroke="#9e9a94" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="6 4"/>
+      <path d="M 4 10 L 14 5.5 Q 12 10 14 14.5 Z" fill="#9e9a94"/>
+    </svg>
+    <div style="background:rgba(214,117,86,0.12); border:1px solid rgba(214,117,86,0.3); border-radius:8px; padding:0.5rem 0.9rem; font-size:0.8rem; color:#d67556;">Réponse</div>
+  </div>
+
+</body>
+</html>

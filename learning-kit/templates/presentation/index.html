@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITRE}}</title>
+    <link rel="stylesheet" href="../../layouts/slides.css">
+    <link rel="stylesheet" href="./components.css">
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="cursor-halo" id="cursor-halo"></div>
+
+    <div class="slides-container" id="slides-container">
+        <!-- Slides générées par LLM :
+        <div class="slide active">
+            <div class="slide-content">
+                <h2 class="slide-title">Titre</h2>
+                ...
+            </div>
+        </div>
+        -->
+    </div>
+
+    <nav class="slide-nav">
+        <button onclick="changeSlide(-1)">← Précédent</button>
+        <span class="slide-counter" id="slide-counter">1 / 1</span>
+        <button onclick="changeSlide(1)">Suivant →</button>
+    </nav>
+
+    <script>
+        const halo = document.getElementById('cursor-halo');
+        document.addEventListener('mousemove', (e) => { halo.style.left = e.clientX + 'px'; halo.style.top = e.clientY + 'px'; });
+
+        let currentSlide = parseInt(localStorage.getItem('currentSlide') || '0');
+        const slides = document.querySelectorAll('.slide');
+
+        function showSlide(index) {
+            if (!slides.length) return;
+            currentSlide = Math.max(0, Math.min(index, slides.length - 1));
+            slides.forEach((s, i) => s.classList.toggle('active', i === currentSlide));
+            document.getElementById('slide-counter').textContent = (currentSlide + 1) + ' / ' + slides.length;
+            localStorage.setItem('currentSlide', currentSlide);
+        }
+
+        function changeSlide(dir) { showSlide(currentSlide + dir); }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') changeSlide(1);
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') changeSlide(-1);
+        });
+
+        window.onload = () => showSlide(currentSlide);
+    </script>
+</body>
+</html>

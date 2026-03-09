@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="./components.css">
+</head>
+<body>
+    <h2>Fiche de Révision — Sujet</h2>
+
+    <p class="theme-title">Thème 1 : Fondamentaux</p>
+
+    <div class="revision-card">
+        <div class="question">Qu'est-ce qu'une vue matérialisée ? <span class="badge badge-high">Important</span></div>
+        <div class="answer">Une vue qui stocke physiquement son résultat, contrairement à une vue classique exécutée à chaque appel.</div>
+    </div>
+
+    <div class="revision-card">
+        <div class="question">Quelle est la différence entre REFRESH COMPLETE et FAST ? <span class="badge badge-med">Moyen</span></div>
+        <div class="answer"><strong>COMPLETE</strong> : recalcule tout. <strong>FAST</strong> : n'applique que les changements depuis le dernier refresh (nécessite un MV log).</div>
+    </div>
+
+    <p class="theme-title">Thème 2 : Syntaxe SQL</p>
+
+    <div class="revision-card">
+        <div class="question">Syntaxe de création d'une VM <span class="badge badge-high">Important</span></div>
+        <div class="answer"><code>CREATE MATERIALIZED VIEW nom AS SELECT ... REFRESH [COMPLETE|FAST] ON [DEMAND|COMMIT];</code></div>
+    </div>
+</body>
+</html>

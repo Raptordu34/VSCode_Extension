@@ -1,0 +1,63 @@
+/* learning-kit/layouts/single-scroll.css */
+@import url('../design/tokens.css');
+
+body {
+    font-family: var(--font-family);
+    margin: 0; padding: 0;
+    min-height: 100vh;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    position: relative;
+}
+
+.blob { position: fixed; border-radius: 50%; filter: blur(80px); z-index: -1; opacity: 0.5; animation: float 10s infinite ease-in-out alternate; }
+.blob-1 { width: 450px; height: 450px; background: var(--accent-dark); top: -100px; left: -100px; }
+@keyframes float { 0% { transform: translate(0,0) scale(1); } 100% { transform: translate(40px,60px) scale(1.1); } }
+
+.cursor-halo {
+    position: fixed;
+    width: 700px; height: 700px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(249,115,22,0.32) 0%, rgba(234,88,12,0.14) 40%, transparent 70%);
+    pointer-events: none; z-index: 0;
+    transform: translate(-50%, -50%);
+    transition: left 0.1s ease-out, top 0.1s ease-out;
+    filter: blur(12px);
+}
+
+.page-container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 3rem 2rem 6rem;
+    position: relative;
+    z-index: 1;
+}
+
+.page-header {
+    background: var(--glass-shine), var(--glass-bg);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-top-color: rgba(255,255,255,0.28);
+    border-radius: var(--radius-lg);
+    padding: 2.5rem 3rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+}
+.page-header h1 {
+    margin: 0;
+    font-size: 2.2rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #ffffff, #cbd5e1);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.page-header p {
+    margin: 0.5rem 0 0;
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}

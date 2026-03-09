@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nodes — SVG Preview</title>
+  <style>
+    body {
+      background: #1a1814;
+      color: #e8e4df;
+      font-family: 'Inter', system-ui, sans-serif;
+      padding: 2rem 3rem;
+      margin: 0;
+    }
+    h1 { color: #d67556; font-size: 1.4rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: #9e9a94; font-size: 0.85rem; margin-bottom: 3rem; }
+    .section-title {
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em;
+      text-transform: uppercase; color: #9e9a94;
+      margin: 2.5rem 0 1rem;
+      border-bottom: 1px solid #2e2b27; padding-bottom: 0.4rem;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; }
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      display: flex; flex-direction: column; align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .card-label { font-size: 0.75rem; font-weight: 500; color: #b8b4ae; font-family: 'Menlo','Consolas',monospace; }
+    .card-canvas {
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.2); border-radius: 6px;
+      padding: 0.8rem 1rem;
+    }
+    .card-desc { font-size: 0.7rem; color: #6e6a64; line-height: 1.4; }
+
+    /* Flowchart demo */
+    .flowchart {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 2rem;
+      display: flex; flex-direction: column; align-items: center; gap: 0;
+    }
+    .flow-row { display: flex; align-items: center; gap: 0; }
+    .flow-label {
+      font-size: 0.72rem; color: #dedad5;
+      position: absolute; pointer-events: none;
+      font-family: 'Inter', sans-serif;
+    }
+    .node-text {
+      font-size: 0.72rem; fill: #dedad5;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    .node-text-accent { fill: #d67556; }
+    .node-text-teal   { fill: #5ba6a0; }
+    .node-text-muted  { fill: #9e9a94; }
+
+    @keyframes dash-flow-down {
+      to { stroke-dashoffset: -20; }
+    }
+    .flow-anim { animation: dash-flow-down 0.9s linear infinite; }
+  </style>
+</head>
+<body>
+
+  <h1>Nodes — SVG Elements</h1>
+  <p class="subtitle">Boîtes, nœuds et formes de diagramme · <code style="color:#d67556">learning-kit/design/svg/nodes.md</code></p>
+
+  <!-- FORMES DE BASE -->
+  <div class="section-title">Formes — accent terracotta</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">node-terminal</div>
+      <div class="card-canvas">
+        <svg width="140" height="40" viewBox="0 0 140 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="138" height="38" rx="19"
+            fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5"/>
+          <text x="70" y="24" text-anchor="middle" class="node-text node-text-accent" font-size="11" font-weight="500">Début / Fin</text>
+        </svg>
+      </div>
+      <div class="card-desc">Ovale pill — start/end d'un algorithme</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">node-process</div>
+      <div class="card-canvas">
+        <svg width="140" height="40" viewBox="0 0 140 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="138" height="38" rx="7"
+            fill="rgba(214,117,86,0.08)" stroke="#d67556" stroke-width="1.5"/>
+          <text x="70" y="24" text-anchor="middle" class="node-text" font-size="11">Traitement</text>
+        </svg>
+      </div>
+      <div class="card-desc">Rectangle — étape de process, instruction</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">node-decision</div>
+      <div class="card-canvas">
+        <svg width="80" height="56" viewBox="0 0 80 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="40,2 78,28 40,54 2,28"
+            fill="rgba(214,117,86,0.08)" stroke="#d67556" stroke-width="1.5"
+            stroke-linejoin="round"/>
+          <text x="40" y="32" text-anchor="middle" class="node-text" font-size="10">cond ?</text>
+        </svg>
+      </div>
+      <div class="card-desc">Losange — condition if / branchement</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">node-io</div>
+      <div class="card-canvas">
+        <svg width="140" height="40" viewBox="0 0 140 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="18,1 139,1 122,39 1,39"
+            fill="rgba(214,117,86,0.08)" stroke="#d67556" stroke-width="1.5"
+            stroke-linejoin="round"/>
+          <text x="70" y="24" text-anchor="middle" class="node-text" font-size="11">Entrée / Sortie</text>
+        </svg>
+      </div>
+      <div class="card-desc">Parallélogramme — I/O, lecture/écriture</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">node-dot</div>
+      <div class="card-canvas">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="6" fill="#d67556"/>
+        </svg>
+      </div>
+      <div class="card-desc">Point de jonction sur un connecteur</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">node-dot · outline</div>
+      <div class="card-canvas">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="6" fill="none" stroke="#d67556" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="card-desc">Nœud creux — étape intermédiaire</div>
+    </div>
+
+  </div>
+
+  <!-- VARIANTS COULEUR -->
+  <div class="section-title">Variantes de couleur</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">accent · terracotta</div>
+      <div class="card-canvas">
+        <svg width="140" height="40" viewBox="0 0 140 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="138" height="38" rx="7"
+            fill="rgba(214,117,86,0.1)" stroke="#d67556" stroke-width="1.5"/>
+          <text x="70" y="24" text-anchor="middle" class="node-text node-text-accent" font-size="11" font-weight="500">Général</text>
+        </svg>
+      </div>
+      <div class="card-desc">Contenu général, étapes principales</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">teal · scientifique</div>
+      <div class="card-canvas">
+        <svg width="140" height="40" viewBox="0 0 140 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="138" height="38" rx="7"
+            fill="rgba(91,166,160,0.1)" stroke="#5ba6a0" stroke-width="1.5"/>
+          <text x="70" y="24" text-anchor="middle" class="node-text node-text-teal" font-size="11" font-weight="500">Théorème</text>
+        </svg>
+      </div>
+      <div class="card-desc">Contenu scientifique formel — math, algo</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">muted · neutre</div>
+      <div class="card-canvas">
+        <svg width="140" height="40" viewBox="0 0 140 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="138" height="38" rx="7"
+            fill="rgba(158,154,148,0.08)" stroke="#9e9a94" stroke-width="1.5"/>
+          <text x="70" y="24" text-anchor="middle" class="node-text node-text-muted" font-size="11">Secondaire</text>
+        </svg>
+      </div>
+      <div class="card-desc">Étape passive, contexte, note</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">dashed · abstrait</div>
+      <div class="card-canvas">
+        <svg width="140" height="40" viewBox="0 0 140 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="138" height="38" rx="7"
+            fill="rgba(214,117,86,0.04)" stroke="#d67556" stroke-width="1.5"
+            stroke-dasharray="6 4"/>
+          <text x="70" y="24" text-anchor="middle" class="node-text node-text-muted" font-size="11">Optionnel</text>
+        </svg>
+      </div>
+      <div class="card-desc">Bloc optionnel, composant abstrait, TODO</div>
+    </div>
+
+  </div>
+
+  <!-- TAILLES -->
+  <div class="section-title">Tailles — node-process</div>
+  <div class="row">
+
+    <div class="card">
+      <div class="card-label">small · 100×32</div>
+      <div class="card-canvas">
+        <svg width="100" height="32" viewBox="0 0 100 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="98" height="30" rx="6"
+            fill="rgba(214,117,86,0.08)" stroke="#d67556" stroke-width="1.5"/>
+          <text x="50" y="20" text-anchor="middle" class="node-text" font-size="10">init()</text>
+        </svg>
+      </div>
+      <div class="card-desc">Compact — pseudocode, inline</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">regular · 140×40</div>
+      <div class="card-canvas">
+        <svg width="140" height="40" viewBox="0 0 140 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="138" height="38" rx="7"
+            fill="rgba(214,117,86,0.08)" stroke="#d67556" stroke-width="1.5"/>
+          <text x="70" y="24" text-anchor="middle" class="node-text" font-size="11">process(data)</text>
+        </svg>
+      </div>
+      <div class="card-desc">Standard — flowchart connecteur</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">wide · 200×44</div>
+      <div class="card-canvas">
+        <svg width="200" height="44" viewBox="0 0 200 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="198" height="42" rx="8"
+            fill="rgba(214,117,86,0.08)" stroke="#d67556" stroke-width="1.5"/>
+          <text x="100" y="27" text-anchor="middle" class="node-text" font-size="11">Calculer la complexité temporelle</text>
+        </svg>
+      </div>
+      <div class="card-desc">Large — description longue, standalone</div>
+    </div>
+
+  </div>
+
+  <!-- FLOWCHART DEMO -->
+  <div class="section-title">Exemple — flowchart algorithme de tri</div>
+  <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:2rem; overflow-x:auto;">
+    <svg width="435" height="320" viewBox="0 0 435 320" fill="none" xmlns="http://www.w3.org/2000/svg"
+         style="font-family:'Inter',system-ui,sans-serif;">
+
+      <!-- ═══ NŒUDS ═══ -->
+
+      <!-- Début pill — centré en (215, 26) -->
+      <rect x="155" y="10" width="120" height="32" rx="16"
+        fill="rgba(214,117,86,0.15)" stroke="#d67556" stroke-width="1.5"/>
+      <text x="215" y="30" text-anchor="middle" font-size="11" font-weight="600" fill="#d67556">Début</text>
+
+      <!-- Lire tableau — centré en (215, 84) -->
+      <rect x="137" y="67" width="156" height="34" rx="7"
+        fill="rgba(214,117,86,0.08)" stroke="#d67556" stroke-width="1.5"/>
+      <text x="215" y="88" text-anchor="middle" font-size="11" fill="#dedad5">Lire tableau A[n]</text>
+
+      <!-- Decision "trié ?" — centre (215, 152), demi-largeur 62, demi-hauteur 40 -->
+      <!-- points: haut(215,112) droite(277,152) bas(215,192) gauche(153,152) -->
+      <polygon points="215,112 277,152 215,192 153,152"
+        fill="rgba(214,117,86,0.08)" stroke="#d67556" stroke-width="1.5" stroke-linejoin="round"/>
+      <text x="215" y="156" text-anchor="middle" font-size="10" fill="#dedad5">trié ?</text>
+
+      <!-- Fin pill — centré en (65, 280) -->
+      <rect x="15" y="264" width="100" height="32" rx="16"
+        fill="rgba(91,166,160,0.12)" stroke="#5ba6a0" stroke-width="1.5"/>
+      <text x="65" y="284" text-anchor="middle" font-size="11" font-weight="600" fill="#5ba6a0">Fin</text>
+
+      <!-- Échanger — centré en (361, 280) -->
+      <rect x="287" y="264" width="148" height="32" rx="7"
+        fill="rgba(158,154,148,0.08)" stroke="#9e9a94" stroke-width="1.5"/>
+      <text x="361" y="284" text-anchor="middle" font-size="10" fill="#9e9a94">Échanger A[i], A[j]</text>
+
+      <!-- ═══ CONNECTEURS ═══ -->
+
+      <!-- Début → Lire (vertical) -->
+      <line x1="215" y1="42" x2="215" y2="59" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M 215 67 L 210 59 Q 215 61 220 59 Z" fill="#d67556"/>
+
+      <!-- Lire → Decision (vertical) -->
+      <line x1="215" y1="101" x2="215" y2="104" stroke="#d67556" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M 215 112 L 210 104 Q 215 106 220 104 Z" fill="#d67556"/>
+
+      <!-- Decision LEFT (153,152) → H 65 → V 264 : branche "Oui" -->
+      <path d="M 153 152 H 65 V 256" stroke="#5ba6a0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 65 264 L 60 256 Q 65 258 70 256 Z" fill="#5ba6a0"/>
+      <!-- label Oui -->
+      <text x="106" y="147" text-anchor="middle" font-size="10" fill="#5ba6a0">Oui</text>
+      <!-- point de coin -->
+      <circle cx="65" cy="152" r="2.5" fill="#5ba6a0"/>
+
+      <!-- Decision RIGHT (277,152) → H 361 → V 264 : branche "Non" -->
+      <path d="M 277 152 H 361 V 256" stroke="#9e9a94" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 361 264 L 356 256 Q 361 258 366 256 Z" fill="#9e9a94"/>
+      <!-- label Non -->
+      <text x="317" y="147" text-anchor="middle" font-size="10" fill="#9e9a94">Non</text>
+      <!-- point de coin -->
+      <circle cx="361" cy="152" r="2.5" fill="#9e9a94"/>
+
+    </svg>
+  </div>
+
+</body>
+</html>

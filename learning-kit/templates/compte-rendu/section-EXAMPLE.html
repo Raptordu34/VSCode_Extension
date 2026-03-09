@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="./components.css">
+    <!-- KaTeX — rendu mathématique -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.35/dist/katex.min.css" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.35/dist/katex.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.35/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    { left: "$$", right: "$$", display: true },
+                    { left: "$",  right: "$",  display: false }
+                ],
+                throwOnError: false
+            });
+        });
+    </script>
+    <script src="./section-utils.js" defer></script>
+</head>
+<body class="mode-detailed">
+
+    <h2>Référentiel des Composants</h2>
+
+    <!-- MODE RÉSUMÉ -->
+    <div class="compact-content">
+        <h3 style="margin-top: 0;">Synthèse</h3>
+        <ul>
+            <li><strong>Texte</strong> — paragraphes, <em>accent</em>, <strong>gras blanc</strong>, <code>code inline</code>, formules KaTeX <code>$...$</code> et <code>$$...$$</code></li>
+            <li><strong>Listes</strong> — puces losange (<code>ul</code>), numérotée (<code>ol</code>), étapes visuelles animées (<code>.steps</code>)</li>
+            <li><strong>Encadrés</strong> — définition (<code>.highlight-box</code>), conseil ampoule (<code>.tip-box</code>), info / warning / danger (<code>.callout-*</code>)</li>
+            <li><strong>Scientifique</strong> — <code>.theorem-box</code>, <code>.proof-box</code> (QED auto), <code>.formula-box</code>, <code>.source</code></li>
+            <li><strong>Code & shell</strong> — <code>pre</code> + copier, <code>.terminal</code> traffic lights, <code>.algo-block</code> pseudo-code nommé</li>
+            <li><strong>Données</strong> — <code>.metrics-grid</code> + <code>.metric-card</code>, <code>.key-value</code> config, <code>.inline-note</code></li>
+            <li><strong>Mise en page</strong> — <code>.two-col</code>, <code>.figure-box</code>, <code>.table-glass</code> 3D, <code>.badge</code> inline</li>
+        </ul>
+    </div>
+
+    <!-- MODE DÉTAILLÉ -->
+    <div class="detailed-content">
+
+        <!-- ── HIÉRARCHIE DES TITRES ── -->
+        <h3>Hiérarchie des titres</h3>
+        <p>
+            Un <code>h3</code> marque le début d'une <strong>sous-partie</strong> (séparateur
+            automatique + point orange). Un <code>h4</code> introduit un <strong>sous-sujet</strong>
+            à l'intérieur de cette sous-partie. Ne jamais préfixer les titres avec des lettres
+            ou des chiffres (A., B., 1., 2.) — la structure visuelle suffit.
+        </p>
+
+        <h4>Premier sous-sujet</h4>
+        <p>
+            Contenu du premier sous-sujet. Le <code>h4</code> est affiché en
+            <code>var(--text-primary)</code> à 1.3 rem, weight 700, avec une bordure gauche
+            orange — clairement un titre, mais subordonné au <code>h3</code> (1.6 rem).
+        </p>
+
+        <h4>Deuxième sous-sujet</h4>
+        <p>
+            On peut enchaîner plusieurs <code>h4</code> dans une même sous-partie.
+            Chaque <code>h4</code> peut contenir n'importe quel composant en dessous
+            (listes, callouts, tableaux…).
+        </p>
+        <ul>
+            <li>Un point illustrant le deuxième sous-sujet</li>
+            <li>Un autre point avec <code>code inline</code></li>
+        </ul>
+
+        <!-- ── TEXTE ── -->
+        <h3>Texte et typographie</h3>
+        <p>
+            Paragraphe standard avec <strong>gras blanc</strong>, <em>accent orange</em>,
+            et <code>code inline</code>. Aucune classe nécessaire — tout est géré par
+            <code>base.css</code>.
+        </p>
+
+        <!-- ── DÉFINITION ── -->
+        <div class="highlight-box">
+            <strong>Définition :</strong> <code>.highlight-box</code> — encadré glassmorphism
+            neutre pour définitions formelles, formules clés, ou points à retenir absolument.
+            Bordure orange à gauche.
+        </div>
+
+        <!-- ── THÉORÈME ── -->
+        <h3>Encadrés scientifiques</h3>
+
+        <div class="theorem-box" data-label="Théorème">
+            <strong>Théorème de Bayes :</strong> Pour deux événements A et B,
+            P(A|B) = P(B|A) · P(A) / P(B), avec P(B) &gt; 0.
+        </div>
+
+        <div class="theorem-box" data-label="Propriété">
+            La complexité en espace d'un arbre B de hauteur <em>h</em> avec
+            <em>n</em> clés et un ordre <em>t</em> est bornée par
+            O(<em>n</em>). La hauteur vérifie <em>h</em> ≤ log<sub>t</sub>(<em>n+1</em>/2).
+        </div>
+
+        <div class="theorem-box" data-label="Lemme">
+            Si <em>G</em> est un graphe connexe à <em>n</em> sommets et <em>m</em> arêtes,
+            alors <em>m</em> ≥ <em>n</em> − 1.
+        </div>
+
+        <!-- ── FORMULE ── -->
+        <h3>Formules</h3>
+
+        <p>
+            Formule inline dans un paragraphe : la fonction sigmoïde $\sigma(z) = \frac{1}{1+e^{-z}}$
+            est utilisée en sortie des réseaux de neurones binaires.
+            La dérivée vérifie $\sigma'(z) = \sigma(z)(1 - \sigma(z))$.
+        </p>
+
+        <div class="formula-box">
+            $$L(\theta) = -\sum_{i=1}^{n} \left[ y_i \log(\hat{y}_i) + (1 - y_i) \log(1 - \hat{y}_i) \right]$$
+            <span class="formula-label">Binary Cross-Entropy Loss</span>
+        </div>
+
+        <div class="formula-box">
+            $$\theta_{t+1} = \theta_t - \alpha \, \nabla_\theta \, L(\theta_t)$$
+            <span class="formula-label">Descente de gradient</span>
+        </div>
+
+        <p class="source">Bishop, C. (2006). Pattern Recognition and Machine Learning. Springer. §4.3.4</p>
+
+        <!-- ── CALLOUTS ── -->
+        <h3>Callouts</h3>
+
+        <div class="tip-box">
+            <strong>Conseil :</strong> Préférer <code>EXPLAIN ANALYZE</code> à <code>EXPLAIN</code>
+            seul — le premier exécute réellement la requête et retourne les temps mesurés.
+        </div>
+
+        <div class="callout-info">
+            <strong>Info :</strong> PostgreSQL utilise un planificateur basé sur des statistiques
+            collectées par <code>ANALYZE</code>. Relancer <code>ANALYZE</code> après une grande
+            insertion peut changer significativement le plan d'exécution.
+        </div>
+
+        <div class="callout-warning">
+            <strong>Attention :</strong> <code>REFRESH MATERIALIZED VIEW</code> sans
+            <code>CONCURRENTLY</code> pose un verrou exclusif — toutes les lectures
+            sont bloquées pendant la durée du rafraîchissement.
+        </div>
+
+        <div class="callout-danger">
+            <strong>Danger :</strong> Ne jamais lancer <code>DROP TABLE</code> en production
+            sans sauvegarde préalable. L'opération est irréversible et instantanée.
+        </div>
+
+        <!-- ── LISTES ── -->
+        <h3>Listes</h3>
+
+        <h4>Liste à puces — losange orange</h4>
+        <ul>
+            <li>Premier point avec <strong>terme clé</strong> mis en valeur</li>
+            <li>Deuxième point avec <em>accent orange</em> et <code>code inline</code></li>
+            <li>Troisième point normal, texte corps standard</li>
+        </ul>
+
+        <h4>Liste ordonnée</h4>
+        <ol>
+            <li>Formuler la question de recherche et les hypothèses</li>
+            <li>Collecter et préparer les données (<em>feature engineering</em>)</li>
+            <li>Entraîner le modèle et évaluer sur le jeu de test</li>
+        </ol>
+
+        <h4>Étapes numérotées animées — <code>.steps</code></h4>
+        <ul class="steps">
+            <li>Analyser le schéma existant et identifier les jointures coûteuses</li>
+            <li>Créer une vue matérialisée avec <code>CREATE MATERIALIZED VIEW ... AS SELECT ...</code></li>
+            <li>Ajouter un index sur les colonnes de filtrage fréquentes</li>
+            <li>Mesurer le gain avec <code>EXPLAIN (ANALYZE, BUFFERS)</code></li>
+        </ul>
+
+        <!-- ── CODE ── -->
+        <h3>Code</h3>
+
+        <h4>Bloc multi-lignes — <code>pre</code></h4>
+        <pre><code>-- Vue matérialisée avec index
+CREATE MATERIALIZED VIEW ventes_mensuelles AS
+    SELECT
+        DATE_TRUNC('month', date_vente) AS mois,
+        region,
+        SUM(montant)                    AS total
+    FROM ventes
+    GROUP BY 1, 2
+WITH DATA;
+
+CREATE INDEX ON ventes_mensuelles (mois, region);</code></pre>
+
+        <h4>Terminal / sortie shell — <code>.terminal</code></h4>
+        <div class="terminal">
+            <code><span class="prompt">$</span> psql -U admin -d mydb
+<span class="prompt">mydb=#</span> EXPLAIN ANALYZE SELECT * FROM ventes_mensuelles WHERE region = 'Nord';
+                              QUERY PLAN
+------------------------------------------------------------------------
+ Seq Scan on ventes_mensuelles  (cost=0.00..12.40 rows=3 width=48)
+                                (actual time=0.018..0.021 rows=3 loops=1)
+   Filter: (region = 'Nord')
+ Planning Time: 0.4 ms
+ Execution Time: 0.1 ms
+<span class="comment"># Index Scan si index présent — O(log n) au lieu de O(n)</span></code>
+        </div>
+
+        <!-- ── COMPARAISON ── -->
+        <h3>Comparaisons — avantages / limites</h3>
+
+        <p>Utiliser <code>.compare-grid</code> avec des <code>.compare-item</code> pour structurer
+        visuellement les comparaisons. Chaque item reçoit une classe <code>good</code>, <code>bad</code>
+        ou <code>neutral</code>, et un attribut <code>data-label</code> pour le badge.</p>
+
+        <div class="compare-grid">
+            <div class="compare-item good" data-label="Idéal pour">
+                <p>Les valeurs très variées (noms, dates, prix) et les recherches de type
+                "plus grand que" (<code>&gt;</code>) ou "entre deux valeurs" (<code>BETWEEN</code>).</p>
+            </div>
+            <div class="compare-item bad" data-label="Limite">
+                <p>Quand on insère beaucoup de données, l'arbre doit se rééquilibrer —
+                ce qui génère un surcoût d'écriture non négligeable.</p>
+            </div>
+        </div>
+
+        <h4>Avec trois items — <code>neutral</code> disponible</h4>
+        <div class="compare-grid">
+            <div class="compare-item good" data-label="Avantage">
+                <p>Lecture ultra-rapide grâce au pré-calcul.</p>
+            </div>
+            <div class="compare-item bad" data-label="Inconvénient">
+                <p>Données potentiellement obsolètes entre deux rafraîchissements.</p>
+            </div>
+            <div class="compare-item neutral" data-label="Cas d'usage">
+                <p>Tableaux de bord analytiques, rapports périodiques.</p>
+            </div>
+        </div>
+
+        <!-- ── MISE EN PAGE ── -->
+        <h3>Mise en page avancée</h3>
+
+        <h4>Deux colonnes — <code>.two-col</code></h4>
+        <div class="two-col">
+            <div class="highlight-box">
+                <strong>K-Means</strong><br>
+                Clustering par centroïdes. Nécessite de fixer <em>k</em>.
+                Complexité <code>O(nkdi)</code>.
+                <span class="badge badge-orange" style="margin-top:0.5rem;display:inline-block">Unsupervised</span>
+            </div>
+            <div class="highlight-box">
+                <strong>DBSCAN</strong><br>
+                Clustering par densité. Détecte les anomalies automatiquement.
+                Complexité <code>O(n log n)</code>.
+                <span class="badge badge-green" style="margin-top:0.5rem;display:inline-block">Flexible</span>
+            </div>
+        </div>
+
+        <h4>Figure / schéma — <code>.figure-box</code></h4>
+        <div class="figure-box">
+            <span class="figure-placeholder">[ Insérer ici un schéma ou une image ]<br>
+            Exemple : <code>&lt;img src="schema-pipeline.png"&gt;</code></span>
+            <figcaption>Fig. 1 — Pipeline ETL avec vue matérialisée en cache intermédiaire</figcaption>
+        </div>
+
+        <!-- ── TABLEAUX ── -->
+        <h3>Tableaux</h3>
+
+        <div class="table-glass">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Algorithme</th>
+                        <th>Avantages</th>
+                        <th>Inconvénients</th>
+                        <th>Complexité</th>
+                        <th>Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Index B-tree</strong></td>
+                        <td>Recherche exacte, tri natif</td>
+                        <td>Faible cardinalité peu aidée</td>
+                        <td><code>O(log n)</code></td>
+                        <td><span class="badge badge-green">Standard</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Index Hash</strong></td>
+                        <td>Égalité stricte O(1)</td>
+                        <td>Inutilisable pour plages</td>
+                        <td><code>O(1)</code></td>
+                        <td><span class="badge badge-blue">Spécialisé</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Index GIN</strong></td>
+                        <td>Full-text, JSON, tableaux</td>
+                        <td>Mise à jour lente</td>
+                        <td><code>O(log n)</code></td>
+                        <td><span class="badge badge-blue">Spécialisé</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Vue matérialisée</strong></td>
+                        <td>Lecture ultra-rapide pré-calculée</td>
+                        <td>Données potentiellement stales</td>
+                        <td><code>O(1)</code> lecture</td>
+                        <td><span class="badge badge-orange">À rafraîchir</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ── BADGES ── -->
+        <h3>Badges</h3>
+        <p>
+            Qualifier un concept inline :
+            <span class="badge badge-orange">Important</span>
+            <span class="badge badge-blue">Théorie</span>
+            <span class="badge badge-green">Validé</span>
+            <span class="badge badge-red">Attention</span>
+        </p>
+
+        <!-- ── SOURCE ── -->
+        <h3>Sources et citations</h3>
+        <p>Utiliser <code>.source</code> après un bloc ou en fin de section :</p>
+        <p class="source">Ramakrishnan, R. & Gehrke, J. (2003). Database Management Systems. McGraw-Hill. §14.1</p>
+        <p class="source">PostgreSQL Documentation 16 — <em>CREATE MATERIALIZED VIEW</em>, §7.8</p>
+
+        <!-- ── DÉMONSTRATION ── -->
+        <h3>Démonstration / Preuve</h3>
+
+        <div class="theorem-box" data-label="Théorème">
+            Pour tout graphe connexe non orienté à <em>n</em> sommets,
+            le nombre minimal d'arêtes est $n - 1$ (arbre couvrant).
+        </div>
+
+        <div class="proof-box">
+            Par récurrence sur <em>n</em>. Pour <em>n</em> = 1 : l'arbre à un sommet a 0 arête,
+            soit $n - 1 = 0$. Supposons vrai pour tout graphe à <em>k</em> &lt; <em>n</em> sommets.
+            Soit <em>G</em> connexe à <em>n</em> sommets. En retirant une feuille <em>v</em>
+            (sommet de degré 1), le graphe <em>G' = G \ {v}</em> reste connexe à <em>n-1</em>
+            sommets et possède, par hypothèse, au moins $n - 2$ arêtes.
+            En rajoutant <em>v</em> et son arête, on obtient au moins $n - 1$ arêtes.
+        </div>
+
+        <!-- ── ALGORITHME ── -->
+        <h3>Algorithmes (pseudo-code)</h3>
+
+        <div class="algo-block" data-name="K-Means Clustering">
+<pre><code>Entrée : X (n points), k (nombre de clusters), ε (convergence)
+Sortie : Affectation c[], centroïdes μ[]
+
+1. Initialiser μ₁..μₖ aléatoirement parmi X
+2. Répéter :
+   a. Pour chaque xᵢ ∈ X :
+         c[i] ← argmin_j ||xᵢ − μⱼ||²
+   b. Pour chaque j = 1..k :
+         μⱼ ← moyenne({ xᵢ | c[i] = j })
+3. Jusqu'à ||Δμ|| < ε
+
+Complexité : O(n · k · d · i)  — i = itérations, d = dimensions</code></pre>
+        </div>
+
+        <!-- ── MÉTRIQUES ── -->
+        <h3>Métriques de performance</h3>
+
+        <div class="metrics-grid">
+            <div class="metric-card good">
+                <span class="metric-value">94.2%</span>
+                <span class="metric-label">Accuracy</span>
+            </div>
+            <div class="metric-card good">
+                <span class="metric-value">0.91</span>
+                <span class="metric-label">F1-Score</span>
+            </div>
+            <div class="metric-card accent">
+                <span class="metric-value">12 ms</span>
+                <span class="metric-label">Latence</span>
+            </div>
+            <div class="metric-card bad">
+                <span class="metric-value">8.3%</span>
+                <span class="metric-label">Loss</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-value">1.2 M</span>
+                <span class="metric-label">Paramètres</span>
+            </div>
+        </div>
+
+        <!-- ── CLÉ–VALEUR ── -->
+        <h3>Hyperparamètres / Configuration</h3>
+
+        <dl class="key-value">
+            <dt>learning_rate</dt>  <dd>0.001</dd>
+            <dt>batch_size</dt>     <dd>128</dd>
+            <dt>epochs</dt>         <dd>50</dd>
+            <dt>optimizer</dt>      <dd>Adam (β₁=0.9, β₂=0.999)</dd>
+            <dt>dropout</dt>        <dd>0.3</dd>
+            <dt>loss</dt>           <dd>categorical_crossentropy</dd>
+        </dl>
+
+        <p class="inline-note">Note : ces hyperparamètres ont été sélectionnés par grid search sur 5-fold cross-validation.</p>
+
+    </div>
+
+</body>
+</html>
