@@ -1,0 +1,219 @@
+<!-- ═══════════════════════════════════════════════════════════════════
+     slide-EXAMPLE.html — Catalogue de référence des composants
+     Chaque fichier slide réel ne contient qu'UN SEUL <div class="slide">
+     Ce fichier est une exception : il montre plusieurs types de slides.
+═══════════════════════════════════════════════════════════════════ -->
+
+
+<!-- ── TYPE 1 : Slide de titre ─────────────────────────────────────── -->
+<div class="slide">
+    <div class="slide-content">
+        <span class="slide-section-label">Cours 3 — Module Données</span>
+        <p class="slide-title">Introduction aux<br>Bases de Données</p>
+        <p class="slide-subtitle">Modèles, langages et architectures · L3 Informatique · 2026</p>
+    </div>
+</div>
+
+
+<!-- ── TYPE 2 : Slide agenda ────────────────────────────────────────── -->
+<div class="slide">
+    <div class="slide-content">
+        <h2>Plan de la séance</h2>
+        <ul class="agenda-list">
+            <li class="current fragment" data-fragment-index="1">Contexte et motivations</li>
+            <li class="fragment fade-left" data-fragment-index="2">Modèle relationnel</li>
+            <li class="fragment fade-left" data-fragment-index="3">Langage SQL</li>
+            <li class="fragment fade-left" data-fragment-index="4">Indexation et performances</li>
+            <li class="fragment fade-left" data-fragment-index="5">Conclusion</li>
+        </ul>
+    </div>
+</div>
+
+
+<!-- ── TYPE 3 : Slide texte + callouts ──────────────────────────────── -->
+<div class="slide">
+    <div class="slide-content">
+        <h2>Pourquoi des bases de données ?</h2>
+        <p>Avant les SGBD, les données étaient stockées dans des <strong>fichiers plats</strong> — redondance massive, incohérences, pas de contrôle des accès concurrents.</p>
+        <div class="callout-info">
+            Un SGBD garantit les propriétés <strong>ACID</strong> : Atomicité, Cohérence, Isolation, Durabilité.
+        </div>
+        <div class="callout-warning">
+            <strong>Piège courant :</strong> confondre un SGBD avec un simple fichier CSV ou Excel.
+        </div>
+    </div>
+</div>
+
+
+<!-- ── TYPE 4 : Highlight box + key-points ──────────────────────────── -->
+<div class="slide">
+    <div class="slide-content">
+        <h2>Modèle relationnel</h2>
+        <div class="highlight-box">
+            <strong>Définition :</strong> Le modèle relationnel représente les données sous forme de <em>relations</em> (tables), composées de <em>tuples</em> (lignes) et d'<em>attributs</em> (colonnes).
+        </div>
+        <ul class="key-points">
+            <li>Chaque table a une <strong>clé primaire</strong> unique par ligne</li>
+            <li>Les <strong>clés étrangères</strong> expriment les associations entre tables</li>
+            <li>Le schéma est défini <em>avant</em> l'insertion des données</li>
+        </ul>
+    </div>
+</div>
+
+
+<!-- ── TYPE 5 : Deux colonnes + compare-grid ────────────────────────── -->
+<div class="slide">
+    <div class="slide-content">
+        <h2>SQL vs NoSQL</h2>
+        <div class="compare-grid">
+            <div class="compare-item good" data-label="SQL — Avantages">
+                <ul>
+                    <li>Schéma rigide et cohérent</li>
+                    <li>Transactions ACID</li>
+                    <li>Requêtes complexes (JOIN)</li>
+                </ul>
+            </div>
+            <div class="compare-item bad" data-label="SQL — Limites">
+                <ul>
+                    <li>Scalabilité horizontale difficile</li>
+                    <li>Migrations de schéma lourdes</li>
+                    <li>Moins adapté aux données hétérogènes</li>
+                </ul>
+            </div>
+        </div>
+        <p class="inline-note">Le choix dépend du volume, de la structure et des contraintes de cohérence.</p>
+    </div>
+</div>
+
+
+<!-- ── TYPE 6 : Métriques + big-stat ────────────────────────────────── -->
+<div class="slide">
+    <div class="slide-content">
+        <h2>Quelques chiffres</h2>
+        <div class="metrics-grid">
+            <div class="metric-card accent">
+                <span class="metric-value">3,4 ZB</span>
+                <span class="metric-label">Données créées en 2023</span>
+            </div>
+            <div class="metric-card good">
+                <span class="metric-value">800+</span>
+                <span class="metric-label">SGBD référencés</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-value">41 ans</span>
+                <span class="metric-label">Âge du standard SQL</span>
+            </div>
+        </div>
+        <div class="big-stat">
+            <span class="stat-value">97%</span>
+            <span class="stat-label">des entreprises Fortune 500 utilisent une base relationnelle</span>
+        </div>
+    </div>
+</div>
+
+
+<!-- ── TYPE 7 : Code / terminal ──────────────────────────────────────── -->
+<div class="slide">
+    <div class="slide-content">
+        <h2>Requête SQL — exemple</h2>
+        <div class="terminal">
+            <code><span class="prompt">psql&gt;</span> <span class="comment">-- Top produits, novembre 2024</span>
+SELECT p.nom, COUNT(c.id) AS nb_commandes,
+       SUM(c.montant)     AS total_ht
+FROM   produits p
+JOIN   commandes c ON c.produit_id = p.id
+WHERE  c.date &gt;= '2024-11-01'
+GROUP  BY p.nom
+ORDER  BY nb_commandes DESC
+LIMIT  10;</code>
+        </div>
+        <div class="tip-box">
+            Toujours préférer <code>JOIN</code> explicite à une jointure dans le <code>WHERE</code>.
+        </div>
+    </div>
+</div>
+
+
+<!-- ── TYPE 8 : Tableau glassmorphism ───────────────────────────────── -->
+<div class="slide">
+    <div class="slide-content">
+        <h2>Types d'index courants</h2>
+        <div class="table-glass">
+            <table>
+                <thead>
+                    <tr><th>Type</th><th>Structure</th><th>Cas d'usage</th><th>Complexité</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>B-Tree</td><td>Arbre équilibré</td><td>Égalité, plages, tri</td><td>O(log n)</td></tr>
+                    <tr><td>Hash</td><td>Table de hachage</td><td>Égalité stricte</td><td>O(1)</td></tr>
+                    <tr><td>GIN</td><td>Index inversé</td><td>JSON, full-text</td><td>O(log n)</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="inline-note">Par défaut PostgreSQL crée un B-Tree sur chaque PRIMARY KEY et UNIQUE.</p>
+    </div>
+</div>
+
+
+<!-- ── TYPE 9 : Séparateur de section ───────────────────────────────── -->
+<div class="slide">
+    <div class="slide-content">
+        <div class="slide-divider">
+            <span class="section-number">4</span>
+            <h2>Indexation et performances</h2>
+            <p class="slide-subtitle">Comprendre EXPLAIN ANALYZE et les stratégies d'optimisation</p>
+        </div>
+    </div>
+</div>
+
+
+<!-- ── TYPE 10 : Conclusion + citation ──────────────────────────────── -->
+<div class="slide">
+    <div class="slide-content">
+        <h2>À retenir</h2>
+        <ul class="key-points">
+            <li class="fragment" data-fragment-index="1">Un SGBD offre persistance, cohérence et accès concurrent</li>
+            <li class="fragment" data-fragment-index="2">SQL est déclaratif : on exprime <em>quoi</em>, pas <em>comment</em></li>
+            <li class="fragment" data-fragment-index="3">L'indexation améliore les lectures, mais a un coût en écriture</li>
+            <li class="fragment grow highlight-current" data-fragment-index="4">Toujours mesurer avant d'optimiser</li>
+        </ul>
+        <div class="quote-block">
+            <blockquote>Premature optimization is the root of all evil.</blockquote>
+            <cite>Donald Knuth, 1974</cite>
+        </div>
+        <p class="source">Silberschatz, Korth, Sudarshan — <em>Database System Concepts</em>, 7e éd., McGraw-Hill, 2020.</p>
+    </div>
+</div>
+
+
+<!-- ── TYPE 11 : Paire auto-animate (1/2) ──────────────────────────── -->
+<div class="slide" data-auto-animate-id="sql-demo">
+    <div class="slide-content">
+        <h2 data-auto-animate-key="title">Optimisation d'une requête</h2>
+        <div class="terminal" data-auto-animate-key="code">
+            <code><span class="prompt">psql&gt;</span> EXPLAIN ANALYZE
+SELECT *
+FROM   inscriptions
+WHERE  semestre = '2024-A';</code>
+        </div>
+        <p class="inline-note" data-auto-animate-key="note">Étape 1 : visualiser le coût réel avant toute optimisation.</p>
+    </div>
+</div>
+
+
+<!-- ── TYPE 12 : Paire auto-animate (2/2) ──────────────────────────── -->
+<div class="slide" data-auto-animate-id="sql-demo">
+    <div class="slide-content">
+        <h2 data-auto-animate-key="title">Optimisation d'une requête</h2>
+        <div class="terminal" data-auto-animate-key="code">
+            <code><span class="prompt">psql&gt;</span> CREATE INDEX idx_inscriptions_semestre
+    ON inscriptions (semestre);
+
+<span class="prompt">psql&gt;</span> EXPLAIN ANALYZE
+SELECT *
+FROM   inscriptions
+WHERE  semestre = '2024-A';</code>
+        </div>
+        <p class="inline-note" data-auto-animate-key="note">Étape 2 : appliquer un index ciblé et comparer immédiatement le nouveau plan.</p>
+    </div>
+</div>

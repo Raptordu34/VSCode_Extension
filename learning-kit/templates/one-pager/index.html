@@ -3,23 +3,356 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{TITRE}}</title>
+    <title>Référentiel des Composants — One Pager</title>
     <link rel="stylesheet" href="../../layouts/single-scroll.css">
     <link rel="stylesheet" href="./components.css">
+    <style>
+        /* base.css (importé par components.css) écrase le background de single-scroll.css
+           via le shorthand `background: transparent`. On réaffirme le fond ici. */
+        body {
+            background-color: var(--bg-color);
+            padding: 0;
+        }
+        /* Bouton print discret */
+        .print-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 10px;
+            font-size: 0.78rem;
+            font-family: var(--font-family);
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            backdrop-filter: blur(12px);
+            transition: all 0.2s;
+            z-index: 50;
+        }
+        .print-btn:hover {
+            background: rgba(214,117,86,0.12);
+            border-color: rgba(214,117,86,0.3);
+            color: var(--accent);
+        }
+        @media print {
+            .blob, .cursor-halo, .reading-progress, .print-btn { display: none !important; }
+            body { background: white !important; }
+            .page-container { max-width: 100%; padding: 1rem; }
+        }
+    </style>
 </head>
 <body>
+    <!-- Barre de progression de lecture -->
+    <div class="reading-progress" id="reading-progress"></div>
+
+    <!-- Fond ambiant -->
     <div class="blob blob-1"></div>
     <div class="cursor-halo" id="cursor-halo"></div>
+
     <div class="page-container">
         <div class="page-header">
             <h1>{{TITRE}}</h1>
             <p>{{SOUS_TITRE}}</p>
         </div>
-        <!-- Contenu généré par LLM -->
+
+        <!-- ═══════════════════════════════════════════
+             Contenu généré par LLM — remplacer ce bloc
+             ═══════════════════════════════════════════ -->
+
+        <h2>Référentiel des Composants</h2>
+
+        <!-- ── SECTION BLOCK ── -->
+        <div class="section-block">
+            <h3>Section Block — container principal</h3>
+            <p>
+                Tout le contenu d'une thématique s'inscrit dans un <code>.section-block</code> —
+                encadré glassmorphism avec reflet supérieur et ombre portée multicouche.
+                Chaque block représente <strong>une idée principale</strong>.
+            </p>
+
+            <div class="key-point">
+                <strong>Règle d'or :</strong> 2 à 5 <code>section-block</code> maximum par document.
+                Un one-pager doit tenir en une seule lecture fluide.
+            </div>
+
+            <div class="tip-box">
+                <strong>Conseil :</strong> Commencer chaque section par une phrase d'accroche courte,
+                puis développer avec les sous-éléments visuels (listes, metrics, callouts).
+            </div>
+        </div>
+
+        <!-- ── MÉTRIQUES ── -->
+        <div class="section-block">
+            <h3>Métriques clés — <code>.metrics-grid</code></h3>
+            <p>
+                Placer les <strong>chiffres impactants</strong> en haut du document, juste après
+                le titre de section, pour ancrer le lecteur dans le contexte.
+                Variantes de couleur : <code>.accent</code>, <code>.good</code>, <code>.bad</code>.
+            </p>
+
+            <div class="metrics-grid">
+                <div class="metric-card good">
+                    <span class="metric-value">98.4%</span>
+                    <span class="metric-label">Disponibilité</span>
+                </div>
+                <div class="metric-card accent">
+                    <span class="metric-value">4.2×</span>
+                    <span class="metric-label">Gain vitesse</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-value">12 ms</span>
+                    <span class="metric-label">Latence P95</span>
+                </div>
+                <div class="metric-card bad">
+                    <span class="metric-value">+340%</span>
+                    <span class="metric-label">Complexité ops</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-value">3 équipes</span>
+                    <span class="metric-label">Impactées</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── MISE EN VALEUR ── -->
+        <div class="section-block">
+            <h3>Mise en valeur</h3>
+
+            <h4>Définition formelle — <code>.highlight-box</code></h4>
+            <div class="highlight-box">
+                <strong>Définition :</strong> Un <em>one-pager</em> est un document synthétique
+                conçu pour être lu en moins de 5 minutes. Il présente un sujet complexe
+                de manière <strong>structurée, dense et visuellement hiérarchisée</strong>,
+                sans sacrifier la précision au profit de la brièveté.
+            </div>
+
+            <h4>Callout info — <code>.callout-info</code></h4>
+            <div class="callout-info">
+                <strong>Info :</strong> Le one-pager est idéal pour les <em>executive summaries</em>,
+                les fiches de décision, les synthèses de veille technologique ou les présentations
+                d'architecture à des parties prenantes non techniques.
+            </div>
+
+            <h4>Callout avertissement — <code>.callout-warning</code></h4>
+            <div class="callout-warning">
+                <strong>Attention :</strong> Au-delà de 5 <code>.section-block</code>, le document
+                perd son caractère synthétique. Envisager le template <em>rapport-projet</em>
+                ou <em>compte-rendu</em> pour les sujets plus étendus.
+            </div>
+
+            <h4>Callout danger — <code>.callout-danger</code></h4>
+            <div class="callout-danger">
+                <strong>Danger :</strong> Ne jamais surcharger un one-pager avec des tableaux
+                exhaustifs ou des pseudo-codes longs — ces éléments brisent la fluidité
+                de lecture et appartiennent aux templates techniques.
+            </div>
+        </div>
+
+        <!-- ── LISTES ── -->
+        <div class="section-block">
+            <h3>Listes et étapes</h3>
+
+            <h4>Liste à puces — losange orange (automatique)</h4>
+            <ul>
+                <li><strong>Densité maîtrisée</strong> — chaque bullet tient en une ou deux lignes maximum</li>
+                <li>Terme technique en <code>code inline</code> pour les noms d'API, de classes, de commandes</li>
+                <li>Accent <em>orange italique</em> pour les concepts centraux à mémoriser</li>
+                <li>
+                    <span class="badge badge-green">Validé</span>
+                    <span class="badge badge-orange">Important</span>
+                    Les badges qualifient un point inline sans interrompre le flux
+                </li>
+            </ul>
+
+            <h4>Liste ordonnée — numéros terracotta</h4>
+            <ol>
+                <li>Définir le public cible et son niveau d'expertise</li>
+                <li>Identifier les 3 à 5 points absolument non négociables du sujet</li>
+                <li>Structurer en blocs thématiques cohérents</li>
+                <li>Relire en mode lecteur : chaque phrase est-elle indispensable ?</li>
+            </ol>
+
+            <h4>Étapes visuelles — <code>.steps</code></h4>
+            <ul class="steps">
+                <li>Collecter les sources brutes (notes, slides, articles)</li>
+                <li>Extraire les idées-forces et les chiffres clés</li>
+                <li>Rédiger les sections en respectant la limite de blocs</li>
+                <li>Valider la lisibilité en 5 minutes chrono</li>
+            </ul>
+        </div>
+
+        <!-- ── COMPARAISON ── -->
+        <div class="section-block">
+            <h3>Comparaison — <code>.compare-grid</code></h3>
+            <p>
+                Utiliser <code>.compare-grid</code> pour structurer les arbitrages.
+                Chaque item reçoit une classe <code>good</code>, <code>bad</code> ou <code>neutral</code>
+                et un attribut <code>data-label</code> pour le badge.
+            </p>
+
+            <div class="compare-grid">
+                <div class="compare-item good" data-label="Forces">
+                    <ul>
+                        <li>Lecture rapide, impact immédiat</li>
+                        <li>Idéal pour décideurs non techniques</li>
+                        <li>Facile à mettre à jour</li>
+                    </ul>
+                </div>
+                <div class="compare-item bad" data-label="Limites">
+                    <ul>
+                        <li>Ne remplace pas une documentation complète</li>
+                        <li>Perd en pertinence si le sujet évolue vite</li>
+                        <li>Risque de sur-simplification</li>
+                    </ul>
+                </div>
+                <div class="compare-item neutral" data-label="Cas d'usage">
+                    <ul>
+                        <li>Revue de sprint / comité de pilotage</li>
+                        <li>Onboarding d'une nouvelle technologie</li>
+                        <li>Bilan de POC ou d'expérimentation</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── MISE EN PAGE AVANCÉE ── -->
+        <div class="section-block">
+            <h3>Mise en page avancée</h3>
+
+            <h4>Deux colonnes — <code>.two-col</code></h4>
+            <div class="two-col">
+                <div class="highlight-box">
+                    <strong>Template one-pager</strong><br>
+                    Document court, une thématique, audience large.
+                    <span class="badge badge-orange" style="margin-top:0.6rem;display:inline-block">Synthèse</span>
+                </div>
+                <div class="highlight-box">
+                    <strong>Template compte-rendu</strong><br>
+                    Cours complet, sections multiples, sidebar navigation.
+                    <span class="badge badge-blue" style="margin-top:0.6rem;display:inline-block">Détaillé</span>
+                </div>
+            </div>
+
+            <h4>Clé–Valeur — <code>.key-value</code></h4>
+            <dl class="key-value">
+                <dt>Type</dt>             <dd>Document synthétique</dd>
+                <dt>Sections max</dt>     <dd>5 section-blocks</dd>
+                <dt>Temps de lecture</dt> <dd>&lt; 5 minutes</dd>
+                <dt>Layout</dt>           <dd>single-scroll (sans sidebar)</dd>
+            </dl>
+
+            <p class="inline-note">Note : remplacer le bloc de contenu dans <code>index.html</code> par le contenu généré.</p>
+
+            <h4>Figure — <code>.figure-box</code></h4>
+            <div class="figure-box">
+                <span class="figure-placeholder">[ Insérer ici un schéma, diagramme ou image ]<br>
+                Exemple : <code>&lt;img src="schema-architecture.png"&gt;</code></span>
+                <figcaption>Fig. 1 — Exemple de diagramme d'architecture embarqué inline</figcaption>
+            </div>
+        </div>
+
+        <!-- ── TABLEAUX & CODE ── -->
+        <div class="section-block">
+            <h3>Tableaux et code</h3>
+
+            <h4>Tableau glassmorphism — <code>.table-glass</code></h4>
+            <div class="table-glass">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Template</th>
+                            <th>Structure</th>
+                            <th>Audience</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>one-pager</strong></td>
+                            <td>Single scroll</td>
+                            <td>Décideurs, pairs</td>
+                            <td><span class="badge badge-green">Prêt</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>compte-rendu</strong></td>
+                            <td>Sidebar + iframe</td>
+                            <td>Étudiants, réviseurs</td>
+                            <td><span class="badge badge-green">Prêt</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>cheat-sheet</strong></td>
+                            <td>Grille dense</td>
+                            <td>Développeurs</td>
+                            <td><span class="badge badge-blue">Disponible</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>comparatif</strong></td>
+                            <td>Colonnes parallèles</td>
+                            <td>Architectes</td>
+                            <td><span class="badge badge-orange">Beta</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h4>Bloc code — <code>pre</code></h4>
+            <pre><code>&lt;div class="section-block"&gt;
+    &lt;h3&gt;Première thématique&lt;/h3&gt;
+    &lt;p&gt;Contenu...&lt;/p&gt;
+    &lt;div class="key-point"&gt;Point essentiel à retenir.&lt;/div&gt;
+&lt;/div&gt;
+
+&lt;div class="metrics-grid"&gt;
+    &lt;div class="metric-card accent"&gt;
+        &lt;span class="metric-value"&gt;42%&lt;/span&gt;
+        &lt;span class="metric-label"&gt;Gain&lt;/span&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+        </div>
+
+        <!-- ── BADGES & SOURCES ── -->
+        <div class="section-block">
+            <h3>Badges et citations</h3>
+
+            <p>
+                Qualifier un concept inline :
+                <span class="badge badge-orange">Important</span>
+                <span class="badge badge-blue">Théorie</span>
+                <span class="badge badge-green">Validé</span>
+                <span class="badge badge-red">Attention</span>
+            </p>
+
+            <p class="source">Newman, S. (2021). <em>Building Microservices</em>, 2nd ed. O'Reilly. §3.2 — Principes de décomposition</p>
+            <p class="source">Martin Fowler — <em>bliki : One-Pager Pattern</em>, martinfowler.com</p>
+        </div>
+
+        <!-- ═══════════════════════════════════════════
+             Fin du contenu
+             ═══════════════════════════════════════════ -->
+
     </div>
+
+    <button class="print-btn" onclick="window.print()">⎙ Imprimer</button>
+
     <script>
+        // Halo curseur
         const halo = document.getElementById('cursor-halo');
-        document.addEventListener('mousemove', (e) => { halo.style.left = e.clientX + 'px'; halo.style.top = e.clientY + 'px'; });
+        document.addEventListener('mousemove', (e) => {
+            halo.style.left = e.clientX + 'px';
+            halo.style.top  = e.clientY + 'px';
+        });
+
+        // Barre de progression de lecture
+        const progressBar = document.getElementById('reading-progress');
+        document.addEventListener('scroll', () => {
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const pct       = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+            progressBar.style.width = Math.min(pct, 100) + '%';
+        }, { passive: true });
     </script>
 </body>
 </html>

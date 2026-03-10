@@ -5,6 +5,101 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{TITRE}}</title>
     <link rel="stylesheet" href="../../layouts/sidebar-iframe.css">
+    <style>
+        /* ── Toolbar flottant en haut à droite du panel contenu ── */
+        .content-toolbar {
+            position: absolute;
+            top: 18px;
+            right: 24px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        /* Annuler le position:absolute hérité de sidebar-iframe.css
+           pour que le bouton reste dans le flux flex du toolbar */
+        .content-toolbar .floating-toggle-btn {
+            position: static;
+        }
+
+        /* Bouton secondaire (effacer, export) — moins proéminent */
+        .toolbar-btn-secondary {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 8px 14px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--text-secondary, #9e9a94);
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+            backdrop-filter: blur(12px);
+        }
+        .toolbar-btn-secondary:hover {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-primary, #f5f3f0);
+            border-color: rgba(255,255,255,0.22);
+        }
+        .toolbar-btn-secondary.danger:hover {
+            background: rgba(248,113,113,0.12);
+            border-color: rgba(248,113,113,0.3);
+            color: #fca5a5;
+        }
+
+        /* Chronomètre */
+        .timer-display {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 8px 14px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.09);
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-secondary, #9e9a94);
+            font-variant-numeric: tabular-nums;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            backdrop-filter: blur(12px);
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .timer-display:hover { background: rgba(255,255,255,0.08); }
+        .timer-display.running { color: #6ee7b7; border-color: rgba(52,211,153,0.25); }
+        .timer-display.running .timer-dot { background: #6ee7b7; animation: blink 1s ease-in-out infinite; }
+        .timer-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary, #9e9a94); }
+        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+        /* Badge "Sauvegardé" */
+        .save-badge {
+            font-size: 0.72rem;
+            color: rgba(52,211,153,0.6);
+            opacity: 0;
+            transition: opacity 0.4s;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .save-badge.visible { opacity: 1; }
+
+        /* Progress dot sur les boutons de navigation */
+        .nav-btn.nav-done::after {
+            content: '';
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 8px;
+            background: #6ee7b7;
+            border-radius: 50%;
+            box-shadow: 0 0 6px rgba(52,211,153,0.6);
+        }
+    </style>
 </head>
 <body>
     <div class="blob blob-1"></div>
@@ -19,58 +114,221 @@
             <div class="nav-links" id="nav-links">
                 <!-- Exemple :
                 <button class="nav-btn active" onclick="loadSection('section-ex1.html', this)">
-                    <span class="icon"><svg ...></svg></span> Exercice 1
+                    <span class="icon">…</span> Exercice 1
+                </button>
+                <button class="nav-btn" onclick="loadSection('section-ex2.html', this)">
+                    Exercice 2
                 </button>
                 -->
+                <button class="nav-btn" onclick="loadSection('section-EXAMPLE.html', this)">Exemple</button>
             </div>
         </nav>
 
         <main class="main-content">
             <div class="glass-panel content-wrapper">
+
+                <!-- Toolbar flottant — visible sur le contenu, pas dans la sidebar -->
+                <div class="content-toolbar">
+                    <!-- Chronomètre — clic pour démarrer/pauser, double-clic pour reset -->
+                    <div class="timer-display" id="timer" onclick="toggleTimer()" ondblclick="resetTimer()" title="Clic : démarrer/pauser · Double-clic : reset">
+                        <span class="timer-dot"></span>
+                        <span id="timer-text">00:00</span>
+                    </div>
+
+                    <span class="save-badge" id="save-badge">✓ sauvegardé</span>
+
+                    <!-- Effacer les réponses -->
+                    <button class="toolbar-btn-secondary danger" onclick="clearAnswers()" title="Effacer toutes les réponses de cet exercice">
+                        ✕ Effacer
+                    </button>
+
+                    <!-- Export des notes -->
+                    <button class="toolbar-btn-secondary" onclick="exportAnswers()" title="Télécharger mes réponses en texte brut">
+                        ↓ Export
+                    </button>
+
+                    <!-- Révéler toutes les solutions -->
+                    <button class="floating-toggle-btn" id="solutions-toggle" onclick="toggleAllSolutions()">
+                        ▶ Révéler toutes les solutions
+                    </button>
+                </div>
+
                 <iframe id="content-frame" src="" frameborder="0"></iframe>
             </div>
         </main>
     </div>
 
     <script>
+        // ── Halo curseur ──────────────────────────────────────────────────
         const halo = document.getElementById('cursor-halo');
         function moveHalo(x, y) { halo.style.left = x + 'px'; halo.style.top = y + 'px'; }
         document.addEventListener('mousemove', (e) => moveHalo(e.clientX, e.clientY));
         function attachIframeHalo(frame) {
-            try { frame.contentWindow.document.addEventListener('mousemove', (e) => { const r = frame.getBoundingClientRect(); moveHalo(r.left + e.clientX, r.top + e.clientY); }); } catch(e) {}
+            try {
+                frame.contentWindow.document.addEventListener('mousemove', (e) => {
+                    const r = frame.getBoundingClientRect();
+                    moveHalo(r.left + e.clientX, r.top + e.clientY);
+                });
+            } catch(e) {}
         }
 
+        // ── Navigation et persistance ─────────────────────────────────────
+        let solutionsRevealed = false;
+
         window.onload = () => {
-            const savedSection = localStorage.getItem('currentSection_td');
             const buttons = document.querySelectorAll('.nav-btn');
-            const firstSection = buttons.length ? buttons[0].getAttribute('onclick').match(/'([^']+)'/)?.[1] : '';
-            const target = savedSection || firstSection;
+            if (!buttons.length) return;
+
+            const saved   = localStorage.getItem('td_currentSection');
+            const first   = buttons[0].getAttribute('onclick')?.match(/'([^']+)'/)?.[1] || '';
+            const savedOk = saved && [...buttons].some(b => b.getAttribute('onclick')?.includes(saved));
+            const target  = savedOk ? saved : first;
+
             if (target) loadSection(target, null);
-            if (savedSection) {
-                buttons.forEach(b => { if (b.getAttribute('onclick')?.includes(savedSection)) b.classList.add('active'); });
-            } else if (buttons.length) {
-                buttons[0].classList.add('active');
-            }
+            buttons.forEach(b => {
+                if (b.getAttribute('onclick')?.includes(target)) b.classList.add('active');
+            });
+
+            // Restaurer les indicateurs de progression
+            restoreProgressDots();
         };
 
         function loadSection(url, button) {
             const frame = document.getElementById('content-frame');
             frame.style.opacity = 0;
-            localStorage.setItem('currentSection_td', url);
+            localStorage.setItem('td_currentSection', url);
+
+            // Réinitialiser le toggle quand on change d'exercice
+            solutionsRevealed = false;
+            updateToggleBtn();
+
             setTimeout(() => {
                 frame.src = url;
                 frame.onload = () => {
                     frame.style.opacity = 1;
                     attachIframeHalo(frame);
-                    const pos = localStorage.getItem('scroll_td_' + url);
+                    // Restaurer position de scroll
+                    const pos = localStorage.getItem('td_scroll_' + url);
                     if (pos) frame.contentWindow.scrollTo(0, parseInt(pos));
                     frame.contentWindow.addEventListener('scroll', () => {
-                        localStorage.setItem('scroll_td_' + url, frame.contentWindow.scrollY);
-                    });
+                        localStorage.setItem('td_scroll_' + url, frame.contentWindow.scrollY);
+                    }, { passive: true });
                 };
-            }, 300);
+            }, 280);
+
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             if (button) button.classList.add('active');
+        }
+
+        // ── Révéler / Masquer toutes les solutions ────────────────────────
+        function toggleAllSolutions() {
+            solutionsRevealed = !solutionsRevealed;
+            updateToggleBtn();
+            sendToFrame(solutionsRevealed ? 'show-all-solutions' : 'hide-all-solutions');
+        }
+
+        function updateToggleBtn() {
+            const btn = document.getElementById('solutions-toggle');
+            btn.innerHTML = solutionsRevealed
+                ? '▼ Masquer les solutions'
+                : '▶ Révéler toutes les solutions';
+        }
+
+        // ── Effacer les réponses (avec confirmation) ──────────────────────
+        function clearAnswers() {
+            if (!confirm('Effacer toutes vos réponses pour cet exercice ?\nCette action est irréversible.')) return;
+            sendToFrame('clear-answers');
+        }
+
+        // ── Export des notes en texte ─────────────────────────────────────
+        function exportAnswers() {
+            sendToFrame('export-answers');
+        }
+
+        function sendToFrame(msg) {
+            const frame = document.getElementById('content-frame');
+            try { frame.contentWindow.postMessage(msg, '*'); } catch(e) {}
+        }
+
+        // ── Chronomètre ───────────────────────────────────────────────────
+        let timerInterval = null;
+        let timerSeconds  = 0;
+        let timerRunning  = false;
+
+        function toggleTimer() {
+            const display = document.getElementById('timer');
+            if (timerRunning) {
+                clearInterval(timerInterval);
+                timerRunning = false;
+                display.classList.remove('running');
+            } else {
+                timerInterval = setInterval(() => {
+                    timerSeconds++;
+                    const m = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+                    const s = String(timerSeconds % 60).padStart(2, '0');
+                    document.getElementById('timer-text').textContent = m + ':' + s;
+                }, 1000);
+                timerRunning = true;
+                display.classList.add('running');
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timerRunning  = false;
+            timerSeconds  = 0;
+            document.getElementById('timer-text').textContent = '00:00';
+            document.getElementById('timer').classList.remove('running');
+        }
+
+        // ── Badge "sauvegardé" ────────────────────────────────────────────
+        let saveBadgeTimeout = null;
+        function showSaveBadge() {
+            const badge = document.getElementById('save-badge');
+            badge.classList.add('visible');
+            clearTimeout(saveBadgeTimeout);
+            saveBadgeTimeout = setTimeout(() => badge.classList.remove('visible'), 2000);
+        }
+
+        // ── Messages entrants depuis l'iframe ────────────────────────────
+        window.addEventListener('message', (e) => {
+            if (e.data?.type === 'solution-revealed') {
+                markDone(localStorage.getItem('td_currentSection') || '');
+            }
+            if (e.data?.type === 'answer-saved') {
+                showSaveBadge();
+            }
+            if (e.data?.type === 'export-data') {
+                downloadAnswers(e.data.text);
+            }
+        });
+
+        function markDone(sectionUrl) {
+            if (!sectionUrl) return;
+            localStorage.setItem('td_done_' + sectionUrl, '1');
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                const url = btn.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+                if (url === sectionUrl) btn.classList.add('nav-done');
+            });
+        }
+
+        function downloadAnswers(text) {
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = 'mes-reponses.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function restoreProgressDots() {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                const url = btn.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+                if (url && localStorage.getItem('td_done_' + url)) {
+                    btn.classList.add('nav-done');
+                }
+            });
         }
     </script>
 </body>

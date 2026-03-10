@@ -3,39 +3,468 @@
 <head>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="./components.css">
+    <script src="./section-utils.js" defer></script>
 </head>
 <body>
 
-    <h2>Exercice N : Titre de l'exercice</h2>
+    <h2>Exercice 3 — Optimisation et Indexation SQL</h2>
 
-    <div class="question">
-        <h3 style="margin-top: 0;">Question 1</h3>
-        <p>Énoncé de la question. Ex : Créer une vue matérialisée qui calcule la moyenne des notes par cours.</p>
+    <!-- ── EN-TÊTE DE L'EXERCICE ── -->
+    <div class="exo-header">
+        <div class="exo-meta">
+            <span class="diff-badge diff-moyen">Intermédiaire</span>
+            <span class="exo-points">◎ 14 pts</span>
+            <span class="exo-time">⏱ 30–45 min</span>
+        </div>
+        <div class="objectifs">
+            <strong>Objectifs</strong>
+            <ul>
+                <li>Identifier les goulots d'étranglement d'une requête SQL</li>
+                <li>Choisir le type d'index adapté à un cas d'usage donné</li>
+                <li>Écrire et mesurer l'effet d'une vue matérialisée</li>
+            </ul>
+        </div>
+        <p class="exo-prereq"><strong>Prérequis :</strong> Cours 4 — <em>Modèle relationnel</em> · Cours 6 — <em>Optimisation de requêtes</em></p>
     </div>
 
-    <div class="hint">
-        Indice : penser à la clause <code>GROUP BY</code> et à <code>CREATE MATERIALIZED VIEW</code>.
+    <!-- ── CONTEXTE ── -->
+    <div class="context-block">
+        <h3 style="margin-top:0;">Contexte — Système de gestion pédagogique</h3>
+        <p>
+            Vous travaillez sur la base de données d'un établissement d'enseignement supérieur.
+            Le DBA constate des requêtes lentes sur les relevés de notes et vous demande de diagnostiquer
+            et corriger les performances.
+        </p>
+
+        <div class="table-glass">
+            <table>
+                <thead>
+                    <tr><th>Table</th><th>Colonnes</th><th>Lignes</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Etudiants</strong></td><td><code>ID_etudiant</code>, <code>nom</code>, <code>prenom</code>, <code>date_naissance</code></td><td>12 000</td></tr>
+                    <tr><td><strong>Cours</strong></td><td><code>ID_cours</code>, <code>intitule</code>, <code>credits</code>, <code>ID_dept</code></td><td>340</td></tr>
+                    <tr><td><strong>Inscriptions</strong></td><td><code>ID_etudiant</code>, <code>ID_cours</code>, <code>semestre</code>, <code>note</code></td><td>180 000</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="callout-info">
+            <strong>Note :</strong> Aucun index secondaire n'existe pour l'instant — seules les clés primaires
+            sont indexées. La requête de référence pour les questions 1 et 2 est donnée ci-dessous.
+        </div>
+
+        <pre><code>-- Requête de référence (actuellement : ~2 400 ms)
+SELECT e.nom, e.prenom, c.intitule, i.note
+FROM   Etudiants e
+JOIN   Inscriptions i ON i.ID_etudiant = e.ID_etudiant
+JOIN   Cours c        ON c.ID_cours    = i.ID_cours
+WHERE  i.semestre = '2024-A'
+  AND  i.note     >= 10
+ORDER BY e.nom;</code></pre>
     </div>
 
-    <div class="solution">
-        <h3 style="margin-top: 0;">Solution</h3>
-        <p>Explication de la démarche :</p>
+    <button class="hint-btn" data-hint="rappel-btree" data-label="Rappel de cours" data-close-label="Masquer le rappel" aria-expanded="false">
+        <span class="btn-arrow">▶</span>
+        <span class="btn-label">Rappel de cours</span>
+    </button>
+    <div class="hint" id="rappel-btree">
+        Un index B-tree est efficace pour les filtres d'égalité, les intervalles et les tris compatibles avec son ordre.
+        Si la requête filtre sur <code>semestre</code> puis sur <code>note</code>, l'ordre des colonnes dans l'index influe directement sur son utilité.
+    </div>
+
+    <button class="hint-btn" data-hint="rappel-plan-long" data-label="Rappel de cours approfondi" data-close-label="Masquer le rappel" aria-expanded="false">
+        <span class="btn-arrow">▶</span>
+        <span class="btn-label">Rappel de cours approfondi</span>
+    </button>
+    <div class="hint" id="rappel-plan-long">
+        <p><strong>Lecture d'un plan :</strong> un plan d'exécution indique dans quel ordre PostgreSQL lit, filtre, joint et trie les données.</p>
+        <p><strong>Réflexe utile :</strong> avant de créer un index, vérifier d'abord où le moteur lit trop de lignes ou trie trop tard dans le pipeline.</p>
         <ul>
-            <li>Étape 1 : identifier les colonnes nécessaires</li>
-            <li>Étape 2 : écrire la requête de base</li>
+            <li><strong>Seq Scan :</strong> parcours complet de table, parfois normal sur de petits volumes, coûteux sur de gros ensembles.</li>
+            <li><strong>Index Scan :</strong> accès ciblé si la condition de filtre correspond à un index exploitable.</li>
+            <li><strong>Sort :</strong> étape potentiellement chère si le tri porte sur beaucoup de lignes et déborde en disque.</li>
         </ul>
-        <p>Requête finale :</p>
-        <code>CREATE MATERIALIZED VIEW vm_moyennes AS SELECT ID_cours, AVG(Note) AS moyenne FROM Inscriptions GROUP BY ID_cours;</code>
+
+        <div class="highlight-box">
+            <p><span class="badge badge-orange">Repère</span></p>
+            <p>Si une étape lit des dizaines de milliers de lignes pour n'en conserver que quelques milliers, le problème est souvent un filtrage trop tardif.</p>
+        </div>
+
+        <div class="table-glass">
+            <table>
+                <thead>
+                    <tr><th>Nœud</th><th>Question à se poser</th><th>Signal d'alerte</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Seq Scan</strong></td><td>La table est-elle trop grosse pour une lecture complète ?</td><td>Beaucoup de lignes supprimées par le filtre</td></tr>
+                    <tr><td><strong>Sort</strong></td><td>Le tri pourrait-il être évité par un index ?</td><td><code>external merge</code> ou gros volume trié</td></tr>
+                    <tr><td><strong>Hash Join</strong></td><td>La jointure est-elle correcte mais alimentée par trop de lignes ?</td><td>Temps élevé malgré une jointure raisonnable</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
+
+    <div class="two-col">
+        <div class="highlight-box">
+            <p><span class="badge badge-green">Exemple</span></p>
+            <p>
+                Si <code>Inscriptions</code> contient seulement 200 lignes, un <code>Seq Scan</code> reste souvent acceptable.
+                Avec 180 000 lignes, le même parcours devient coûteux : le besoin d'indexation change d'échelle.
+            </p>
+        </div>
+
+        <div class="callout-info">
+            <p><span class="badge badge-blue">Analogie</span></p>
+            <p><strong>Intuition :</strong> un index joue le rôle d'un sommaire dans un manuel. Sans lui, le moteur relit page après page ; avec lui,
+            il saute directement au bon chapitre puis affine la recherche.</p>
+        </div>
+    </div>
+
+    <div class="two-col">
+        <div class="highlight-box">
+            <p><span class="badge badge-green">Exemple développé</span></p>
+            <p>
+                Supposons qu'un relevé de notes soit demandé pour 3 200 inscriptions pertinentes parmi 180 000 lignes stockées.
+                Sans index composite, PostgreSQL parcourt toute la table, filtre tardivement, puis trie le résultat.
+            </p>
+            <ul>
+                <li>Lecture initiale : 180 000 lignes consultées.</li>
+                <li>Lignes utiles : environ 3 200.</li>
+                <li>Effet attendu après indexation : accès direct au sous-ensemble filtré.</li>
+            </ul>
+
+            <pre><code>CREATE INDEX idx_inscriptions_sem_note
+    ON Inscriptions (semestre, note);</code></pre>
+
+            <p class="inline-note">L'exemple développé montre le contexte, l'action, puis le gain attendu. Il ne se contente pas d'une commande isolée.</p>
+        </div>
+
+        <div class="callout-info">
+            <p><span class="badge badge-blue">Analogie développée</span></p>
+            <p><strong>Image mentale :</strong> imaginez une bibliothèque universitaire sans catalogue. Pour trouver un ouvrage, il faut inspecter chaque rayon l'un après l'autre.</p>
+            <p>
+                L'index est ce catalogue. Il n'écrit pas le contenu à votre place, mais il vous dit immédiatement où aller.
+                Un index composite revient à classer d'abord par discipline, puis par auteur : on réduit progressivement l'espace de recherche.
+            </p>
+            <ul>
+                <li><strong>Sans index :</strong> exploration exhaustive.</li>
+                <li><strong>Avec index simple :</strong> accès rapide à une première catégorie.</li>
+                <li><strong>Avec index composite :</strong> accès rapide à la bonne catégorie puis au bon sous-ensemble.</li>
+            </ul>
+        </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!-- QUESTION 1                                     -->
+    <!-- ══════════════════════════════════════════════ -->
 
     <div class="question">
-        <h3 style="margin-top: 0;">Question 2</h3>
-        <p>Deuxième question de l'exercice...</p>
+        <div class="question-header">
+            <span class="question-num">Q1</span>
+            <span class="question-pts">4 pts</span>
+            <span class="diff-badge diff-fondamental">Fondamental</span>
+        </div>
+        <p>
+            En utilisant <code>EXPLAIN ANALYZE</code>, identifiez les deux opérations les plus coûteuses
+            dans le plan d'exécution de la requête de référence. Justifiez pourquoi elles sont coûteuses.
+        </p>
+
+        <!-- Piège courant — AVANT les indices (efficacité pédagogique prouvée) -->
+        <div class="erreur-freq">
+            <strong>Piège courant :</strong> Confondre le coût estimé (<code>cost=…</code>) avec le temps
+            mesuré (<code>actual time=…</code>). <code>EXPLAIN</code> seul n'exécute pas la requête —
+            utiliser obligatoirement <code>EXPLAIN ANALYZE</code>.
+        </div>
+
+        <!-- Indice 1 (visible dès le départ) -->
+        <button class="hint-btn" data-hint="q1-h1" data-label="Indice 1/2" aria-expanded="false">
+            <span class="btn-arrow">▶</span>
+            <span class="btn-label">Indice 1/2</span>
+        </button>
+        <div class="hint" id="q1-h1">
+            Cherchez les nœuds avec <code>Seq Scan</code> (parcours séquentiel) sur la table la plus volumineuse.
+            Le coût explose quand le moteur parcourt 180 000 lignes sans index.
+        </div>
+
+        <!-- Indice 2 (verrouillé jusqu'à révélation de l'indice 1) -->
+        <button class="hint-btn hint-locked" data-hint="q1-h2" data-label="Indice 2/2" aria-expanded="false">
+            <span class="btn-arrow">▶</span>
+            <span class="btn-label">Indice 2/2</span>
+        </button>
+        <div class="hint" id="q1-h2">
+            Deuxième opération coûteuse : le tri (<code>Sort</code>) sur <code>e.nom</code> porte sur
+            l'ensemble des lignes filtrées. Sans index sur <code>nom</code>, il ne peut pas être évité.
+        </div>
     </div>
 
+    <!-- Zone de réponse -->
+    <div class="reponse-zone" contenteditable="true" data-placeholder="Décrivez les deux opérations coûteuses et leur justification…"></div>
+
+    <!-- Solution -->
+    <button class="solution-btn" aria-expanded="false">
+        <span class="btn-arrow">▶</span>
+        <span class="btn-label">Voir la solution</span>
+    </button>
     <div class="solution">
-        <h3 style="margin-top: 0;">Solution</h3>
-        <p>Réponse à la question 2...</p>
+        <div class="solution-inner">
+            <h4 style="margin-top:0;">Solution — Q1</h4>
+
+            <ul class="steps">
+                <li>Lancer <code>EXPLAIN ANALYZE SELECT …</code> pour obtenir le vrai plan d'exécution.</li>
+                <li>Repérer <strong>Seq Scan on Inscriptions</strong> — parcours de 180 000 lignes sans filtrage préalable par index sur <code>semestre</code> ou <code>note</code>.</li>
+                <li>Repérer <strong>Sort on e.nom</strong> — tri en mémoire ou sur disque de plusieurs milliers de lignes.</li>
+            </ul>
+
+            <div class="terminal">
+                <code><span class="prompt">mydb=#</span> EXPLAIN ANALYZE SELECT e.nom, …;
+                                     QUERY PLAN
+---------------------------------------------------------------------------
+ Sort  (cost=4820..4830 rows=3200 width=72) (actual time=2100..2150 rows=3200)
+   Sort Key: e.nom
+   Sort Method: external merge  Disk: 420kB
+   ->  Hash Join  (cost=210..580 rows=3200 width=72) (actual time=18..1900)
+         ->  Seq Scan on Inscriptions  (cost=0..4800 rows=3200 width=20)
+               Filter: ((semestre = '2024-A') AND (note >= 10))
+               Rows Removed by Filter: 176800
+<span class="comment"># → Seq Scan = coûteux (176 800 lignes ignorées)</span>
+<span class="comment"># → Sort Method: external merge = débordement sur disque</span></code>
+            </div>
+
+            <p class="inline-note">Le <code>Seq Scan</code> élimine 176 800 lignes sur 180 000 : un index sur <code>(semestre, note)</code> réduirait ce coût à O(log n).</p>
+        </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!-- QUESTION 2                                     -->
+    <!-- ══════════════════════════════════════════════ -->
+
+    <div class="question">
+        <div class="question-header">
+            <span class="question-num">Q2</span>
+            <span class="question-pts">5 pts</span>
+            <span class="diff-badge diff-moyen">Intermédiaire</span>
+        </div>
+        <p>
+            Proposez et créez les index qui permettraient d'optimiser la requête de référence.
+            Justifiez chaque choix (type d'index, colonnes, ordre).
+        </p>
+
+        <div class="erreur-freq">
+            <strong>Piège courant :</strong> Créer un index sur <em>chaque</em> colonne de la table.
+            Chaque index ralentit les <code>INSERT</code>/<code>UPDATE</code>. Il faut cibler
+            uniquement les colonnes filtrées (<code>WHERE</code>) et triées (<code>ORDER BY</code>).
+        </div>
+
+        <button class="hint-btn" data-hint="q2-h1" data-label="Indice 1/1" aria-expanded="false">
+            <span class="btn-arrow">▶</span>
+            <span class="btn-label">Indice 1/1</span>
+        </button>
+        <div class="hint" id="q2-h1">
+            Un index <strong>composite</strong> sur <code>(semestre, note)</code> couvre le filtre <code>WHERE</code>.
+            Pour le tri <code>ORDER BY e.nom</code>, un index sur <code>nom</code> dans <code>Etudiants</code>
+            permet au planificateur d'éviter le sort explicite.
+        </div>
+    </div>
+
+    <div class="highlight-box">
+        <p><span class="badge badge-orange">Méthode</span></p>
+        <ul class="steps">
+            <li>Repérer d'abord les colonnes de filtre dans <code>WHERE</code>.</li>
+            <li>Vérifier ensuite si un tri ou une jointure fréquente justifie un second index.</li>
+            <li>Éviter les index isolés inutiles sur des colonnes peu sélectives.</li>
+            <li>Valider la proposition avec un nouveau <code>EXPLAIN ANALYZE</code>.</li>
+        </ul>
+    </div>
+
+    <div class="reponse-zone" contenteditable="true" data-placeholder="Écrivez vos CREATE INDEX et justifiez chaque décision…"></div>
+
+    <button class="solution-btn" aria-expanded="false">
+        <span class="btn-arrow">▶</span>
+        <span class="btn-label">Voir la solution</span>
+    </button>
+    <div class="solution">
+        <div class="solution-inner">
+            <h4 style="margin-top:0;">Solution — Q2</h4>
+
+            <pre><code>-- Index 1 : filtre composite sur Inscriptions
+-- semestre en premier (égalité exacte) → note ensuite (range ≥ 10)
+CREATE INDEX idx_inscriptions_sem_note
+    ON Inscriptions (semestre, note);
+
+-- Index 2 : tri ORDER BY sur Etudiants.nom
+CREATE INDEX idx_etudiants_nom
+    ON Etudiants (nom);</code></pre>
+
+            <div class="two-col">
+                <div class="highlight-box">
+                    <strong>Pourquoi composite ?</strong><br>
+                    Un index <code>(semestre, note)</code> couvre les deux prédicats en un seul
+                    parcours B-tree. L'ordre des colonnes suit la règle du préfixe le plus sélectif.
+                </div>
+                <div class="highlight-box">
+                    <strong>Résultat attendu</strong><br>
+                    Avec ces deux index : <code>Seq Scan</code> → <code>Index Scan</code>,
+                    temps de 2 400 ms → ~40 ms. Gain ×60.
+                </div>
+            </div>
+
+            <div class="table-glass">
+                <table>
+                    <thead>
+                        <tr><th>Opération avant</th><th>Opération après</th><th>Gain</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Seq Scan (180 000 lignes)</td><td>Index Scan (~3 200 lignes)</td><td><span class="badge badge-green">×56</span></td></tr>
+                        <tr><td>Sort (external merge, disque)</td><td>Index Scan (trié natif)</td><td><span class="badge badge-green">Sans tri</span></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="two-col">
+        <div class="highlight-box">
+            <p><span class="badge badge-red">Contre-exemple</span></p>
+            <p>
+                Un index sur <code>note</code> seul semble séduisant, mais il n'aide pas à filtrer d'abord sur
+                <code>semestre = '2024-A'</code>. Le moteur risque alors de parcourir trop d'entrées pour rester performant.
+            </p>
+        </div>
+
+        <div class="callout-info">
+            <strong>Checklist avant validation :</strong>
+            <ul>
+                <li>L'index proposé correspond-il à un vrai filtre ou tri fréquent ?</li>
+                <li>L'ordre des colonnes de l'index est-il justifié ?</li>
+                <li>Le gain est-il vérifié par un plan d'exécution et pas seulement supposé ?</li>
+            </ul>
+        </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!-- QUESTION 3                                     -->
+    <!-- ══════════════════════════════════════════════ -->
+
+    <div class="question">
+        <div class="question-header">
+            <span class="question-num">Q3</span>
+            <span class="question-pts">5 pts</span>
+            <span class="diff-badge diff-avance">Avancé</span>
+        </div>
+        <p>
+            Le rapport de notes par cours est interrogé 500 fois par jour, toujours avec les mêmes agrégats.
+            Implémentez une <strong>vue matérialisée</strong> <code>vm_stats_cours</code> contenant :
+            la moyenne, la note maximale, la note minimale et le nombre d'inscrits par cours et par semestre.
+        </p>
+
+        <div class="sub-question">
+            <strong>a)</strong> Écrivez le DDL de la vue matérialisée.
+        </div>
+        <div class="sub-question">
+            <strong>b)</strong> Ajoutez un index sur la vue pour accélérer les recherches par <code>semestre</code>.
+        </div>
+        <div class="sub-question">
+            <strong>c)</strong> Quelle commande permet de rafraîchir la vue sans bloquer les lectures en production ?
+        </div>
+
+        <div class="erreur-freq">
+            <strong>Piège courant :</strong> Lancer <code>REFRESH MATERIALIZED VIEW vm_stats_cours</code>
+            sans <code>CONCURRENTLY</code>. Sans ce mot-clé, toutes les lectures sont bloquées pendant
+            le rafraîchissement — inacceptable en production.
+        </div>
+
+        <button class="hint-btn" data-hint="q3-h1" data-label="Indice 1/2" aria-expanded="false">
+            <span class="btn-arrow">▶</span>
+            <span class="btn-label">Indice 1/2</span>
+        </button>
+        <div class="hint" id="q3-h1">
+            Syntaxe de base : <code>CREATE MATERIALIZED VIEW nom AS SELECT … WITH DATA;</code>.
+            Utilisez <code>GROUP BY ID_cours, semestre</code> pour les agrégats.
+        </div>
+
+        <button class="hint-locked hint-btn" data-hint="q3-h2" data-label="Indice 2/2" aria-expanded="false">
+            <span class="btn-arrow">▶</span>
+            <span class="btn-label">Indice 2/2</span>
+        </button>
+        <div class="hint" id="q3-h2">
+            Pour <code>REFRESH CONCURRENTLY</code>, la vue doit posséder un <strong>index unique</strong>.
+            Créez-le sur <code>(ID_cours, semestre)</code> avant d'utiliser le refresh concurrent.
+        </div>
+    </div>
+
+    <div class="reponse-zone" contenteditable="true" data-placeholder="Réponses a), b), c)…"></div>
+
+    <button class="solution-btn" aria-expanded="false">
+        <span class="btn-arrow">▶</span>
+        <span class="btn-label">Voir la solution</span>
+    </button>
+    <div class="solution">
+        <div class="solution-inner">
+            <h4 style="margin-top:0;">Solution — Q3</h4>
+
+            <p><strong>a) DDL de la vue matérialisée</strong></p>
+            <pre><code>CREATE MATERIALIZED VIEW vm_stats_cours AS
+    SELECT
+        i.ID_cours,
+        c.intitule,
+        i.semestre,
+        ROUND(AVG(i.note), 2)  AS moyenne,
+        MAX(i.note)            AS note_max,
+        MIN(i.note)            AS note_min,
+        COUNT(*)               AS nb_inscrits
+    FROM Inscriptions i
+    JOIN Cours c ON c.ID_cours = i.ID_cours
+    GROUP BY i.ID_cours, c.intitule, i.semestre
+WITH DATA;</code></pre>
+
+            <p><strong>b) Index pour les recherches par semestre</strong></p>
+            <pre><code>-- Index unique requis pour REFRESH CONCURRENTLY
+CREATE UNIQUE INDEX idx_vm_cours_pk
+    ON vm_stats_cours (ID_cours, semestre);
+
+-- Index secondaire pour les filtres sur semestre seul
+CREATE INDEX idx_vm_cours_semestre
+    ON vm_stats_cours (semestre);</code></pre>
+
+            <p><strong>c) Rafraîchissement sans blocage</strong></p>
+            <pre><code>-- CONCURRENTLY : les lectures restent possibles pendant le refresh
+REFRESH MATERIALIZED VIEW CONCURRENTLY vm_stats_cours;</code></pre>
+
+            <p class="inline-note">Planifier ce <code>REFRESH</code> via <code>pg_cron</code> ou un job externe (toutes les heures, la nuit, ou après chaque vague d'inscriptions).</p>
+        </div>
+    </div>
+
+
+    <!-- ── BARÈME ── -->
+    <div class="bareme">
+        <span class="bareme-pts">4</span>
+        <span class="bareme-label">Q1 — Analyse EXPLAIN ANALYZE</span>
+        <span class="bareme-desc">2 pts par opération coûteuse identifiée et justifiée</span>
+
+        <span class="bareme-pts">5</span>
+        <span class="bareme-label">Q2 — Création d'index</span>
+        <span class="bareme-desc">2 pts DDL corrects · 3 pts justification (ordre, type, sélectivité)</span>
+
+        <span class="bareme-pts">5</span>
+        <span class="bareme-label">Q3 — Vue matérialisée</span>
+        <span class="bareme-desc">2 pts DDL · 1 pt index unique · 2 pts REFRESH CONCURRENTLY + justification</span>
+
+        <div class="bareme-total">Total : <strong>14 pts</strong></div>
+    </div>
+
+
+    <!-- ── POUR ALLER PLUS LOIN ── -->
+    <div class="pour-aller-plus-loin">
+        <strong>Pour aller plus loin</strong>
+        <ul>
+            <li>Comparez <code>EXPLAIN (ANALYZE, BUFFERS)</code> avant et après vos index — observez la colonne <code>shared hit</code>.</li>
+            <li>Que se passe-t-il si vous créez un <em>partial index</em> filtré sur <code>WHERE semestre = '2024-A'</code> ? Quel est l'avantage ?</li>
+            <li>Recherchez la différence entre une vue matérialisée et une vue classique en termes de cohérence des données.</li>
+        </ul>
     </div>
 
 </body>

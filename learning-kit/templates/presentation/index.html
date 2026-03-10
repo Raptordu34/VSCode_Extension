@@ -6,52 +6,1083 @@
     <title>{{TITRE}}</title>
     <link rel="stylesheet" href="../../layouts/slides.css">
     <link rel="stylesheet" href="./components.css">
-</head>
-<body>
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-    <div class="cursor-halo" id="cursor-halo"></div>
+    <style>
+        /* ══════════════════════════════════════════════════════════════
+           CANVAS FIXE 1280×720 (16:9) — scalé par JS au viewport
+           Technique : transform: translate(-50%,-50%) scale(ratio)
+           positionné à left:50% top:50% du viewport
+        ══════════════════════════════════════════════════════════════ */
 
-    <div class="slides-container" id="slides-container">
-        <!-- Slides générées par LLM :
-        <div class="slide active">
-            <div class="slide-content">
-                <h2 class="slide-title">Titre</h2>
-                ...
-            </div>
-        </div>
-        -->
-    </div>
-
-    <nav class="slide-nav">
-        <button onclick="changeSlide(-1)">← Précédent</button>
-        <span class="slide-counter" id="slide-counter">1 / 1</span>
-        <button onclick="changeSlide(1)">Suivant →</button>
-    </nav>
-
-    <script>
-        const halo = document.getElementById('cursor-halo');
-        document.addEventListener('mousemove', (e) => { halo.style.left = e.clientX + 'px'; halo.style.top = e.clientY + 'px'; });
-
-        let currentSlide = parseInt(localStorage.getItem('currentSlide') || '0');
-        const slides = document.querySelectorAll('.slide');
-
-        function showSlide(index) {
-            if (!slides.length) return;
-            currentSlide = Math.max(0, Math.min(index, slides.length - 1));
-            slides.forEach((s, i) => s.classList.toggle('active', i === currentSlide));
-            document.getElementById('slide-counter').textContent = (currentSlide + 1) + ' / ' + slides.length;
-            localStorage.setItem('currentSlide', currentSlide);
+        /* Corps : fond sombre, pas de scroll */
+        body {
+            background-color: var(--bg-color);
+            padding: 0;
+            overflow: hidden;
         }
 
-        function changeSlide(dir) { showSlide(currentSlide + dir); }
+        /* Masquer l'ancienne nav centrée */
+        .slide-nav { display: none; }
 
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') changeSlide(1);
-            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') changeSlide(-1);
+        /* ── Canvas 1280×720 ── */
+        #slides-container {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            width: 1280px;
+            height: 720px;
+            transform-origin: center center;
+            /* transform: translate(-50%,-50%) scale(x) appliqué par scaleSlides() */
+            overflow: hidden;
+            /* transparent — le fond body + halo curseur transparaissent à travers */
+            background: transparent;
+            z-index: 1;
+            will-change: transform;
+        }
+
+        /* ── Slide : couvre tout le canvas, padding pour laisser la carte respirer ── */
+        .slide {
+            position: absolute;
+            top: 0; left: 0;
+            width: 1280px;
+            height: 720px;
+            padding: 2.5rem 3.5rem;
+            box-sizing: border-box;
+            display: flex;
+            align-items: stretch;
+            justify-content: stretch;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.45s ease;
+        }
+        .slide.active  { opacity: 1; pointer-events: all; }
+
+        /* ── Carte glassmorphism 3D — hérite des tokens de design ── */
+        .slide-content {
+            flex: 1;
+            max-width: none;
+            position: relative;
+            isolation: isolate;
+            border: 1px solid var(--glass-border);
+            border-top-color: rgba(255,255,255,0.28);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--glass-shadow),
+                        inset 0 1px 0 rgba(255,255,255,0.18),
+                        0 0 0 1px rgba(255,255,255,0.04);
+            padding: 3rem 4.5rem;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .slide-content::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: var(--glass-shine), var(--glass-bg);
+            backdrop-filter: blur(28px) saturate(180%) brightness(1.05);
+            -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(1.05);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .slide-content > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           UI — en dehors du canvas, fixés au viewport
+        ══════════════════════════════════════════════════════════════ */
+
+        /* ── Flèches latérales ── */
+        .nav-arrow {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.4);
+            width: 46px; height: 46px;
+            border-radius: 50%;
+            font-size: 1.6rem;
+            cursor: pointer;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+            transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center;
+            line-height: 1;
+        }
+        .nav-arrow:hover {
+            background: rgba(214,117,86,0.15);
+            border-color: rgba(214,117,86,0.3);
+            color: var(--accent, #d67556);
+            transform: translateY(-50%) scale(1.08);
+        }
+        .nav-arrow-left  { left: 1rem; }
+        .nav-arrow-right { right: 1rem; }
+
+        /* ── Dots de progression ── */
+        .progress-dots {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex; gap: 0.45rem; align-items: center;
+            z-index: 200;
+        }
+        .progress-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            border: none; cursor: pointer;
+            transition: all 0.25s ease;
+            padding: 0;
+        }
+        .progress-dot.active { width: 22px; border-radius: 3px; background: var(--accent, #d67556); }
+        .progress-dot:hover:not(.active) { background: rgba(255,255,255,0.5); }
+
+        /* ── Compteur ── */
+        .slide-counter-badge {
+            position: fixed;
+            bottom: 1.4rem;
+            right: 2rem;
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.3);
+            font-variant-numeric: tabular-nums;
+            font-family: 'Courier New', monospace;
+            z-index: 200;
+            letter-spacing: 0.04em;
+        }
+
+        /* ── Contrôles haut droite ── */
+        .top-controls {
+            position: fixed;
+            top: 0.9rem; right: 1.25rem;
+            display: flex; gap: 0.4rem;
+            z-index: 200;
+        }
+        .ctrl-btn {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.09);
+            color: rgba(255,255,255,0.35);
+            width: 34px; height: 34px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            position: relative;
+            backdrop-filter: blur(12px);
+            transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center;
+            font-family: inherit;
+        }
+        .ctrl-btn:hover  { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.2); }
+        .ctrl-btn.active { background: rgba(96,165,250,0.12); border-color: rgba(96,165,250,0.28); color: #93c5fd; }
+        .ctrl-btn[data-badge]::after {
+            content: attr(data-badge);
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            min-width: 15px;
+            height: 15px;
+            padding: 0 3px;
+            border-radius: 999px;
+            background: rgba(248,113,113,0.95);
+            color: #fff;
+            font-size: 0.58rem;
+            font-weight: 700;
+            line-height: 15px;
+            text-align: center;
+            box-shadow: 0 0 0 2px rgba(15,15,14,0.95);
+        }
+
+        /* ── Mode progression intra-slide ── */
+        body.progressive-disabled .fragment {
+            transition: none !important;
+        }
+        body.progressive-disabled .fragment,
+        body.progressive-disabled .fragment:not(.fragment-visible),
+        body.progressive-disabled .fragment.fragment-visible {
+            opacity: 1 !important;
+            transform: none !important;
+            filter: none !important;
+            pointer-events: auto !important;
+        }
+
+        /* ── Fragments / reveal progressif ── */
+        .fragment {
+            transition: opacity 0.28s ease, transform 0.35s ease, filter 0.35s ease;
+        }
+        .fragment:not(.fragment-visible) {
+            opacity: 0;
+            transform: translateY(16px);
+            filter: blur(6px);
+            pointer-events: none;
+        }
+        .fragment.fragment-visible {
+            opacity: 1;
+            transform: none;
+            filter: none;
+        }
+        .fragment.fade-left:not(.fragment-visible) { transform: translateX(28px); }
+        .fragment.fade-right:not(.fragment-visible) { transform: translateX(-28px); }
+        .fragment.grow:not(.fragment-visible) { transform: scale(0.92); }
+        .fragment.blur-focus:not(.fragment-visible) { opacity: 0.14; filter: blur(10px); }
+        .fragment.current-fragment.highlight-current {
+            box-shadow: 0 0 0 1px rgba(214,117,86,0.35), 0 0 24px rgba(214,117,86,0.12);
+            border-radius: 10px;
+        }
+
+        /* ── Auto-animate léger entre slides ── */
+        .slide.auto-animate-measure {
+            opacity: 1 !important;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        .slide.auto-animating {
+            transition: opacity 0.2s ease;
+        }
+
+        /* ── Mode contraste / lecture ── */
+        body.high-contrast {
+            background-color: #171513;
+        }
+        body.high-contrast .blob {
+            opacity: 0.18;
+            filter: blur(56px);
+        }
+        body.high-contrast .cursor-halo {
+            opacity: 0.12;
+            filter: blur(5px);
+        }
+        body.high-contrast .slide-content {
+            border-color: rgba(255,255,255,0.22);
+            border-top-color: rgba(255,255,255,0.3);
+            box-shadow: 0 28px 72px rgba(0,0,0,0.62), inset 0 1px 0 rgba(255,255,255,0.12);
+        }
+        body.high-contrast .slide-content::before {
+            background: linear-gradient(160deg, rgba(21,21,19,0.96) 0%, rgba(28,28,26,0.94) 100%);
+            backdrop-filter: blur(10px) saturate(118%) brightness(1.02);
+            -webkit-backdrop-filter: blur(10px) saturate(118%) brightness(1.02);
+        }
+        body.high-contrast .slide-content,
+        body.high-contrast .slide-content p,
+        body.high-contrast .slide-content li,
+        body.high-contrast .slide-content td {
+            color: #f4f1ed;
+            text-shadow: none;
+        }
+        body.high-contrast .slide-subtitle,
+        body.high-contrast .inline-note,
+        body.high-contrast .source,
+        body.high-contrast .metric-label {
+            color: #ddd5cc !important;
+        }
+        body.high-contrast .ctrl-btn,
+        body.high-contrast .nav-arrow,
+        body.high-contrast .overview-shell,
+        body.high-contrast .help-card {
+            border-color: rgba(255,255,255,0.18);
+        }
+
+        /* ── Overview mode ── */
+        .overview-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            z-index: 900;
+            background: rgba(6,6,6,0.86);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 2rem;
+            box-sizing: border-box;
+        }
+        .overview-overlay.visible { display: block; }
+        .overview-shell {
+            height: 100%;
+            background: rgba(24,24,22,0.92);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .overview-header {
+            padding: 1.4rem 1.7rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .overview-header h3 {
+            margin: 0 0 0.35rem;
+            padding: 0;
+            border: none;
+            display: block;
+        }
+        .overview-header h3::before { display: none; }
+        .overview-header p {
+            margin: 0;
+            font-size: 0.86rem;
+            color: var(--text-secondary);
+        }
+        .overview-grid {
+            flex: 1;
+            overflow: auto;
+            padding: 1.25rem 1.5rem 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            align-content: start;
+        }
+        .overview-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 0.8rem;
+            cursor: pointer;
+            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+            text-align: left;
+            color: inherit;
+            position: relative;
+        }
+        .overview-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(214,117,86,0.28);
+            box-shadow: 0 10px 28px rgba(0,0,0,0.28);
+        }
+        .overview-card.active {
+            border-color: rgba(214,117,86,0.35);
+            box-shadow: 0 0 0 1px rgba(214,117,86,0.2), 0 12px 30px rgba(214,117,86,0.08);
+        }
+        .overview-card[data-issues]::after {
+            content: attr(data-issues);
+            position: absolute;
+            top: 0.55rem;
+            right: 0.65rem;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: rgba(248,113,113,0.95);
+            color: #fff;
+            font-size: 0.62rem;
+            font-weight: 700;
+            line-height: 18px;
+            text-align: center;
+        }
+        .overview-card-title {
+            display: block;
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.65rem;
+            letter-spacing: 0.02em;
+        }
+        .overview-preview {
+            height: 156px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: linear-gradient(160deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+            border: 1px solid rgba(255,255,255,0.06);
+            position: relative;
+        }
+        .overview-preview .slide {
+            position: absolute;
+            inset: 0;
+            width: 1280px;
+            height: 720px;
+            padding: 2.5rem 3.5rem;
+            transform-origin: top left;
+            transform: scale(0.217);
+            opacity: 1;
+            pointer-events: none;
+        }
+
+        /* ── Diagnostic auteur ── */
+        .diagnostics-summary {
+            position: fixed;
+            left: 1.3rem;
+            bottom: 1.2rem;
+            z-index: 250;
+            padding: 0.5rem 0.8rem;
+            border-radius: 12px;
+            background: rgba(18,18,17,0.92);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            letter-spacing: 0.02em;
+            display: none;
+        }
+        body.diagnostics-enabled .diagnostics-summary { display: block; }
+        .slide-diagnostics {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 3;
+            display: none;
+            align-items: flex-start;
+            gap: 0.5rem;
+            max-width: 340px;
+        }
+        body.diagnostics-enabled .slide.active[data-diagnostic-count]:not([data-diagnostic-count="0"]) .slide-diagnostics {
+            display: flex;
+        }
+        .slide-diagnostics-badge {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: rgba(248,113,113,0.18);
+            border: 1px solid rgba(248,113,113,0.32);
+            color: #fca5a5;
+            font-size: 0.78rem;
+            font-weight: 800;
+            line-height: 20px;
+            text-align: center;
+        }
+        .slide-diagnostics-panel {
+            background: rgba(18,18,17,0.95);
+            border: 1px solid rgba(248,113,113,0.16);
+            border-radius: 12px;
+            padding: 0.65rem 0.8rem;
+            box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+        }
+        .slide-diagnostics-panel strong {
+            display: block;
+            font-size: 0.74rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #fca5a5;
+            margin-bottom: 0.35rem;
+        }
+        .slide-diagnostics-panel ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .slide-diagnostics-panel li {
+            margin: 0;
+            font-size: 0.76rem;
+            line-height: 1.5;
+            color: #e6ddd5;
+        }
+        body.diagnostics-enabled .slide.active.diagnostic-overflow .slide-content {
+            box-shadow: 0 0 0 1px rgba(248,113,113,0.28), 0 24px 60px rgba(0,0,0,0.45);
+        }
+        body.diagnostics-enabled .slide.active.diagnostic-dense .slide-content {
+            box-shadow: 0 0 0 1px rgba(251,191,36,0.22), 0 24px 60px rgba(0,0,0,0.45);
+        }
+
+        /* ── Overlay d'aide ── */
+        .help-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(12px);
+            z-index: 1000;
+            display: none; align-items: center; justify-content: center;
+        }
+        .help-overlay.visible { display: flex; }
+        .help-card {
+            background: rgba(36,36,34,0.98);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-top-color: rgba(255,255,255,0.22);
+            border-radius: 20px;
+            padding: 2rem 2.5rem;
+            max-width: 400px; width: 100%;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+        }
+        .help-card h3 {
+            margin: 0 0 1.25rem;
+            font-size: 1rem;
+            color: var(--text-primary, #f5f3f0);
+            border: none; padding: 0; display: block; font-weight: 700;
+        }
+        .help-card h3::before { display: none; }
+        .help-shortcuts { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+        .help-shortcuts td { padding: 0.38rem 0.5rem !important; border-bottom: 1px solid rgba(255,255,255,0.06) !important; }
+        .help-shortcuts td:first-child {
+            font-family: 'Courier New', monospace;
+            color: var(--accent, #d67556) !important;
+            white-space: nowrap;
+            padding-right: 1.5rem !important;
+            font-size: 0.78rem;
+        }
+        .help-close {
+            margin-top: 1.25rem; margin-left: auto; display: block;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-secondary, #9e9a94);
+            padding: 5px 20px; border-radius: 20px;
+            cursor: pointer; font-family: inherit; font-size: 0.82rem;
+            transition: all 0.2s;
+        }
+        .help-close:hover { background: rgba(255,255,255,0.1); color: var(--text-primary, #f5f3f0); }
+    </style>
+</head>
+<body>
+    <!-- Cursor halo + blobs au niveau viewport (pas dans le canvas) -->
+    <div class="cursor-halo" id="cursor-halo"></div>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <!-- ── Canvas 1280×720 — peuplé par loadSlides() ── -->
+    <div id="slides-container">
+        <!-- Slides injectées ici par loadSlides() -->
+    </div>
+
+    <!-- ── UI fixée au viewport ── -->
+    <div class="top-controls">
+        <button class="ctrl-btn" id="progressive-btn" onclick="toggleProgressiveMode()" title="Affichage progressif (P)">P</button>
+        <button class="ctrl-btn" id="contrast-btn" onclick="toggleContrastMode()" title="Mode contraste (C)">C</button>
+        <button class="ctrl-btn" id="overview-btn" onclick="toggleOverview()" title="Vue d'ensemble (O)">O</button>
+        <button class="ctrl-btn" id="diagnostics-btn" onclick="toggleDiagnostics()" title="Diagnostic auteur (D)">D</button>
+        <button class="ctrl-btn" id="fullscreen-btn" onclick="toggleFullscreen()" title="Plein écran (F)">⛶</button>
+        <button class="ctrl-btn" onclick="toggleHelp()" title="Aide (?)">?</button>
+    </div>
+
+    <button class="nav-arrow nav-arrow-left"  onclick="changeSlide(-1)" title="Précédent (←)">‹</button>
+    <button class="nav-arrow nav-arrow-right" onclick="changeSlide(1)"  title="Suivant (→)">›</button>
+
+    <div class="progress-dots" id="progress-dots"></div>
+    <div class="slide-counter-badge" id="slide-counter">— / —</div>
+    <div class="diagnostics-summary" id="diagnostics-summary"></div>
+
+    <div class="overview-overlay" id="overview-overlay" onclick="closeOverview(event)">
+        <div class="overview-shell">
+            <div class="overview-header">
+                <h3>Vue d'ensemble</h3>
+                <p>Cliquer sur une slide pour naviguer. Les badges rouges signalent les slides à revoir.</p>
+            </div>
+            <div class="overview-grid" id="overview-grid"></div>
+        </div>
+    </div>
+
+    <!-- Aide -->
+    <div class="help-overlay" id="help-overlay">
+        <div class="help-card">
+            <h3>Raccourcis clavier</h3>
+            <table class="help-shortcuts">
+                <tr><td>← → / Espace</td><td>Slide suivante / précédente</td></tr>
+                <tr><td>↑ ↓</td><td>Navigation (alternative)</td></tr>
+                <tr><td>P</td><td>Activer / désactiver l'affichage progressif</td></tr>
+                <tr><td>F</td><td>Plein écran / quitter</td></tr>
+                <tr><td>C</td><td>Mode contraste / lecture</td></tr>
+                <tr><td>O</td><td>Vue d'ensemble du deck</td></tr>
+                <tr><td>D</td><td>Diagnostic overflow / densité</td></tr>
+                <tr><td>?</td><td>Afficher / masquer cette aide</td></tr>
+                <tr><td>Échap</td><td>Fermer les panneaux</td></tr>
+            </table>
+            <button class="help-close" onclick="closeHelp()">Fermer</button>
+        </div>
+    </div>
+
+    <script>
+        // ════════════════════════════════════════════════════════════════
+        // 📝 CONFIGURATION — liste des fichiers slides dans l'ordre
+        // ════════════════════════════════════════════════════════════════
+        const SLIDES = [
+            'slide-EXAMPLE.html',
+            // 'slide-titre.html',
+            // 'slide-agenda.html',
+            // 'slide-concepts.html',
+        ];
+        // ════════════════════════════════════════════════════════════════
+        const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const AUTO_ANIMATE_DURATION = 420;
+
+        // ── Halo curseur ──────────────────────────────────────────────
+        const halo = document.getElementById('cursor-halo');
+        document.addEventListener('mousemove', e => {
+            halo.style.left = e.clientX + 'px';
+            halo.style.top  = e.clientY + 'px';
         });
 
-        window.onload = () => showSlide(currentSlide);
+        // ── Scaling 1280×720 → viewport ──────────────────────────────
+        const SLIDE_W = 1280, SLIDE_H = 720;
+        function scaleSlides() {
+            const container = document.getElementById('slides-container');
+            const scale = Math.min(
+                window.innerWidth  / SLIDE_W,
+                window.innerHeight / SLIDE_H
+            ) * 0.88;
+            if (CSS.supports('zoom', '1')) {
+                container.style.left = ((window.innerWidth - (SLIDE_W * scale)) / 2) + 'px';
+                container.style.top = ((window.innerHeight - (SLIDE_H * scale)) / 2) + 'px';
+                container.style.zoom = scale;
+                container.style.transform = 'none';
+            } else {
+                container.style.left = '50%';
+                container.style.top = '50%';
+                container.style.zoom = '';
+                container.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            }
+        }
+        window.addEventListener('resize', () => {
+            scaleSlides();
+            evaluateDeckHealth();
+            buildOverview();
+        });
+
+        // ── État ──────────────────────────────────────────────────────
+        let currentSlide = parseInt(localStorage.getItem('pres_slide') || '0');
+        let progressiveEnabled = localStorage.getItem('pres_progressive') === null
+            ? true
+            : localStorage.getItem('pres_progressive') === '1';
+        let contrastEnabled = localStorage.getItem('pres_contrast') === '1';
+        let overviewVisible = false;
+        let diagnosticsVisible = false;
+        let autoAnimateTimer = null;
+        function getSlides() { return document.querySelectorAll('#slides-container .slide'); }
+
+        // ── Chargement des slides via fetch ───────────────────────────
+        async function loadSlides() {
+            const container = document.getElementById('slides-container');
+            for (const file of SLIDES) {
+                try {
+                    const res = await fetch(file);
+                    if (!res.ok) throw new Error(res.status);
+                    container.insertAdjacentHTML('beforeend', await res.text());
+                } catch (e) {
+                    console.warn('Slide introuvable :', file, '(serveur requis — pas file://)');
+                }
+            }
+            enhanceCodeBlocks(container);
+            prepareSlides();
+            scaleSlides();
+            applyProgressiveMode(progressiveEnabled);
+            applyContrastMode(contrastEnabled);
+            evaluateDeckHealth();
+            buildDots();
+            buildOverview();
+            updateDiagnosticsUI();
+            showSlide(currentSlide, { immediate: true });
+        }
+
+        function enhanceCodeBlocks(container) {
+            container.querySelectorAll('pre:not(.has-copy)').forEach(pre => {
+                pre.classList.add('has-copy');
+                const w = document.createElement('div');
+                w.className = 'code-wrapper';
+                pre.parentNode.insertBefore(w, pre);
+                w.appendChild(pre);
+                const btn = document.createElement('button');
+                btn.className = 'copy-btn';
+                btn.textContent = 'Copier';
+                btn.addEventListener('click', () => {
+                    navigator.clipboard.writeText(pre.querySelector('code')?.innerText ?? pre.innerText)
+                        .then(() => {
+                            btn.textContent = 'Copié ✓';
+                            btn.classList.add('copied');
+                            setTimeout(() => { btn.textContent = 'Copier'; btn.classList.remove('copied'); }, 2000);
+                        });
+                });
+                w.appendChild(btn);
+            });
+        }
+
+        function prepareSlides() {
+            getSlides().forEach((slide, index) => {
+                slide.dataset.slideIndex = String(index);
+                initializeFragments(slide);
+                ensureDiagnosticsPanel(slide);
+            });
+        }
+
+        function getOrderedFragments(slide) {
+            return [...slide.querySelectorAll('.fragment')]
+                .map((fragment, order) => ({
+                    fragment,
+                    order,
+                    index: Number.isFinite(parseInt(fragment.dataset.fragmentIndex, 10))
+                        ? parseInt(fragment.dataset.fragmentIndex, 10)
+                        : Number.MAX_SAFE_INTEGER,
+                }))
+                .sort((left, right) => left.index === right.index ? left.order - right.order : left.index - right.index)
+                .map(entry => entry.fragment);
+        }
+
+        function initializeFragments(slide) {
+            if (!progressiveEnabled) {
+                getOrderedFragments(slide).forEach(fragment => {
+                    fragment.classList.add('fragment-visible');
+                    fragment.classList.remove('current-fragment');
+                });
+                return;
+            }
+            getOrderedFragments(slide).forEach(fragment => {
+                fragment.classList.remove('fragment-visible', 'current-fragment');
+            });
+        }
+
+        function syncCurrentFragment(slide) {
+            const fragments = getOrderedFragments(slide);
+            fragments.forEach(fragment => fragment.classList.remove('current-fragment'));
+            const current = [...fragments].reverse().find(fragment => fragment.classList.contains('fragment-visible'));
+            if (current) current.classList.add('current-fragment');
+        }
+
+        function revealNextFragment() {
+            if (!progressiveEnabled) return false;
+            const slide = getSlides()[currentSlide];
+            if (!slide) return false;
+            const next = getOrderedFragments(slide).find(fragment => !fragment.classList.contains('fragment-visible'));
+            if (!next) return false;
+            next.classList.add('fragment-visible');
+            syncCurrentFragment(slide);
+            return true;
+        }
+
+        function hidePreviousFragment() {
+            if (!progressiveEnabled) return false;
+            const slide = getSlides()[currentSlide];
+            if (!slide) return false;
+            const previous = [...getOrderedFragments(slide)].reverse().find(fragment => fragment.classList.contains('fragment-visible'));
+            if (!previous) return false;
+            previous.classList.remove('fragment-visible', 'current-fragment');
+            syncCurrentFragment(slide);
+            return true;
+        }
+
+        function ensureDiagnosticsPanel(slide) {
+            const content = slide.querySelector('.slide-content');
+            if (!content || content.querySelector('.slide-diagnostics')) return;
+            const diagnostics = document.createElement('div');
+            diagnostics.className = 'slide-diagnostics';
+            diagnostics.innerHTML = '<span class="slide-diagnostics-badge">!</span><div class="slide-diagnostics-panel"></div>';
+            content.appendChild(diagnostics);
+        }
+
+        // ── Navigation ────────────────────────────────────────────────
+        function buildDots() {
+            const c = document.getElementById('progress-dots');
+            c.innerHTML = '';
+            getSlides().forEach((_, i) => {
+                const d = document.createElement('button');
+                d.className = 'progress-dot';
+                d.setAttribute('aria-label', 'Slide ' + (i + 1));
+                d.addEventListener('click', () => showSlide(i));
+                c.appendChild(d);
+            });
+        }
+
+        function showSlide(index, options = {}) {
+            const slides = getSlides();
+            if (!slides.length) return;
+            const nextIndex = Math.max(0, Math.min(index, slides.length - 1));
+            const previousSlide = slides[currentSlide];
+            const nextSlide = slides[nextIndex];
+            clearAutoAnimateState();
+            if (!nextSlide) return;
+
+            if (!options.immediate && previousSlide && previousSlide !== nextSlide && maybeAutoAnimate(previousSlide, nextSlide)) {
+                currentSlide = nextIndex;
+            } else {
+                slides.forEach((slide, slideIndex) => slide.classList.toggle('active', slideIndex === nextIndex));
+                currentSlide = nextIndex;
+            }
+
+            document.getElementById('slide-counter').textContent = (currentSlide + 1) + ' / ' + slides.length;
+            document.querySelectorAll('.progress-dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
+            localStorage.setItem('pres_slide', currentSlide);
+            updateOverviewSelection();
+        }
+
+        function changeSlide(dir) {
+            if (overviewVisible) return;
+            if (dir > 0 && revealNextFragment()) return;
+            if (dir < 0 && hidePreviousFragment()) return;
+            showSlide(currentSlide + dir);
+        }
+
+        function getAutoAnimateGroup(slide) {
+            if (!slide) return '';
+            if (slide.dataset.autoAnimateId) return slide.dataset.autoAnimateId;
+            if (slide.hasAttribute('data-auto-animate')) return '__auto__';
+            return '';
+        }
+
+        function collectAutoAnimateElements(slide) {
+            return new Map([...slide.querySelectorAll('[data-auto-animate-key]')].map(element => [element.dataset.autoAnimateKey, element]));
+        }
+
+        function maybeAutoAnimate(fromSlide, toSlide) {
+            if (REDUCED_MOTION) return false;
+            const fromGroup = getAutoAnimateGroup(fromSlide);
+            const toGroup = getAutoAnimateGroup(toSlide);
+            if (!fromGroup || fromGroup !== toGroup) return false;
+
+            const fromMap = collectAutoAnimateElements(fromSlide);
+            const toMap = collectAutoAnimateElements(toSlide);
+            const matchingKeys = [...toMap.keys()].filter(key => fromMap.has(key));
+            if (!matchingKeys.length) return false;
+
+            toSlide.classList.add('active', 'auto-animate-measure');
+
+            const matched = matchingKeys.map(key => {
+                const fromElement = fromMap.get(key);
+                const toElement = toMap.get(key);
+                const fromRect = fromElement.getBoundingClientRect();
+                const toRect = toElement.getBoundingClientRect();
+                const scaleX = fromRect.width / Math.max(toRect.width, 1);
+                const scaleY = fromRect.height / Math.max(toRect.height, 1);
+                const deltaX = fromRect.left - toRect.left;
+                const deltaY = fromRect.top - toRect.top;
+                toElement.style.transition = 'none';
+                toElement.style.transformOrigin = 'top left';
+                toElement.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(${scaleX}, ${scaleY})`;
+                toElement.style.opacity = '0.2';
+                return toElement;
+            });
+
+            const unmatched = [...toMap.entries()]
+                .filter(([key]) => !fromMap.has(key))
+                .map(([, element]) => element);
+
+            unmatched.forEach(element => {
+                element.style.transition = 'none';
+                element.style.opacity = '0';
+                element.style.transform = 'translateY(12px)';
+            });
+
+            toSlide.getBoundingClientRect();
+
+            requestAnimationFrame(() => {
+                toSlide.classList.remove('auto-animate-measure');
+                toSlide.classList.add('auto-animating');
+                fromSlide.classList.remove('active');
+
+                requestAnimationFrame(() => {
+                    matched.forEach(element => {
+                        element.style.transition = `transform ${AUTO_ANIMATE_DURATION}ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity ${AUTO_ANIMATE_DURATION}ms ease`;
+                        element.style.transform = 'none';
+                        element.style.opacity = '1';
+                    });
+                    unmatched.forEach(element => {
+                        element.style.transition = `transform ${AUTO_ANIMATE_DURATION}ms ease, opacity ${AUTO_ANIMATE_DURATION}ms ease`;
+                        element.style.transform = 'none';
+                        element.style.opacity = '1';
+                    });
+                });
+            });
+
+            autoAnimateTimer = window.setTimeout(() => {
+                clearInlineAutoAnimateStyles(toSlide);
+                toSlide.classList.remove('auto-animating');
+                fromSlide.classList.remove('auto-animating');
+            }, AUTO_ANIMATE_DURATION + 80);
+
+            return true;
+        }
+
+        function clearInlineAutoAnimateStyles(slide) {
+            slide.querySelectorAll('[data-auto-animate-key]').forEach(element => {
+                element.style.transition = '';
+                element.style.transformOrigin = '';
+                element.style.transform = '';
+                element.style.opacity = '';
+            });
+        }
+
+        function clearAutoAnimateState() {
+            if (autoAnimateTimer) {
+                clearTimeout(autoAnimateTimer);
+                autoAnimateTimer = null;
+            }
+            getSlides().forEach(slide => {
+                slide.classList.remove('auto-animating', 'auto-animate-measure');
+                clearInlineAutoAnimateStyles(slide);
+            });
+        }
+
+        function getSlideTitle(slide, index) {
+            const title = slide.querySelector('.slide-title, h2, .section-number');
+            return title ? title.textContent.trim().replace(/\s+/g, ' ') : 'Slide ' + (index + 1);
+        }
+
+        function createOverviewPreview(slide) {
+            const clone = slide.cloneNode(true);
+            clone.querySelectorAll('.fragment').forEach(fragment => fragment.classList.add('fragment-visible'));
+            clone.querySelectorAll('.slide-diagnostics').forEach(panel => panel.remove());
+            clone.querySelectorAll('.copy-btn, .copy-btn--bar').forEach(button => button.remove());
+            clone.classList.remove('active', 'auto-animating', 'auto-animate-measure');
+            return clone;
+        }
+
+        function buildOverview() {
+            const grid = document.getElementById('overview-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            getSlides().forEach((slide, index) => {
+                const card = document.createElement('button');
+                card.className = 'overview-card';
+                card.type = 'button';
+                card.dataset.slideIndex = String(index);
+                const issues = parseInt(slide.dataset.diagnosticCount || '0', 10);
+                if (issues > 0) card.dataset.issues = String(issues);
+                card.innerHTML = `<span class="overview-card-title">${index + 1}. ${getSlideTitle(slide, index)}</span><div class="overview-preview"></div>`;
+                card.querySelector('.overview-preview').appendChild(createOverviewPreview(slide));
+                card.addEventListener('click', () => {
+                    toggleOverview(false);
+                    showSlide(index);
+                });
+                grid.appendChild(card);
+            });
+            updateOverviewSelection();
+        }
+
+        function updateOverviewSelection() {
+            document.querySelectorAll('.overview-card').forEach((card, index) => {
+                card.classList.toggle('active', index === currentSlide);
+            });
+        }
+
+        function toggleOverview(force) {
+            overviewVisible = typeof force === 'boolean' ? force : !overviewVisible;
+            document.getElementById('overview-overlay').classList.toggle('visible', overviewVisible);
+            document.getElementById('overview-btn').classList.toggle('active', overviewVisible);
+            if (overviewVisible) {
+                closeHelp();
+                updateOverviewSelection();
+            }
+        }
+
+        function closeOverview(event) {
+            if (!event || event.target.id === 'overview-overlay') toggleOverview(false);
+        }
+
+        function applyProgressiveMode(enabled) {
+            progressiveEnabled = enabled;
+            document.body.classList.toggle('progressive-disabled', !enabled);
+            document.getElementById('progressive-btn').classList.toggle('active', enabled);
+            document.getElementById('progressive-btn').title = enabled
+                ? 'Affichage progressif actif (P)'
+                : 'Slides complètes d\'un coup (P)';
+            localStorage.setItem('pres_progressive', enabled ? '1' : '0');
+            getSlides().forEach(slide => initializeFragments(slide));
+            const activeSlide = getSlides()[currentSlide];
+            if (activeSlide && progressiveEnabled) syncCurrentFragment(activeSlide);
+        }
+
+        function toggleProgressiveMode() {
+            applyProgressiveMode(!progressiveEnabled);
+        }
+
+        function applyContrastMode(enabled) {
+            contrastEnabled = enabled;
+            document.body.classList.toggle('high-contrast', enabled);
+            document.getElementById('contrast-btn').classList.toggle('active', enabled);
+            localStorage.setItem('pres_contrast', enabled ? '1' : '0');
+        }
+
+        function toggleContrastMode() {
+            applyContrastMode(!contrastEnabled);
+        }
+
+        function evaluateSlideHealth(slide) {
+            const content = slide.querySelector('.slide-content');
+            if (!content) return 0;
+            const issues = [];
+            const overflowY = content.scrollHeight - content.clientHeight > 8;
+            const overflowX = content.scrollWidth - content.clientWidth > 8;
+            const bullets = content.querySelectorAll('li').length;
+            const paragraphs = [...content.querySelectorAll('p')].filter(paragraph => {
+                return !paragraph.classList.contains('slide-title')
+                    && !paragraph.classList.contains('slide-subtitle')
+                    && !paragraph.classList.contains('inline-note')
+                    && !paragraph.classList.contains('source');
+            }).length;
+            const words = (content.innerText || '').trim().split(/\s+/).filter(Boolean).length;
+            const complexBlocks = content.querySelectorAll('table, pre, .metrics-grid, .compare-grid, .two-col, .figure-box').length;
+
+            if (overflowY || overflowX) issues.push('Overflow du contenu dans la carte 1280×720');
+            if (bullets > 6) issues.push('Trop de points visibles en une seule slide');
+            if (paragraphs > 3) issues.push('Texte trop dense, réduire à 2–3 paragraphes');
+            if (words > 110) issues.push('Charge textuelle élevée pour une lecture en salle');
+            if (complexBlocks > 3) issues.push('Trop de blocs complexes concurrents');
+
+            slide.dataset.diagnosticCount = String(issues.length);
+            slide.classList.toggle('diagnostic-overflow', overflowY || overflowX);
+            slide.classList.toggle('diagnostic-dense', !overflowY && issues.length > 0);
+
+            const panel = slide.querySelector('.slide-diagnostics-panel');
+            if (panel) {
+                panel.innerHTML = issues.length
+                    ? `<strong>À revoir</strong><ul>${issues.map(issue => `<li>${issue}</li>`).join('')}</ul>`
+                    : '';
+            }
+            return issues.length;
+        }
+
+        function evaluateDeckHealth() {
+            let issueSlides = 0;
+            getSlides().forEach(slide => {
+                if (evaluateSlideHealth(slide) > 0) issueSlides++;
+            });
+            const diagnosticsBtn = document.getElementById('diagnostics-btn');
+            if (issueSlides > 0) diagnosticsBtn.dataset.badge = String(issueSlides);
+            else diagnosticsBtn.removeAttribute('data-badge');
+            const summary = document.getElementById('diagnostics-summary');
+            summary.textContent = issueSlides
+                ? `${issueSlides} slide(s) signalée(s) : overflow ou densité excessive.`
+                : 'Aucun problème de densité ou de dépassement détecté.';
+            updateOverviewIssueBadges();
+        }
+
+        function updateOverviewIssueBadges() {
+            document.querySelectorAll('.overview-card').forEach(card => {
+                const slide = getSlides()[parseInt(card.dataset.slideIndex, 10)];
+                const issues = parseInt(slide?.dataset.diagnosticCount || '0', 10);
+                if (issues > 0) card.dataset.issues = String(issues);
+                else card.removeAttribute('data-issues');
+            });
+        }
+
+        function updateDiagnosticsUI() {
+            document.body.classList.toggle('diagnostics-enabled', diagnosticsVisible);
+            document.getElementById('diagnostics-btn').classList.toggle('active', diagnosticsVisible);
+        }
+
+        function toggleDiagnostics(force) {
+            diagnosticsVisible = typeof force === 'boolean' ? force : !diagnosticsVisible;
+            updateDiagnosticsUI();
+        }
+
+        // ── Clavier ───────────────────────────────────────────────────
+        document.addEventListener('keydown', e => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (overviewVisible && e.key !== 'Escape' && e.key !== 'o' && e.key !== 'O') return;
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); changeSlide(1); }
+            if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                    { e.preventDefault(); changeSlide(-1); }
+            if (e.key === 'p' || e.key === 'P') toggleProgressiveMode();
+            if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+            if (e.key === 'c' || e.key === 'C') toggleContrastMode();
+            if (e.key === 'o' || e.key === 'O') toggleOverview();
+            if (e.key === 'd' || e.key === 'D') toggleDiagnostics();
+            if (e.key === '?') toggleHelp();
+            if (e.key === 'Escape') { closeHelp(); toggleOverview(false); }
+        });
+
+        // ── Plein écran ───────────────────────────────────────────────
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
+        }
+        document.addEventListener('fullscreenchange', () => {
+            const btn = document.getElementById('fullscreen-btn');
+            const isFS = !!document.fullscreenElement;
+            btn.textContent = isFS ? '⊡' : '⛶';
+            btn.title = isFS ? 'Quitter le plein écran (F)' : 'Plein écran (F)';
+            // Recalculer le scale après changement de taille
+            scaleSlides();
+            evaluateDeckHealth();
+        });
+
+        // ── Aide ──────────────────────────────────────────────────────
+        function toggleHelp() { document.getElementById('help-overlay').classList.toggle('visible'); }
+        function closeHelp()  { document.getElementById('help-overlay').classList.remove('visible'); }
+
+        // ── Init ──────────────────────────────────────────────────────
+        window.onload = loadSlides;
     </script>
 </body>
 </html>
