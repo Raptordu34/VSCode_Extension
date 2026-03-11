@@ -201,6 +201,29 @@ WHERE  semestre = '2024-A';</code>
 </div>
 
 
+<!-- ── TYPE 13 : Slide avec image/schéma cliquable (lightbox) ───────── -->
+<div class="slide">
+    <div class="slide-content">
+        <h2>Architecture 3-tiers</h2>
+        <div class="two-col">
+            <div>
+                <ul class="key-points">
+                    <li>Couche <strong>présentation</strong> — UI (navigateur, app mobile)</li>
+                    <li>Couche <strong>métier</strong> — API & logique applicative</li>
+                    <li>Couche <strong>données</strong> — SGBD & stockage persistant</li>
+                </ul>
+                <p class="inline-note">Chaque couche est indépendante et interchangeable.</p>
+            </div>
+            <figure class="figure-box" onclick="openLightbox(this)">
+                <span class="figure-placeholder">🖼 Schéma architecture 3-tiers</span>
+                <!-- Remplacer le placeholder par : <img src="schema-3tiers.png" alt="Architecture 3-tiers"> -->
+                <figcaption>Architecture 3-tiers — <em>cliquer pour agrandir</em><span class="zoom-hint">↗ zoom</span></figcaption>
+            </figure>
+        </div>
+    </div>
+</div>
+
+
 <!-- ── TYPE 12 : Paire auto-animate (2/2) ──────────────────────────── -->
 <div class="slide" data-auto-animate-id="sql-demo">
     <div class="slide-content">

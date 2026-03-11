@@ -12,8 +12,8 @@ body {
 }
 
 .blob { position: absolute; border-radius: 50%; filter: blur(80px); z-index: -1; opacity: 0.5; animation: float 10s infinite ease-in-out alternate; }
-.blob-1 { width: 500px; height: 500px; background: var(--accent-dark); top: -150px; right: -100px; }
-.blob-2 { width: 350px; height: 350px; background: #1e3a5f; bottom: -100px; left: -80px; }
+.blob-1 { width: 500px; height: 500px; background: var(--accent-dark); top: -150px; left: -100px; }
+.blob-2 { display: none; }
 @keyframes float { 0% { transform: translate(0,0) scale(1); } 100% { transform: translate(30px,50px) scale(1.08); } }
 
 .cursor-halo {

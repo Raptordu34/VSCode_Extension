@@ -32,7 +32,7 @@
             height: 720px;
             transform-origin: center center;
             /* transform: translate(-50%,-50%) scale(x) appliqué par scaleSlides() */
-            overflow: hidden;
+            overflow: visible;
             /* transparent — le fond body + halo curseur transparaissent à travers */
             background: transparent;
             z-index: 1;
@@ -517,6 +517,107 @@
             transition: all 0.2s;
         }
         .help-close:hover { background: rgba(255,255,255,0.1); color: var(--text-primary, #f5f3f0); }
+
+        /* ── Figure-box cliquable ── */
+        .figure-box[onclick] {
+            cursor: zoom-in;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .figure-box[onclick]:hover {
+            transform: scale(1.015);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.12),
+                        0 12px 32px rgba(0,0,0,0.4),
+                        0 0 0 1px rgba(214,117,86,0.3);
+            border-color: rgba(214,117,86,0.35);
+        }
+        .figure-box .zoom-hint {
+            display: block;
+            margin-top: 0.5rem;
+            font-size: 0.72rem;
+            color: rgba(214,117,86,0.5);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        /* ── Lightbox ── */
+        .lightbox-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.72);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 2.5rem;
+            box-sizing: border-box;
+            cursor: zoom-out;
+        }
+        .lightbox-overlay.visible { display: flex; }
+
+        .lightbox-inner {
+            position: relative;
+            max-width: 88vw;
+            max-height: 84vh;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 40px 100px rgba(0,0,0,0.75),
+                        0 0 0 1px rgba(255,255,255,0.1),
+                        inset 0 1px 0 rgba(255,255,255,0.12);
+            cursor: default;
+            animation: lightbox-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        @keyframes lightbox-in {
+            from { opacity: 0; transform: scale(0.9); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+
+        .lightbox-inner img {
+            display: block;
+            max-width: 88vw;
+            max-height: 84vh;
+            object-fit: contain;
+            background: rgba(22,22,20,0.98);
+        }
+
+        .lightbox-placeholder-full {
+            width: 680px;
+            max-width: 82vw;
+            padding: 5rem 3rem;
+            background: rgba(28,28,26,0.98);
+            border-radius: 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            text-align: center;
+        }
+        .lightbox-placeholder-full .ph-icon { font-size: 5rem; opacity: 0.4; }
+        .lightbox-placeholder-full .ph-label { font-size: 1.25rem; font-weight: 600; color: var(--text-secondary, #9e9a94); }
+        .lightbox-placeholder-full .ph-sub { font-size: 0.85rem; color: rgba(214,117,86,0.5); letter-spacing: 0.05em; text-transform: uppercase; }
+
+        .lightbox-close-btn {
+            position: absolute;
+            top: 0.8rem; right: 0.8rem;
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.65);
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.18s;
+            z-index: 10;
+            line-height: 1;
+        }
+        .lightbox-close-btn:hover {
+            background: rgba(214,117,86,0.25);
+            border-color: rgba(214,117,86,0.4);
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -573,6 +674,13 @@
                 <tr><td>Échap</td><td>Fermer les panneaux</td></tr>
             </table>
             <button class="help-close" onclick="closeHelp()">Fermer</button>
+        </div>
+    </div>
+
+    <!-- Lightbox image -->
+    <div class="lightbox-overlay" id="lightbox-overlay" onclick="closeLightboxOnBackdrop(event)">
+        <div class="lightbox-inner" id="lightbox-inner">
+            <button class="lightbox-close-btn" onclick="closeLightbox()" title="Fermer (Échap)">✕</button>
         </div>
     </div>
 
@@ -1059,7 +1167,7 @@
             if (e.key === 'o' || e.key === 'O') toggleOverview();
             if (e.key === 'd' || e.key === 'D') toggleDiagnostics();
             if (e.key === '?') toggleHelp();
-            if (e.key === 'Escape') { closeHelp(); toggleOverview(false); }
+            if (e.key === 'Escape') { closeHelp(); toggleOverview(false); closeLightbox(); }
         });
 
         // ── Plein écran ───────────────────────────────────────────────
@@ -1080,6 +1188,47 @@
         // ── Aide ──────────────────────────────────────────────────────
         function toggleHelp() { document.getElementById('help-overlay').classList.toggle('visible'); }
         function closeHelp()  { document.getElementById('help-overlay').classList.remove('visible'); }
+
+        // ── Lightbox image ────────────────────────────────────────────
+        function openLightbox(element) {
+            const overlay = document.getElementById('lightbox-overlay');
+            const inner   = document.getElementById('lightbox-inner');
+            // Nettoyer le contenu précédent (garder le bouton fermer)
+            inner.querySelectorAll('img, .lightbox-placeholder-full').forEach(el => el.remove());
+
+            const img = element.querySelector('img');
+            if (img) {
+                const clone = img.cloneNode(true);
+                clone.style.cssText = '';
+                inner.appendChild(clone);
+            } else {
+                // Placeholder : reproduire le contenu visuel en grand
+                const phIcon  = element.querySelector('.figure-placeholder')?.textContent || '';
+                const altText = element.querySelector('figcaption')?.textContent
+                             || element.querySelector('img')?.alt
+                             || 'Schéma / Image';
+                const ph = document.createElement('div');
+                ph.className = 'lightbox-placeholder-full';
+                ph.innerHTML = `
+                    <span class="ph-icon">🖼</span>
+                    <span class="ph-label">${altText}</span>
+                    <span class="ph-sub">Remplacer le placeholder par une vraie image</span>
+                `;
+                inner.appendChild(ph);
+            }
+
+            overlay.classList.add('visible');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox-overlay').classList.remove('visible');
+            document.body.style.overflow = '';
+        }
+
+        function closeLightboxOnBackdrop(event) {
+            if (event.target.id === 'lightbox-overlay') closeLightbox();
+        }
 
         // ── Init ──────────────────────────────────────────────────────
         window.onload = loadSlides;
