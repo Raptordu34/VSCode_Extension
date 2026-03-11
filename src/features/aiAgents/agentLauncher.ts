@@ -8,6 +8,15 @@ import { findClaudeAccount, findProviderAccount, buildProviderLaunchEnvironment 
 import { escapeShellArg } from "../../utils/index.js";
 import { PENDING_COPILOT_PROMPT_KEY } from "../workflow/constants.js";
 
+function buildTerminalName(providerLabel: string, projectContext: ProjectContext, accountLabel?: string): string {
+	const stepLabel = projectContext.currentStage
+		? `Stage ${String(projectContext.currentStage.index).padStart(2, '0')} ${projectContext.workflowPlan.preset}`
+		: `${projectContext.workflowPlan.preset} workflow`;
+	return accountLabel
+		? `AI [${providerLabel}] - ${stepLabel} (${accountLabel})`
+		: `AI [${providerLabel}] - ${stepLabel}`;
+}
+
 export function buildClaudeLaunchCommand(projectContext: ProjectContext, instruction: string): string {
 	const parts = ['claude'];
 	if (projectContext.workflowPlan.providerModel) {
@@ -30,7 +39,7 @@ export function launchClaude(context: vscode.ExtensionContext, projectContext: P
 	const claudeAccount = findClaudeAccount(configuration, projectContext.workflowPlan.claudeAccountId);
 	void (async () => {
 		const terminal = vscode.window.createTerminal({
-			name: claudeAccount ? `Claude Code (${claudeAccount.label})` : 'Claude Code',
+			name: buildTerminalName('Claude', projectContext, claudeAccount?.label),
 			cwd: projectContext.workspaceFolder.uri.fsPath,
 			env: {
 				...(await buildProviderLaunchEnvironment(context, claudeAccount)),
@@ -71,7 +80,7 @@ export function launchGemini(context: vscode.ExtensionContext, projectContext: P
 	const geminiAccount = findProviderAccount(configuration, 'gemini', projectContext.workflowPlan.providerAccountId);
 	void (async () => {
 		const terminal = vscode.window.createTerminal({
-			name: geminiAccount ? `Gemini CLI (${geminiAccount.label})` : 'Gemini CLI',
+			name: buildTerminalName('Gemini', projectContext, geminiAccount?.label),
 			cwd: projectContext.workspaceFolder.uri.fsPath,
 			env: await buildProviderLaunchEnvironment(context, geminiAccount)
 		});

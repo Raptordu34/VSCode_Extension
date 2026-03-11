@@ -172,6 +172,18 @@
       {
         "command": "ai-context-orchestrator.addLearningDocumentSources",
         "title": "AI Context Orchestrator: Add Learning Document Sources"
+      },
+      {
+        "command": "ai-context-orchestrator.startPipeline",
+        "title": "AI Context Orchestrator: Start Pipeline"
+      },
+      {
+        "command": "ai-context-orchestrator.advancePipelineStep",
+        "title": "AI Context Orchestrator: Advance Pipeline Step"
+      },
+      {
+        "command": "ai-context-orchestrator.abortPipeline",
+        "title": "AI Context Orchestrator: Abort Pipeline"
       }
     ],
     "viewsContainers": {

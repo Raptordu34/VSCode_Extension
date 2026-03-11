@@ -20,12 +20,14 @@ import { getWorkspaceModeLabel, getWorkspaceModeState } from '../workspace/servi
 import { getActiveLearningDocument, getLearningDocumentById } from '../documents/service.js';
 import { getEffectiveWorkflowIntentCopy } from '../workflow/presets.js';
 import { buildSourceAnalysisSynthesisSection, readReconciledSourceAnalysisBatch } from './sourceAnalysisBatch.js';
+import { readProjectMemory } from './projectMemory.js';
 
 export function buildRawContextContent(
 	workflowPlan: WorkflowExecutionPlan,
 	workspaceFolder: vscode.WorkspaceFolder,
 	workspaceModeLabel: string | undefined,
 	activeLearningDocumentSummary: string | undefined,
+	projectMemory: string | undefined,
 	sourceAnalysisSummary: string | undefined,
 	detectedTech: string[],
 	readmeLines: string[],
@@ -62,6 +64,9 @@ export function buildRawContextContent(
 		workflowPlan.targetSourceOutputFile ? `Assigned analysis output: ${workflowPlan.targetSourceOutputFile}` : undefined,
 		activeLearningDocumentSummary ? 'Document instruction: Respect the active learning-kit structure and imported sources when generating output.' : undefined,
 		'',
+		projectMemory ? '## Project Memory' : undefined,
+		projectMemory,
+		projectMemory ? '' : undefined,
 		sourceAnalysisSummary ? '## Distributed Source Analysis' : undefined,
 		sourceAnalysisSummary,
 		sourceAnalysisSummary ? '' : undefined,
@@ -428,6 +433,7 @@ export async function gatherProjectContext(
 		const sourceAnalysisBatch = workflowPlan.sourceAnalysisBatchId
 			? await readReconciledSourceAnalysisBatch(workspaceFolder.uri)
 			: undefined;
+		const projectMemory = workflowPlan.startNewWorkflow ? await readProjectMemory(workspaceFolder.uri) : undefined;
 		const sourceAnalysisJob = sourceAnalysisBatch?.jobs.find((job) => job.id === workflowPlan.sourceAnalysisJobId);
 		const sourceAnalysisSummary = sourceAnalysisBatch && !sourceAnalysisJob
 			? await buildSourceAnalysisSynthesisSection(workspaceFolder.uri, sourceAnalysisBatch)
@@ -488,6 +494,7 @@ export async function gatherProjectContext(
 			workspaceFolder,
 			workspaceModeLabel,
 			activeLearningDocumentSummary,
+			projectMemory,
 			sourceAnalysisSummary,
 			detectedTech,
 			readmeLines,
@@ -562,7 +569,9 @@ export async function gatherProjectContext(
 				reused: false,
 				workflowSession: workflowArtifacts.session,
 				currentStage: workflowArtifacts.stage,
-				brief: workflowArtifacts.brief
+				brief: workflowArtifacts.brief,
+				currentObjective: workflowArtifacts.objective,
+				projectMemory
 			}), 6000);
 		}
 
@@ -580,7 +589,9 @@ export async function gatherProjectContext(
 			reused: false,
 			workflowSession: workflowArtifacts.session,
 			currentStage: workflowArtifacts.stage,
-			brief: workflowArtifacts.brief
+			brief: workflowArtifacts.brief,
+			currentObjective: workflowArtifacts.objective,
+			projectMemory
 		};
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -740,6 +751,7 @@ export async function tryReuseExistingContext(
 			? buildArtifactPlan(workspaceFolder.uri, workflowPlan, metadata)
 			: undefined;
 		const workflowArtifacts = await persistWorkflowArtifacts(workspaceFolder, workflowPlan, metadata, contextFile, artifactPlan);
+		const projectMemory = workflowPlan.startNewWorkflow ? await readProjectMemory(workspaceFolder.uri) : undefined;
 
 		Logger.info(reason);
 		if (artifactPlan) {
@@ -763,7 +775,9 @@ export async function tryReuseExistingContext(
 			reused: true,
 			workflowSession: workflowArtifacts.session,
 			currentStage: workflowArtifacts.stage,
-			brief: workflowArtifacts.brief
+			brief: workflowArtifacts.brief,
+			currentObjective: workflowArtifacts.objective,
+			projectMemory
 		};
 	} catch (error) {
 		Logger.warn(`Failed to reuse context: ${error instanceof Error ? error.message : String(error)}`);

@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import type { WorkflowDashboardState, WorkflowTreeNode, WorkflowStageStatus, ExtensionConfiguration, WorkflowExecutionPlan, ProjectContext, WorkflowQuickPickItem, ClaudeEffortLevel, WorkflowPreset, WorkflowBrief, WorkflowSessionState, ProviderTarget, LastWorkflowConfig, ArtifactGovernancePolicy } from "./types.js";
+import { readActivePipelineState } from "./pipelineService.js";
+import { PIPELINE_TEMPLATES } from "./pipelineTemplates.js";
 import type { ProviderStatusCache } from "../providers/types.js";
 import type { LearningDocumentRecord } from '../documents/types.js';
 import { PROVIDER_STATUS_CACHE_KEY, CONTEXT_FILE_NAME, LAST_WORKFLOW_CONFIG_KEY, PENDING_COPILOT_PROMPT_KEY, WORKFLOW_HISTORY_COLLAPSE_STATE_KEY } from "./constants.js";
@@ -17,6 +19,7 @@ import { readWorkflowHistoryIndex, repairWorkflowHistoryIndex } from "../context
 import { detectGovernancePolicy } from "./artifactGovernance.js";
 import { getWorkspaceModeState } from '../workspace/service.js';
 import { getActiveLearningDocument, getLearningDocuments } from '../documents/service.js';
+import { readWorkflowObjective } from '../aiAgents/aiEnhancer.js';
 
 type WorkflowHistoryCollapseState = Record<string, string[]>;
 
@@ -108,6 +111,7 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 		readWorkflowHistoryIndex(workspaceFolder.uri),
 		detectGovernancePolicy(workspaceFolder)
 	]);
+	const currentObjective = await readWorkflowObjective(workspaceFolder.uri);
 	const sourceAnalysisBatch = await readReconciledSourceAnalysisBatch(workspaceFolder.uri) ?? session?.sourceAnalysisBatch;
 	const [learningDocuments, activeLearningDocument] = await Promise.all([
 		getLearningDocuments(context, workspaceFolder),
@@ -124,6 +128,9 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 	const copilotPendingPrompt = context.globalState.get<string>(PENDING_COPILOT_PROMPT_KEY);
 	const latestStage = session?.stages.at(-1);
 	const artifactCount = session?.stages.reduce((total, stage) => total + stage.artifactFiles.length, 0) ?? 0;
+
+	const activePipeline = readActivePipelineState(context, workspaceFolder);
+	const availablePipelineTemplates = Object.values(PIPELINE_TEMPLATES);
 
 	return {
 		workspaceFolder,
@@ -147,7 +154,10 @@ export async function getWorkflowDashboardState(context: vscode.ExtensionContext
 		providerStatuses,
 		providerStatusUpdatedAt: providerStatusCache?.updatedAt,
 		copilotPendingPrompt,
-		artifactGovernance
+		artifactGovernance,
+		currentObjective,
+		activePipeline,
+		availablePipelineTemplates
 	};
 }
 export async function updateSelectedWorkflowStageStatus(

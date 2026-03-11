@@ -27,13 +27,16 @@ export const DEFAULT_CONTEXT_FILES = [
 ];
 
 export const WORKFLOW_STATE_DIRECTORY = '.ai-orchestrator';
-export const WORKFLOW_STAGE_DIRECTORY = '.ai-orchestrator/stages';
+export const WORKFLOW_STAGE_DIRECTORY = 'stage';
+export const WORKFLOW_OBJECTIVE_FILE = 'stage/00_OBJECTIVE.md';
 export const WORKFLOW_SOURCE_ANALYSIS_DIRECTORY = '.ai-orchestrator/analysis';
 export const WORKFLOW_SOURCE_ANALYSIS_BATCH_FILE = '.ai-orchestrator/analysis/source-batch.json';
 export const WORKFLOW_SESSION_FILE = '.ai-orchestrator/session.json';
 export const WORKFLOW_BRIEF_FILE = '.ai-orchestrator/brief.md';
 export const WORKFLOW_HISTORY_DIRECTORY = '.ai-orchestrator/history';
 export const WORKFLOW_HISTORY_INDEX_FILE = '.ai-orchestrator/history/index.json';
+export const PROJECT_MEMORY_DIRECTORY = '.orchestrator';
+export const PROJECT_MEMORY_FILE = '.orchestrator/memory.md';
 export const PROVIDER_STATUS_CACHE_KEY = 'aiContextOrchestrator.providerStatusCache';
 export const PROVIDER_ACCOUNT_SECRET_PREFIX = 'provider-account-secret';
 export const CLAUDE_DEFAULT_MODELS = [
@@ -58,9 +61,15 @@ export const LAST_WORKFLOW_CONFIG_KEY = 'aiContextOrchestrator.lastWorkflowConfi
 export const WORKFLOW_HISTORY_COLLAPSE_STATE_KEY = 'aiContextOrchestrator.workflowHistoryCollapseState';
 export const PENDING_COPILOT_PROMPT_KEY = 'aiContextOrchestrator.pendingCopilotPrompt';
 
+export const ACTIVE_PIPELINE_STATE_KEY = 'aiContextOrchestrator.activePipeline';
+
+export const GITIGNORE_BLOCK_MARKER = '# VSCode AI Orchestrator';
 export const GITIGNORE_MANAGED_PATHS = [
-	'.ai-orchestrator/session.json',
-	'.ai-orchestrator/stages/',
-	'.ai-orchestrator/history/',
-	'.ai-context.md'
+	'/stage/',
+	'/.claude/',
+	'/.gemini/',
+	'/.github/agents/',
+	'/.ai-orchestrator/',
+	'/.orchestrator/',
+	'/.ai-context.md'
 ] as const;

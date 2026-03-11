@@ -1052,15 +1052,53 @@ export function renderDesignShellDocument(options: DesignShellOptions): string {
 	.stage-preview summary:hover { color: var(--text-body); background: var(--hover-bg); }
 	.stage-preview-body {
 		padding: 8px 10px;
-		font-family: var(--vscode-editor-font-family, monospace);
-		font-size: 0.74rem;
+		font-size: 0.82rem;
 		color: var(--text-secondary);
-		white-space: pre-wrap;
-		max-height: 200px;
+		max-height: 400px;
 		overflow-y: auto;
 		border-top: 1px solid var(--glass-border);
 		background: var(--panel-bg);
+		font-family: inherit;
+		white-space: inherit;
 	}
+	.stage-preview-body h1, .stage-preview-body h2, .stage-preview-body h3 {
+		color: var(--text-primary);
+		font-size: 0.88rem;
+		font-weight: 600;
+		margin: 8px 0 4px;
+	}
+	.stage-preview-body p { margin: 4px 0; }
+	.stage-preview-body ul, .stage-preview-body ol { padding-left: 18px; margin: 4px 0; }
+	.stage-preview-body code {
+		font-family: var(--vscode-editor-font-family, monospace);
+		font-size: 0.78rem;
+		background: var(--panel-strong);
+		border: 1px solid var(--glass-border);
+		border-radius: 3px;
+		padding: 0 3px;
+	}
+	.stage-preview-body pre {
+		background: var(--panel-strong);
+		border: 1px solid var(--glass-border);
+		border-radius: var(--radius-sm);
+		padding: 6px 8px;
+		overflow-x: auto;
+		font-size: 0.74rem;
+	}
+	.stage-preview-body pre code { background: none; border: none; padding: 0; }
+	.stage-preview-body blockquote {
+		border-left: 3px solid var(--accent);
+		margin: 4px 0;
+		padding: 2px 8px;
+		color: var(--text-secondary);
+	}
+	.stage-preview-body table { border-collapse: collapse; width: 100%; font-size: 0.78rem; margin: 4px 0; }
+	.stage-preview-body th, .stage-preview-body td {
+		border: 1px solid var(--glass-border);
+		padding: 3px 6px;
+		text-align: left;
+	}
+	.stage-preview-body th { background: var(--panel-strong); color: var(--text-primary); }
 	/* Copilot banner */
 	.copilot-banner {
 		padding: 12px 14px;

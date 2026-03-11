@@ -201,6 +201,14 @@ export interface WorkflowBrief {
 	rawText: string;
 }
 
+export interface WorkflowObjectiveState {
+	relativePath: string;
+	content: string;
+	upgradedGoal: string;
+	rawInput: string;
+	generatedAt: string;
+}
+
 export interface WorkflowArchivedFile {
 	relativePath: string;
 	kind: WorkflowArchivedFileKind;
@@ -258,6 +266,8 @@ export interface ProjectContext {
 	workflowSession?: WorkflowSessionState;
 	currentStage?: WorkflowStageRecord;
 	brief?: WorkflowBrief;
+	currentObjective?: WorkflowObjectiveState;
+	projectMemory?: string;
 }
 
 export interface ExtensionConfiguration {
@@ -324,6 +334,9 @@ export interface WorkflowDashboardState {
 	providerStatusUpdatedAt?: string;
 	copilotPendingPrompt?: string;
 	artifactGovernance?: ArtifactGovernancePolicy;
+	currentObjective?: WorkflowObjectiveState;
+	activePipeline?: ActivePipelineState;
+	availablePipelineTemplates?: PipelineTemplateDefinition[];
 }
 
 export interface WorkflowTreeNode {
@@ -348,4 +361,48 @@ export interface LastWorkflowConfig {
   claudeEffort?: ClaudeEffortLevel;
 	learningDocumentId?: string;
   brief?: string;
+}
+
+// Pipeline types
+export type PipelineTemplateId = 'add-feature' | 'bug-fix' | 'code-review' | 'refactor';
+
+export interface PipelineStepConfig {
+  preset: WorkflowPreset;
+  label: string;
+  provider?: ProviderTarget;
+  providerModel?: string;
+  providerAccountId?: string;
+  claudeAccountId?: string;
+  claudeEffort?: ClaudeEffortLevel;
+}
+
+export interface PipelineTemplateDefinition {
+  id: PipelineTemplateId;
+  label: string;
+  description: string;
+  steps: WorkflowPreset[];
+  gitBranchPrefix?: string;
+  skipGit?: boolean;
+}
+
+export interface ActivePipelineState {
+  templateId: PipelineTemplateId;
+  branchName?: string;
+  baseBranch?: string;
+  currentStepIndex: number;
+  stepConfigs: PipelineStepConfig[];
+	pendingManualCompletion?: {
+	stepIndex: number;
+	provider: ProviderTarget;
+	label: string;
+	};
+  workflowId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GitOperationResult {
+  success: boolean;
+  branchName?: string;
+  error?: string;
 }
