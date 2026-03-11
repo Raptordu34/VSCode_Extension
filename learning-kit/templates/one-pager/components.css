@@ -11,13 +11,20 @@
     border: 1px solid rgba(255,255,255,0.1);
     border-top-color: rgba(255,255,255,0.2);
     border-radius: 16px;
-    padding: 2rem 2.5rem;
+    padding: 1rem 2.5rem 2rem;
     margin-bottom: 1.75rem;
     box-shadow:
         inset 0 1px 0 rgba(255,255,255,0.12),
         0 4px 16px rgba(0,0,0,0.22),
         0 16px 40px rgba(0,0,0,0.12);
     position: relative;
+}
+
+/* h3 en tête de bloc : supprime la séparation héritée de base.css */
+.section-block > h3:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
 }
 
 /* ─────────────────────────────────────────────

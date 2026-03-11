@@ -1,5 +1,5 @@
 /* learning-kit/templates/presentation/components.css */
-@import url('../../design/base.css');
+@import url('./design/base.css');
 
 /* ── Reset body pour le layout slides ───────────────────────────── */
 /* base.css (importé ci-dessus) applique background:transparent et padding:60px 80px

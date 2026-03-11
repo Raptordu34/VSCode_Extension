@@ -93,6 +93,37 @@
             z-index: 1;
         }
 
+        /* ── Slides two-col — éviter l'overflow vertical ── */
+        .slide-content > .two-col {
+            flex: 1;
+            min-height: 0;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            align-items: stretch;
+        }
+        .two-col .figure-box {
+            margin-top: 0;
+            height: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .two-col .figure-box img {
+            max-height: 210px;
+            width: 100%;
+            object-fit: contain;
+        }
+        .two-col .steps { margin-top: 0.5rem; margin-bottom: 0; }
+        .two-col .steps li { padding: 0.45rem 0.9rem; margin-bottom: 0.35rem; font-size: 0.9rem; }
+        .two-col .highlight-box { margin-top: 0.6rem; }
+        .two-col .callout-warning,
+        .two-col .callout-info,
+        .two-col .callout-danger {
+            margin-top: 0.6rem;
+            padding-top: 0.65rem;
+            padding-bottom: 0.65rem;
+        }
+
         /* ══════════════════════════════════════════════════════════════
            UI — en dehors du canvas, fixés au viewport
         ══════════════════════════════════════════════════════════════ */
@@ -208,7 +239,6 @@
             opacity: 1 !important;
             transform: none !important;
             filter: none !important;
-            pointer-events: auto !important;
         }
 
         /* ── Fragments / reveal progressif ── */
@@ -518,12 +548,30 @@
         }
         .help-close:hover { background: rgba(255,255,255,0.1); color: var(--text-primary, #f5f3f0); }
 
+        /* ── Isolation des colonnes two-col (empêche les li.fragment de voler les clics) ── */
+        .two-col > * {
+            min-width: 0;
+        }
+        .two-col > :first-child {
+            position: relative;
+            z-index: 1;
+            isolation: isolate;
+            overflow: hidden;
+            overflow-wrap: anywhere;
+        }
+        .two-col > .figure-box {
+            position: relative;
+            z-index: 3;
+        }
+
         /* ── Figure-box cliquable ── */
-        .figure-box[onclick] {
+        .figure-box-clickable {
+            position: relative;
+            z-index: 2;
             cursor: zoom-in;
             transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
         }
-        .figure-box[onclick]:hover {
+        .figure-box-clickable:hover {
             transform: scale(1.015);
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.12),
                         0 12px 32px rgba(0,0,0,0.4),
@@ -618,6 +666,49 @@
             border-color: rgba(214,117,86,0.4);
             color: #fff;
         }
+
+        /* ── Debug hitbox ── */
+        .hitbox-debug-panel {
+            position: fixed;
+            left: 1rem;
+            bottom: 1rem;
+            z-index: 260;
+            width: min(420px, calc(100vw - 2rem));
+            padding: 0.85rem 0.95rem;
+            border-radius: 14px;
+            background: rgba(19,19,18,0.92);
+            border: 1px solid rgba(255,255,255,0.12);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+            backdrop-filter: blur(12px);
+            display: none;
+            font-size: 0.73rem;
+            line-height: 1.45;
+            color: rgba(255,255,255,0.8);
+        }
+        body.hitbox-debug .hitbox-debug-panel { display: block; }
+        .hitbox-debug-panel strong {
+            display: inline-block;
+            min-width: 112px;
+            color: rgba(255,255,255,0.52);
+            font-weight: 600;
+        }
+        .hitbox-debug-panel code {
+            font-family: 'Courier New', monospace;
+            color: #f5f3f0;
+            word-break: break-word;
+        }
+        body.hitbox-debug .slide.active .figure-box {
+            outline: 2px solid rgba(96,165,250,0.9);
+            outline-offset: 3px;
+        }
+        body.hitbox-debug .slide.active .fragment {
+            outline: 1px dashed rgba(248,113,113,0.55);
+            outline-offset: 1px;
+        }
+        body.hitbox-debug .hitbox-debug-target {
+            outline: 3px solid rgba(251,191,36,0.95) !important;
+            outline-offset: 2px !important;
+        }
     </style>
 </head>
 <body>
@@ -637,6 +728,7 @@
         <button class="ctrl-btn" id="contrast-btn" onclick="toggleContrastMode()" title="Mode contraste (C)">C</button>
         <button class="ctrl-btn" id="overview-btn" onclick="toggleOverview()" title="Vue d'ensemble (O)">O</button>
         <button class="ctrl-btn" id="diagnostics-btn" onclick="toggleDiagnostics()" title="Diagnostic auteur (D)">D</button>
+        <button class="ctrl-btn" id="hitbox-btn" onclick="toggleHitboxDebug()" title="Debug hitbox (H)">H</button>
         <button class="ctrl-btn" id="fullscreen-btn" onclick="toggleFullscreen()" title="Plein écran (F)">⛶</button>
         <button class="ctrl-btn" onclick="toggleHelp()" title="Aide (?)">?</button>
     </div>
@@ -670,11 +762,21 @@
                 <tr><td>C</td><td>Mode contraste / lecture</td></tr>
                 <tr><td>O</td><td>Vue d'ensemble du deck</td></tr>
                 <tr><td>D</td><td>Diagnostic overflow / densité</td></tr>
+                <tr><td>H</td><td>Debug hitbox / cible de clic</td></tr>
                 <tr><td>?</td><td>Afficher / masquer cette aide</td></tr>
                 <tr><td>Échap</td><td>Fermer les panneaux</td></tr>
             </table>
             <button class="help-close" onclick="closeHelp()">Fermer</button>
         </div>
+    </div>
+
+    <div class="hitbox-debug-panel" id="hitbox-debug-panel">
+        <div><strong>Mode</strong><code id="hitbox-debug-mode">inactif</code></div>
+        <div><strong>Coordonnées</strong><code id="hitbox-debug-coords">—</code></div>
+        <div><strong>Sous pointeur</strong><code id="hitbox-debug-top">—</code></div>
+        <div><strong>Dans figure</strong><code id="hitbox-debug-figure">—</code></div>
+        <div><strong>Dernier clic</strong><code id="hitbox-debug-click">—</code></div>
+        <div><strong>Stack</strong><code id="hitbox-debug-stack">—</code></div>
     </div>
 
     <!-- Lightbox image -->
@@ -690,9 +792,6 @@
         // ════════════════════════════════════════════════════════════════
         const SLIDES = [
             'slide-EXAMPLE.html',
-            // 'slide-titre.html',
-            // 'slide-agenda.html',
-            // 'slide-concepts.html',
         ];
         // ════════════════════════════════════════════════════════════════
         const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -739,8 +838,116 @@
         let contrastEnabled = localStorage.getItem('pres_contrast') === '1';
         let overviewVisible = false;
         let diagnosticsVisible = false;
+        let hitboxDebugEnabled = false;
+        let hitboxDebugTarget = null;
         let autoAnimateTimer = null;
         function getSlides() { return document.querySelectorAll('#slides-container .slide'); }
+
+        function describeElement(element) {
+            if (!element) return '—';
+            const tag = element.tagName ? element.tagName.toLowerCase() : 'node';
+            const id = element.id ? `#${element.id}` : '';
+            const className = typeof element.className === 'string'
+                ? element.className.trim().split(/\s+/).filter(Boolean).slice(0, 4).map(name => `.${name}`).join('')
+                : '';
+            return `${tag}${id}${className}`;
+        }
+
+        function setHitboxDebugTarget(element) {
+            if (hitboxDebugTarget === element) return;
+            if (hitboxDebugTarget) hitboxDebugTarget.classList.remove('hitbox-debug-target');
+            hitboxDebugTarget = element || null;
+            if (hitboxDebugTarget) hitboxDebugTarget.classList.add('hitbox-debug-target');
+        }
+
+        function setHitboxDebugValue(id, value) {
+            const node = document.getElementById(id);
+            if (node) node.textContent = value;
+        }
+
+        function buildHitboxDebugReport(clientX, clientY, clickTarget = null) {
+            const activeSlide = getSlides()[currentSlide];
+            const activeFigure = activeSlide?.querySelector('.figure-box');
+            const topElement = document.elementFromPoint(clientX, clientY);
+            const stackElements = document.elementsFromPoint(clientX, clientY).slice(0, 8);
+            const stack = stackElements.map(describeElement).join(' <- ');
+            const inFigure = activeFigure
+                ? (() => {
+                    const rect = activeFigure.getBoundingClientRect();
+                    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+                })()
+                : false;
+
+            return {
+                activeSlide,
+                activeFigure,
+                topElement,
+                stack,
+                inFigure,
+                clickTarget,
+                text: [
+                    'DEBUG_HITBOX',
+                    `slide=${currentSlide + 1}`,
+                    `mode=${progressiveEnabled ? 'progressif' : 'non_progressif'}`,
+                    `coords=${Math.round(clientX)},${Math.round(clientY)}`,
+                    `top=${describeElement(topElement)}`,
+                    `click=${describeElement(clickTarget)}`,
+                    `figure=${activeFigure ? describeElement(activeFigure) : 'aucune'}`,
+                    `inside_figure=${inFigure ? 'oui' : 'non'}`,
+                    `stack=${stack || '—'}`,
+                ].join('\n')
+            };
+        }
+
+        function updateHitboxDebug(clientX, clientY, clickTarget = null) {
+            if (!hitboxDebugEnabled) return;
+            const report = buildHitboxDebugReport(clientX, clientY, clickTarget);
+
+            setHitboxDebugTarget(report.topElement);
+            setHitboxDebugValue('hitbox-debug-mode', progressiveEnabled ? 'progressif' : 'non progressif');
+            setHitboxDebugValue('hitbox-debug-coords', `${Math.round(clientX)}, ${Math.round(clientY)}`);
+            setHitboxDebugValue('hitbox-debug-top', describeElement(report.topElement));
+            setHitboxDebugValue('hitbox-debug-figure', report.activeFigure ? `${report.inFigure ? 'oui' : 'non'} · ${describeElement(report.activeFigure)}` : 'aucune figure active');
+            setHitboxDebugValue('hitbox-debug-stack', report.stack || '—');
+            if (clickTarget) setHitboxDebugValue('hitbox-debug-click', describeElement(clickTarget));
+        }
+
+        function copyHitboxDebugReport(clientX, clientY, clickTarget) {
+            if (!hitboxDebugEnabled) return;
+            const report = buildHitboxDebugReport(clientX, clientY, clickTarget);
+            navigator.clipboard.writeText(report.text)
+                .then(() => setHitboxDebugValue('hitbox-debug-click', `${describeElement(clickTarget)} · copie OK`))
+                .catch(() => setHitboxDebugValue('hitbox-debug-click', `${describeElement(clickTarget)} · copie KO`));
+        }
+
+        function toggleHitboxDebug(force) {
+            hitboxDebugEnabled = typeof force === 'boolean' ? force : !hitboxDebugEnabled;
+            document.body.classList.toggle('hitbox-debug', hitboxDebugEnabled);
+            document.getElementById('hitbox-btn').classList.toggle('active', hitboxDebugEnabled);
+            document.getElementById('hitbox-btn').title = hitboxDebugEnabled
+                ? 'Debug hitbox actif (H)'
+                : 'Debug hitbox (H)';
+            if (!hitboxDebugEnabled) {
+                setHitboxDebugTarget(null);
+                setHitboxDebugValue('hitbox-debug-mode', 'inactif');
+                setHitboxDebugValue('hitbox-debug-coords', '—');
+                setHitboxDebugValue('hitbox-debug-top', '—');
+                setHitboxDebugValue('hitbox-debug-figure', '—');
+                setHitboxDebugValue('hitbox-debug-click', '—');
+                setHitboxDebugValue('hitbox-debug-stack', '—');
+            }
+        }
+
+        // ── Lightbox — capture listener sur la figure-box (phase capture = avant tout enfant) ──
+        function setupFigureLightbox(container) {
+            container.querySelectorAll('.figure-box[onclick]').forEach(fig => {
+                fig.classList.add('figure-box-clickable');
+                fig.removeAttribute('onclick');
+                // useCapture:true intercepte le clic avant n'importe quel enfant,
+                // indépendamment de pointer-events ou z-index des enfants.
+                fig.addEventListener('click', () => openLightbox(fig), true);
+            });
+        }
 
         // ── Chargement des slides via fetch ───────────────────────────
         async function loadSlides() {
@@ -755,6 +962,7 @@
                 }
             }
             enhanceCodeBlocks(container);
+            setupFigureLightbox(container);
             prepareSlides();
             scaleSlides();
             applyProgressiveMode(progressiveEnabled);
@@ -1155,6 +1363,15 @@
             updateDiagnosticsUI();
         }
 
+        document.addEventListener('mousemove', e => {
+            updateHitboxDebug(e.clientX, e.clientY);
+        }, true);
+
+        document.addEventListener('click', e => {
+            updateHitboxDebug(e.clientX, e.clientY, e.target);
+            copyHitboxDebugReport(e.clientX, e.clientY, e.target);
+        }, true);
+
         // ── Clavier ───────────────────────────────────────────────────
         document.addEventListener('keydown', e => {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -1166,6 +1383,7 @@
             if (e.key === 'c' || e.key === 'C') toggleContrastMode();
             if (e.key === 'o' || e.key === 'O') toggleOverview();
             if (e.key === 'd' || e.key === 'D') toggleDiagnostics();
+            if (e.key === 'h' || e.key === 'H') toggleHitboxDebug();
             if (e.key === '?') toggleHelp();
             if (e.key === 'Escape') { closeHelp(); toggleOverview(false); closeLightbox(); }
         });
