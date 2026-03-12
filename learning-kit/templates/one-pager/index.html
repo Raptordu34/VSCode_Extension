@@ -39,8 +39,45 @@
         }
         @media print {
             .blob, .cursor-halo, .reading-progress, .print-btn { display: none !important; }
-            body { background: white !important; }
+            body {
+                background-color: var(--bg-color) !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            * {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
             .page-container { max-width: 100%; padding: 1rem; }
+
+            /* Éviter les coupures de page à l'intérieur des blocs */
+            .section-block,
+            .key-point,
+            .tip-box,
+            .highlight-box,
+            .callout-info,
+            .callout-warning,
+            .callout-danger,
+            .metrics-grid,
+            .metric-card,
+            .compare-grid,
+            .compare-item,
+            .two-col,
+            .three-col,
+            .table-glass,
+            .figure-box,
+            .key-value,
+            .steps li,
+            pre {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            /* Éviter qu'un titre se retrouve seul en bas de page */
+            h2, h3, h4 {
+                break-after: avoid;
+                page-break-after: avoid;
+            }
         }
     </style>
 </head>
