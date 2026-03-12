@@ -33,7 +33,7 @@ body {
 
 /* ── SLIDE TYPOGRAPHY ────────────────────────────────────────────── */
 .slide-title {
-    font-size: clamp(2.2rem, 5vw, 3.5rem);
+    font-size: clamp(3rem, 7vw, 5rem);
     font-weight: 800;
     line-height: 1.15;
     background: linear-gradient(135deg, var(--text-primary) 30%, var(--text-muted));
@@ -151,6 +151,8 @@ ul.agenda-list li {
     font-size: 1.05rem;
     margin-bottom: 0;
     transition: background 0.2s;
+    word-break: normal;
+    overflow-wrap: break-word;
 }
 ul.agenda-list li::before {
     content: counter(agenda-counter, decimal-leading-zero);
@@ -195,6 +197,8 @@ ul.key-points li {
     border-radius: 10px;
     font-size: 1.05rem;
     margin-bottom: 0;
+    word-break: normal;
+    overflow-wrap: break-word;
 }
 ul.key-points li::before {
     content: '✓';
@@ -307,6 +311,8 @@ ul.key-points li::before {
         0 2px 8px rgba(214,117,86,0.08);
 }
 .table-glass table { margin: 0; }
+.table-glass th,
+.table-glass td { text-align: center; }
 
 /* ── BLOC DE CODE ─────────────────────────────────────────────────── */
 .code-wrapper { position: relative; margin-top: 1rem; }

@@ -185,8 +185,9 @@ et un `data-auto-animate-key` sur les éléments qui doivent être reliés visue
 ## Règles pour les présentations
 
 ### Contenu par slide
-- **Maximum 5–6 bullet points** ou **2–3 paragraphes courts** par slide
-- Préférer les listes `.key-points` aux paragraphes denses
+- **Maximum 5–6 bullet points** ou **2–3 paragraphes courts** par slide. Il est **strictement interdit** de surcharger les listes à puces.
+- Assure-toi que les textes dans les puces soient concis et percutants. Formule des phrases claires pour éviter que le texte ne soit trop long.
+- Évite absolument les retours à la ligne intempestifs au milieu des mots (pas de textes trop longs qui casseraient la mise en page).
 - Un concept clé = une slide
 - Si tu utilises des fragments, limiter à **3–5 étapes** par slide
 - Le diagnostic auteur du template signale automatiquement les slides trop denses ou en overflow

@@ -72,8 +72,14 @@
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             overflow: hidden;
+        }
+
+        /* Centrer verticalement pour les slides de titre et de transition */
+        .slide-content:has(.slide-title),
+        .slide-content:has(.slide-divider) {
+            justify-content: center;
         }
 
         .slide-content::before {
@@ -285,6 +291,29 @@
         body.high-contrast .overview-shell,
         body.high-contrast .help-card {
             border-color: rgba(255,255,255,0.18);
+        }
+
+        /* ── Mode Basse Performance ── */
+        body.low-perf .blob { display: none !important; }
+        body.low-perf .cursor-halo { display: none !important; }
+        body.low-perf .slide-content::before {
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            background: rgba(28, 28, 26, 0.98) !important;
+        }
+        body.low-perf .slide-content {
+            box-shadow: none !important;
+            border-color: rgba(255,255,255,0.1) !important;
+        }
+        body.low-perf .fragment:not(.fragment-visible) {
+            filter: none !important;
+        }
+        body.low-perf .fragment {
+            transition: opacity 0.2s ease, transform 0.2s ease !important;
+        }
+        body.low-perf .slide-divider .section-number {
+            filter: none !important;
+            text-shadow: none !important;
         }
 
         /* ── Overview mode ── */
@@ -635,6 +664,7 @@
     <div class="top-controls">
         <button class="ctrl-btn" id="progressive-btn" onclick="toggleProgressiveMode()" title="Affichage progressif (P)">P</button>
         <button class="ctrl-btn" id="contrast-btn" onclick="toggleContrastMode()" title="Mode contraste (C)">C</button>
+        <button class="ctrl-btn" id="perf-btn" onclick="togglePerfMode()" title="Mode performance (L)">L</button>
         <button class="ctrl-btn" id="overview-btn" onclick="toggleOverview()" title="Vue d'ensemble (O)">O</button>
         <button class="ctrl-btn" id="diagnostics-btn" onclick="toggleDiagnostics()" title="Diagnostic auteur (D)">D</button>
         <button class="ctrl-btn" id="fullscreen-btn" onclick="toggleFullscreen()" title="Plein écran (F)">⛶</button>
@@ -668,6 +698,7 @@
                 <tr><td>P</td><td>Activer / désactiver l'affichage progressif</td></tr>
                 <tr><td>F</td><td>Plein écran / quitter</td></tr>
                 <tr><td>C</td><td>Mode contraste / lecture</td></tr>
+                <tr><td>L</td><td>Mode basse perf. (désactive effets lourds)</td></tr>
                 <tr><td>O</td><td>Vue d'ensemble du deck</td></tr>
                 <tr><td>D</td><td>Diagnostic overflow / densité</td></tr>
                 <tr><td>?</td><td>Afficher / masquer cette aide</td></tr>
@@ -700,9 +731,16 @@
 
         // ── Halo curseur ──────────────────────────────────────────────
         const halo = document.getElementById('cursor-halo');
+        let haloRaf = null;
         document.addEventListener('mousemove', e => {
-            halo.style.left = e.clientX + 'px';
-            halo.style.top  = e.clientY + 'px';
+            if (lowPerfEnabled) return;
+            if (!haloRaf) {
+                haloRaf = requestAnimationFrame(() => {
+                    halo.style.left = e.clientX + 'px';
+                    halo.style.top  = e.clientY + 'px';
+                    haloRaf = null;
+                });
+            }
         });
 
         // ── Scaling 1280×720 → viewport ──────────────────────────────
@@ -737,6 +775,7 @@
             ? true
             : localStorage.getItem('pres_progressive') === '1';
         let contrastEnabled = localStorage.getItem('pres_contrast') === '1';
+        let lowPerfEnabled = localStorage.getItem('pres_lowperf') === '1';
         let overviewVisible = false;
         let diagnosticsVisible = false;
         let autoAnimateTimer = null;
@@ -759,6 +798,7 @@
             scaleSlides();
             applyProgressiveMode(progressiveEnabled);
             applyContrastMode(contrastEnabled);
+            applyPerfMode(lowPerfEnabled);
             evaluateDeckHealth();
             buildDots();
             buildOverview();
@@ -914,7 +954,7 @@
         }
 
         function maybeAutoAnimate(fromSlide, toSlide) {
-            if (REDUCED_MOTION) return false;
+            if (REDUCED_MOTION || lowPerfEnabled) return false;
             const fromGroup = getAutoAnimateGroup(fromSlide);
             const toGroup = getAutoAnimateGroup(toSlide);
             if (!fromGroup || fromGroup !== toGroup) return false;
@@ -1086,6 +1126,21 @@
             applyContrastMode(!contrastEnabled);
         }
 
+        function applyPerfMode(enabled) {
+            lowPerfEnabled = enabled;
+            document.body.classList.toggle('low-perf', enabled);
+            const btn = document.getElementById('perf-btn');
+            if (btn) {
+                btn.classList.toggle('active', enabled);
+                btn.title = enabled ? 'Mode performance activé (L)' : 'Mode performance désactivé (L)';
+            }
+            localStorage.setItem('pres_lowperf', enabled ? '1' : '0');
+        }
+
+        function togglePerfMode() {
+            applyPerfMode(!lowPerfEnabled);
+        }
+
         function evaluateSlideHealth(slide) {
             const content = slide.querySelector('.slide-content');
             if (!content) return 0;
@@ -1164,6 +1219,7 @@
             if (e.key === 'p' || e.key === 'P') toggleProgressiveMode();
             if (e.key === 'f' || e.key === 'F') toggleFullscreen();
             if (e.key === 'c' || e.key === 'C') toggleContrastMode();
+            if (e.key === 'l' || e.key === 'L') togglePerfMode();
             if (e.key === 'o' || e.key === 'O') toggleOverview();
             if (e.key === 'd' || e.key === 'D') toggleDiagnostics();
             if (e.key === '?') toggleHelp();

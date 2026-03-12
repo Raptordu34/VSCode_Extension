@@ -47,12 +47,20 @@ h3 {
     color: var(--text-primary);
     font-size: 1.6rem;
     margin-top: 2.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid rgba(255,255,255,0.08);
     font-weight: 700;
     display: flex;
     align-items: center;
     gap: 12px;
+}
+
+hr.section-divider {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.08); /* SÃ©paration blanche discrÃ¨te */
+    margin: 2.5rem 0 1.5rem 0; /* Respecte l'ancien espacement (margin + padding du H3) */
+}
+
+hr.section-divider + h3 {
+    margin-top: 0; /* Evite que le margin-top du H3 s'ajoute Ã  celui du hr */
 }
 h3::before {
     content: '';
@@ -76,7 +84,7 @@ h4 {
     letter-spacing: 0.01em;
 }
 
-p, li { font-size: 1.15rem; color: var(--text-body); }
+p, li { font-size: 1.15rem; color: var(--text-body); word-break: normal; overflow-wrap: break-word; }
 ul { margin-top: 12px; }
 li { margin-bottom: 10px; }
 strong { color: var(--text-primary); font-weight: 600; }
@@ -92,10 +100,10 @@ code {
 
 table { border-collapse: collapse; width: 100%; }
 thead tr { background: rgba(28,25,23,0.85) !important; }
-thead th { color: #fff7ed !important; font-weight: 600; }
+thead th { color: #fff7ed !important; font-weight: 600; text-align: center; }
 tbody tr { background: rgba(255,255,255,0.04) !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
 tbody tr:nth-child(even) { background: rgba(214,117,86,0.06) !important; }
-td { color: var(--text-muted) !important; }
+td { color: var(--text-muted) !important; text-align: center; }
 
 /* Surcharges couleurs inline générées par LLM */
 [style*="color: #374151"],[style*="color: #475569"],[style*="color: #0f172a"],[style*="color: #1e293b"] { color: var(--text-body) !important; }

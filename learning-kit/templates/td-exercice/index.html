@@ -49,6 +49,15 @@
             border-color: rgba(248,113,113,0.3);
             color: #fca5a5;
         }
+        .toolbar-btn-secondary.done {
+            background: rgba(110,231,183,0.12);
+            border-color: rgba(110,231,183,0.3);
+            color: #6ee7b7;
+        }
+        .toolbar-btn-secondary.done:hover {
+            background: rgba(110,231,183,0.18);
+            border-color: rgba(110,231,183,0.4);
+        }
 
         /* Chronomètre */
         .timer-display {
@@ -142,6 +151,11 @@
                         ✕ Effacer
                     </button>
 
+                    <!-- Valider l'exercice -->
+                    <button class="toolbar-btn-secondary" id="validate-btn" onclick="validateCurrentSection()" title="Marquer cet exercice comme terminé">
+                        ✓ Valider
+                    </button>
+
                     <!-- Export des notes -->
                     <button class="toolbar-btn-secondary" onclick="exportAnswers()" title="Télécharger mes réponses en texte brut">
                         ↓ Export
@@ -201,6 +215,9 @@
             // Réinitialiser le toggle quand on change d'exercice
             solutionsRevealed = false;
             updateToggleBtn();
+            
+            // Mettre à jour le bouton de validation
+            updateValidateBtn(localStorage.getItem('td_done_' + url));
 
             setTimeout(() => {
                 frame.src = url;
@@ -292,9 +309,6 @@
 
         // ── Messages entrants depuis l'iframe ────────────────────────────
         window.addEventListener('message', (e) => {
-            if (e.data?.type === 'solution-revealed') {
-                markDone(localStorage.getItem('td_currentSection') || '');
-            }
             if (e.data?.type === 'answer-saved') {
                 showSaveBadge();
             }
@@ -303,6 +317,24 @@
             }
         });
 
+        // ── Validation manuelle ────────────────────────────
+        function validateCurrentSection() {
+            const sectionUrl = localStorage.getItem('td_currentSection') || '';
+            const isDone = localStorage.getItem('td_done_' + sectionUrl);
+            
+            if (isDone) {
+                // S'il est déjà validé, on donne la possibilité de l'invalider
+                localStorage.removeItem('td_done_' + sectionUrl);
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    const url = btn.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+                    if (url === sectionUrl) btn.classList.remove('nav-done');
+                });
+                updateValidateBtn(false);
+            } else {
+                markDone(sectionUrl);
+            }
+        }
+
         function markDone(sectionUrl) {
             if (!sectionUrl) return;
             localStorage.setItem('td_done_' + sectionUrl, '1');
@@ -310,6 +342,20 @@
                 const url = btn.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
                 if (url === sectionUrl) btn.classList.add('nav-done');
             });
+            updateValidateBtn(true);
+        }
+
+        function updateValidateBtn(isDone) {
+            const btn = document.getElementById('validate-btn');
+            if (btn) {
+                if (isDone) {
+                    btn.classList.add('done');
+                    btn.innerHTML = '✓ Validé';
+                } else {
+                    btn.classList.remove('done');
+                    btn.innerHTML = '✓ Valider';
+                }
+            }
         }
 
         function downloadAnswers(text) {

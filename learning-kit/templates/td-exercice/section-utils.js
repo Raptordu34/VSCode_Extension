@@ -17,14 +17,6 @@
 
             const label = btn.querySelector('.btn-label');
             if (label) label.textContent = isVisible ? 'Voir la solution' : 'Masquer la solution';
-
-            // Notifier index.html (progress tracking)
-            if (!isVisible) {
-                window.parent.postMessage(
-                    { type: 'solution-revealed', href: window.location.href },
-                    '*'
-                );
-            }
         });
     });
 

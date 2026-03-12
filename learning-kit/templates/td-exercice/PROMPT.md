@@ -52,9 +52,7 @@ Un fichier `section-<slug>.html` par exercice (ex: `section-ex1-sql.html`).
 
     <!-- 2. Contexte (optionnel) -->
     <div class="context-block">
-        <h3 style="margin-top:0;">Contexte</h3>
-        <p>Données, schéma, énoncé du problème…</p>
-    </div>
+        <h3>Contexte</h3>
 
     <!-- 2 bis. Rappel de cours (optionnel) -->
     <button class="hint-btn" data-hint="rappel-jointure" data-label="Rappel de cours" data-close-label="Masquer le rappel" aria-expanded="false">
